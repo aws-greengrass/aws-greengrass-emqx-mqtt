@@ -1,0 +1,11 @@
+--- emqx_ctl.cmd	2022-02-21 13:20:25.000000000 -0500
++++ emqx_ctl.cmd	2022-02-21 13:20:36.000000000 -0500
+@@ -36,7 +36,7 @@
+ )
+ 
+ :: Write the erl.ini file to set up paths relative to this script
+-@call :write_ini
++:: @call :write_ini
+ 
+ :: If a start.boot file is not present, copy one from the named .boot file
+ @if not exist "%rel_dir%\start.boot" (

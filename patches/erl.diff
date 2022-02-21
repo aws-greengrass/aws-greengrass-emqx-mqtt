@@ -1,0 +1,9 @@
+--- erl.ini	2022-02-21 13:21:55.000000000 -0500
++++ erl.ini	2022-02-21 13:22:10.000000000 -0500
+@@ -1,4 +1,4 @@
+ [erlang]
+-Bindir=C:\\Program Files\\erl-23.0\\erts-11.0\\bin
++Bindir=.\\erts-11.0\\bin
+ Progname=erl
+-Rootdir=C:\\Program Files\\erl-23.0
++Rootdir=.\\
