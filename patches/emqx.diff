@@ -1,6 +1,27 @@
---- emqx.cmd	2022-02-21 13:07:23.000000000 -0500
-+++ emqx.cmd	2022-02-21 13:11:23.000000000 -0500
-@@ -67,7 +67,7 @@
+--- emqx.cmd	2022-02-21 16:30:22.000000000 -0500
++++ emqx.cmd	2022-02-21 16:43:52.000000000 -0500
+@@ -30,12 +30,19 @@
+ @for %%A in ("%script_dir%\..") do @(
+   set rel_root_dir=%%~fA
+ )
++@if exist %rel_root_dir% (
++  cd /d %rel_root_dir%
++)
+ @set rel_dir=%rel_root_dir%\releases\%rel_vsn%
+ @set RUNNER_ROOT_DIR=%rel_root_dir%
+ 
+ @set etc_dir=%rel_root_dir%\etc
+ @set lib_dir=%rel_root_dir%\lib
+-@set data_dir=%rel_root_dir%\data
++@if defined EMQX_NODE__DATA_DIR (
++  set data_dir=%EMQX_NODE__DATA_DIR%
++) else (
++  @set data_dir=%rel_root_dir%\data
++)
+ @set emqx_conf=%etc_dir%\emqx.conf
+ 
+ @call :find_erts_dir
+@@ -67,7 +74,7 @@
  )
  
  :: Write the erl.ini file to set up paths relative to this script
@@ -9,7 +30,31 @@
  
  :: If a start.boot file is not present, copy one from the named .boot file
  @if not exist "%rel_dir%\start.boot" (
-@@ -255,7 +255,7 @@
+@@ -207,9 +214,9 @@
+ @call :generate_app_config
+ @set args=-detached %sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
+ @echo off
+-cd /d %rel_root_dir%
+ @echo on
+-@start "%rel_name%" %werl% -boot "%boot_script%" %args%
++@title "%rel_name%"
++@%werl% -boot "%boot_script%" %args% || exit /b %ERRORLEVEL%
+ @goto :eof
+ 
+ :: Stop the Windows service
+@@ -237,9 +244,9 @@
+ @call :generate_app_config
+ @set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
+ @echo off
+-cd /d %rel_root_dir%
+ @echo on
+-@start "bin\%rel_name% console" %werl% -boot "%boot_script%" %args%
++@title "%rel_root_dir%\bin\%rel_name% console"
++@%werl% -boot "%boot_script%" %args% || exit /b %ERRORLEVEL%
+ @echo emqx is started!
+ @goto :eof
+ 
+@@ -255,7 +262,7 @@
  
  :: Attach to a running node
  :attach
@@ -18,3 +63,8 @@
  @start "%node_name% attach" %werl% -boot "%clean_boot_script%" ^
    -remsh %node_name% %node_type% console_%node_name% -setcookie %node_cookie%
  @goto :eof
+@@ -264,4 +271,3 @@
+ :set_trim
+ @set %1=%2
+ @goto :eof
+-

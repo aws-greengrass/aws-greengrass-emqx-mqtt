@@ -15,7 +15,7 @@ except ModuleNotFoundError or NameError:
     pip.main(['install', "patch"])
     import patch as pypatch
 
-EMQX_VERSION = "4.3.11"
+EMQX_VERSION = "4.3.12"
 
 EMQX_DOWNLOAD_BASE = f"https://www.emqx.com/en/downloads/broker/{EMQX_VERSION}/emqx-PLATFORM-{EMQX_VERSION}CPU.zip"
 OUTPUT_DIR = "target"
