@@ -1,4 +1,0 @@
-[submodule "emqx"]
-	path = emqx
-	url = https://github.com/emqx/emqx.git
-	branch = main-v4.4
