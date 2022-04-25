@@ -61,7 +61,7 @@ COPY emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
 COPY --from=builder /emqx-rel/emqx /opt/emqx
 
 RUN ln -s /opt/emqx/bin/* /usr/local/bin/
-RUN apk add --no-cache curl ncurses-libs openssl sudo libstdc++ bash
+RUN apk add --no-cache curl ncurses-libs openssl libstdc++ bash
 
 WORKDIR /opt/emqx
 
