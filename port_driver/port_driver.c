@@ -1,4 +1,7 @@
-/* port_driver.c */
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -8,11 +11,16 @@
 #include <cda_integration.h>
 
 // OPERATIONS
-#define ON_CLIENT_AUTHENTICATE 1
+#define ON_CLIENT_CONNECT      0
+#define ON_CLIENT_CONNECTED    1
+#define ON_CLIENT_DISCONNECT   2
+#define ON_CLIENT_AUTHENTICATE 3
+#define ON_CLIENT_CHECK_ACL    4
 
 // RETURN CODES
 #define RETURN_CODE_SUCCESS    0
 #define RETURN_CODE_UNKNOWN_OP 1
+#define RETURN_CODE_UNEXPECTED 2
 
 // TODO: Improve logging. Add timestamp to the logs
 #define LOG(str,args...) printf("%s:%d %s() "str"\n",__FILE__,__LINE__,__func__, ##args)
@@ -22,8 +30,9 @@ typedef struct {
     CDA_INTEGRATION_HANDLE* cda_integration_handle;
 } DriverContext;
 
-static ErlDrvData drv_start(ErlDrvPort port, char *buff)
+static ErlDrvData drv_start(ErlDrvPort port, char* buff)
 {
+    (void)buff;
     LOG("Starting the driver");
     ei_init();
     DriverContext* context = (DriverContext*)driver_alloc(sizeof(DriverContext));
@@ -45,38 +54,162 @@ static unsigned int get_operation(ErlIOVec *ev) {
     return bin->orig_bytes[0];
 }
 
-static void write_bool_to_port(DriverContext* context, bool result, char return_code) {
+static void write_bool_to_port(DriverContext* context, bool result, const char return_code) {
     ErlDrvBinary* out = driver_alloc_binary(sizeof(result));
+    if(!out) {
+        LOG("Out of memory");
+        goto cleanup;
+    }
     memcpy(&out->orig_bytes[0], &result, sizeof(result));
-    driver_output_binary(context->port, &return_code, 1, out, 0, sizeof(result));
+    char return_code_temp = return_code;
+    if(driver_output_binary(context->port, &return_code_temp, 1, out, 0, sizeof(result))) {
+        LOG("Out of memory");
+        goto cleanup;
+    }
+
+cleanup:
     driver_free_binary(out);
 }
 
-static void handle_on_client_authenticate(DriverContext* context, ErlIOVec *ev) {
-    ErlDrvBinary* bin = ev->binv[1];
-    char* buf = &bin->orig_bytes[1];
-
-    int index = 0;
+static int decode_version(char* buff, int* index) {
+    // read and discard
     int version = 0;
-    ei_decode_version(buf, &index, &version);
+    if(ei_decode_version(buff, index, &version)) {
+        return -1;
+    }
+    return version;
+}
+
+static int get_next_entry_size(char* buff, int* index) {
+    // decode and discard
+    if(decode_version(buff, index) == -1) {
+        return -1;
+    }
 
     int type;
     int entry_size;
-    int res = ei_get_type(buf, &index, &type, &entry_size);
+    if(ei_get_type(buff, index, &type, &entry_size)) {
+        return -1;
+    }
+    return entry_size;
+}
 
-    char *decoded_value = (char *)malloc(sizeof(char) * (entry_size + 1));
-    ei_decode_string(buf, &index, decoded_value);
-    bool result = on_client_authenticate(context->cda_integration_handle, decoded_value);
-    free(decoded_value);
+static char* get_buffer_for_next_entry(char* buff, int* index) {
+    int entry_size = get_next_entry_size(buff, index);
+    if(entry_size == -1) {
+        LOG("Failed to get the entry size of next entry");
+        return NULL;
+    }
 
+    char* b = (char *)malloc(sizeof(char) * (entry_size + 1));
+    if(!b) {
+        LOG("Out of memory");
+    }
+    return b;
+}
+
+static void delete_buffer(char* buff) {
+    free(buff);
+}
+
+static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
+        bool (*func)(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem)) {
+    char *client_id, *pem = NULL;
     char return_code = RETURN_CODE_SUCCESS;
+    bool result = false;
+
+    ErlDrvBinary* bin = ev->binv[1];
+    char* buff = &bin->orig_bytes[1];
+
+    int index = 0;
+    client_id = get_buffer_for_next_entry(buff, &index);
+    if(!client_id) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, client_id)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    pem = get_buffer_for_next_entry(buff, &index);
+    if(!pem) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, pem)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    result = (*func)(context->cda_integration_handle, client_id, pem);
+
+respond:
     write_bool_to_port(context, result, return_code);
+
+cleanup:
+    delete_buffer(client_id);
+    delete_buffer(pem);
+}
+
+static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
+    char *client_id, *pem, *topic, *pub_sub = NULL;
+    char return_code = RETURN_CODE_SUCCESS;
+    bool result = false;
+
+    ErlDrvBinary* bin = ev->binv[1];
+    char* buff = &bin->orig_bytes[1];
+
+    int index = 0;
+    client_id = get_buffer_for_next_entry(buff, &index);
+    if(!client_id) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, client_id)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    pem = get_buffer_for_next_entry(buff, &index);
+    if(!pem) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, pem)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    topic = get_buffer_for_next_entry(buff, &index);
+    if(!topic) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, topic)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    pub_sub = get_buffer_for_next_entry(buff, &index);
+    if(!pub_sub) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, pub_sub)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    result = on_check_acl(context->cda_integration_handle, client_id, pem, topic, pub_sub);
+
+respond:
+    write_bool_to_port(context, result, return_code);
+
+cleanup:
+    delete_buffer(client_id);
+    delete_buffer(pem);
+    delete_buffer(topic);
+    delete_buffer(pub_sub);
 }
 
 static void handle_unknown_op(DriverContext* context) {
     bool result = false;
-    char return_code = RETURN_CODE_UNKNOWN_OP;
-    write_bool_to_port(context, result, return_code);
+    write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
 }
 
 static void drv_output(ErlDrvData handle, ErlIOVec *ev)
@@ -84,8 +217,20 @@ static void drv_output(ErlDrvData handle, ErlIOVec *ev)
     DriverContext* context = (DriverContext*)handle;
     const unsigned int op = get_operation(ev);
     switch(op) {
+        case ON_CLIENT_CONNECT:
+            handle_client_id_and_pem(context, ev, &on_client_connect);
+            break;
+        case ON_CLIENT_CONNECTED:
+            handle_client_id_and_pem(context, ev, &on_client_connected);
+            break;
+        case ON_CLIENT_DISCONNECT:
+            handle_client_id_and_pem(context, ev, &on_client_disconnected);
+            break;
         case ON_CLIENT_AUTHENTICATE:
-            handle_on_client_authenticate(context, ev);
+            handle_client_id_and_pem(context, ev, &on_client_authenticate);
+            break;
+        case ON_CLIENT_CHECK_ACL:
+            handle_check_acl(context, ev);
             break;
         default:
             LOG("Unknown operation: %u", op);

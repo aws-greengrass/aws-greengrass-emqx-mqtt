@@ -6,13 +6,22 @@
 -module(port_driver_integration).
 
 -export([start/0, stop/0, init/1]).
--export([on_client_authenticate/1]).
+-export([ on_client_authenticate/2
+        , on_client_connect/2
+        , on_client_connected/2
+        , on_client_disconnected/2
+        , on_client_check_acl/4
+        ]).
 
 -include("emqx.hrl").
 -import(os,[getenv/1]).
 
 %% OPERATIONS
--define(ON_CLIENT_AUTHENTICATE, 1).
+-define(ON_CLIENT_CONNECT, 0).
+-define(ON_CLIENT_CONNECTED, 1).
+-define(ON_CLIENT_DISCONNECT, 2).
+-define(ON_CLIENT_AUTHENTICATE, 3).
+-define(ON_CLIENT_CHECK_ACL, 4).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -59,8 +68,20 @@ loop(Port) ->
 	    exit(port_terminated)
     end.
 
-on_client_authenticate(ClientId) ->
-    call_port({on_client_authenticate, ClientId}).
+on_client_connect(ClientId, CertPem) ->
+    call_port({on_client_connect, ClientId, CertPem}).
+
+on_client_connected(ClientId, CertPem) ->
+    call_port({on_client_connected, ClientId, CertPem}).
+
+on_client_disconnected(ClientId, CertPem) ->
+    call_port({on_client_disconnected, ClientId, CertPem}).
+
+on_client_authenticate(ClientId, CertPem) ->
+    call_port({on_client_authenticate, ClientId, CertPem}).
+
+on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
+    call_port({on_client_check_acl, ClientId, CertPem, Topic, PubSub}).
 
 call_port(Msg) ->
     process ! {call, self(), Msg},
@@ -76,11 +97,32 @@ call_port(Msg) ->
 	    end
     end.
 
-encode({on_client_authenticate, ClientId}) ->
-%% TODO: Improve this - redundant conversion?
-    ClientId_binary = term_to_binary(binary_to_list(ClientId)),
-    Enc = [<<?ON_CLIENT_AUTHENTICATE, ClientId_binary/binary>>],
-    logger:debug("Encoded ~p to: ~p~n",[ClientId, Enc]),
-    Enc.
+encode({on_client_connect, ClientId, CertPem}) ->
+    encode({ClientId, CertPem, ?ON_CLIENT_CONNECT});
+encode({on_client_connected, ClientId, CertPem}) ->
+    encode({ClientId, CertPem, ?ON_CLIENT_CONNECTED});
+encode({on_client_disconnected, ClientId, CertPem}) ->
+    encode({ClientId, CertPem, ?ON_CLIENT_DISCONNECT});
+encode({on_client_authenticate, ClientId, CertPem}) ->
+    encode({ClientId, CertPem, ?ON_CLIENT_AUTHENTICATE});
+encode({on_client_check_acl, ClientId, CertPem, Topic, PubSub}) ->
+    {ClientIdBinary, CertPemBinary} = convert_to_binary({ClientId, CertPem}),
+    TopicBinary = convert_to_binary({Topic}),
+    PubSubBinary = acl_action_to_binary(PubSub),
+    [<<?ON_CLIENT_CHECK_ACL, ClientIdBinary/binary, CertPemBinary/binary,
+        TopicBinary/binary, PubSubBinary/binary>>];
+encode({A, B, Operation}) ->
+    {ABinary, BBinary} = convert_to_binary({A, B}),
+    [<<Operation, ABinary/binary, BBinary/binary>>].
 
-decode(String) -> String.
+decode(Data) -> Data.
+
+convert_to_binary({A}) ->
+    %% TODO: Improve this - redundant conversion?
+    term_to_binary(binary_to_list(A));
+convert_to_binary({A, B}) ->
+    {convert_to_binary({A}), convert_to_binary({B})}.
+
+acl_action_to_binary(PubSub) ->
+    %% TODO: Improve this - redundant conversion?
+    term_to_binary(atom_to_list(PubSub)).

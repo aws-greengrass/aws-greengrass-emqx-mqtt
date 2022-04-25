@@ -1,10 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
-
-# Uncomment if you need erl directories for Mac
-#execute_process (
-#    COMMAND erl -noshell -eval 'io:format("~n~s/../usr/include~n", [[code:lib_dir()]]).' -s erlang halt | tail -n 1
-#    OUTPUT_VARIABLE ERL_INCLUDE
-#)
+cmake_minimum_required(VERSION 3.2)
 
 project(port_driver)
 

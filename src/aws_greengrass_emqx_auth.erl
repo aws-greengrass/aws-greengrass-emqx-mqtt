@@ -7,7 +7,14 @@
 
 -include("emqx.hrl").
 
--import(port_driver_integration,[on_client_authenticate/1]).
+-import(base64, [encode/1]).
+
+-import(port_driver_integration,[ on_client_authenticate/1
+        , on_client_connect/2
+        , on_client_connected/2
+        , on_client_disconnected/2
+        , on_client_check_acl/3
+        ]).
 
 -export([ load/1
         , unload/0
@@ -36,23 +43,48 @@ load(Env) ->
 %% Client Lifecycle Hooks Impl
 %%--------------------------------------------------------------------
 
-on_client_connect(ConnInfo = #{clientid := ClientId}, Props, _Env) ->
-    logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n",
-              [ClientId, ConnInfo, Props]),
+on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Props, _Env) ->
+    logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
+              [ClientId, ConnInfo, Props, _Env]),
+
+    PeerCertEncoded = encode_peer_cert(PeerCert),
+    put(cert_pem, PeerCertEncoded),
+
+    case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
+        {ok, <<1>>} -> ok;
+        Unexpected ->
+            logger:debug("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+    end,
     {ok, Props}.
 
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
-    logger:debug("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
-              [ClientId, ClientInfo, ConnInfo]).
+    logger:debug("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n, Env:~n~p~n",
+              [ClientId, ClientInfo, ConnInfo, _Env]),
+
+    PeerCertEncoded = get(cert_pem),
+    case port_driver_integration:on_client_connected(ClientId, PeerCertEncoded) of
+        {ok, <<1>>} -> ok;
+        Unexpected ->
+            logger:debug("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+    end.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
-    logger:debug("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n",
-              [ClientId, ReasonCode, ClientInfo, ConnInfo]).
+    logger:debug("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n, Env:~n~p~n",
+              [ClientId, ReasonCode, ClientInfo, ConnInfo, _Env]),
+
+    PeerCertEncoded = get(cert_pem),
+    case port_driver_integration:on_client_disconnected(ClientId, PeerCertEncoded) of
+        {ok, <<1>>} -> ok;
+        Unexpected ->
+            logger:debug("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected])
+    end.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
-    logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n",
-              [ClientId, ClientInfo, Result]),
-    case port_driver_integration:on_client_authenticate(ClientId) of
+    logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
+              [ClientId, ClientInfo, Result, _Env]),
+
+    PeerCertEncoded = get(cert_pem),
+    case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
         {ok, <<1>>} ->
             logger:debug("Client(~s) authenticated successfully", [ClientId]),
             {ok, Result#{auth_result => success}};
@@ -64,10 +96,33 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
             {stop, Result#{auth_result => not_authorized}}
     end.
 
-on_client_check_acl(ClientInfo = #{clientid := ClientId}, Topic, PubSub, Result, _Env) ->
-    logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n",
-              [ClientId, PubSub, Topic, ClientInfo, Result]),
-    {ok, Result}.
+on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
+    logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
+              [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
+
+    PeerCertEncoded = get(cert_pem),
+    case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
+        {ok, <<1>>} ->
+            logger:debug("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
+            {stop, allow};
+        {ok, Res} ->
+            logger:debug("Client(~s) not authorized to perform ~p on topic ~p. Res:~p", [ClientId, PubSub, Topic, Res]),
+            {stop, deny};
+        {error, Error} ->
+            logger:debug("Client(~s) not authorized to perform ~p on topic ~p. Error:~p",
+                [ClientId, PubSub, Topic, Error]),
+            {stop, deny}
+    end.
+
+encode_peer_cert(PeerCert) ->
+    case PeerCert of
+        nossl ->
+            <<"">>;
+        undefined ->
+            <<"">>;
+        _ ->
+            base64:encode(PeerCert)
+    end.
 
 %%--------------------------------------------------------------------
 %% Called when the plugin application stop
