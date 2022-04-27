@@ -14,12 +14,13 @@ if (UNIX)
         OUTPUT_VARIABLE ERL_INCLUDES
     )
     message("Erlang include directory found: ${ERL_INCLUDES}")
-endif (UNIX)
 
-execute_process(
-    COMMAND erl -noshell -eval "io:format(\"~s\", [code:lib_dir()])" -s erlang halt
-    OUTPUT_VARIABLE ERL_LIBS
-)
+    execute_process(
+        COMMAND erl -noshell -eval "io:format(\"~s../usr/lib\", [code:lib_dir()])" -s erlang halt
+        OUTPUT_VARIABLE ERL_LIBS
+    )
+    message("Erlang libs directory found: ${ERL_LIBS}")
+endif (UNIX)
 
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
 include_directories("${CDA_INTEGRATION_INCLUDES}" ${ERL_INCLUDES})
