@@ -22,9 +22,9 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
-      - uses: jwlawson/actions-setup-cmake@v1.12
-        with:
-          cmake-version: '3.2'
+
+      - name: Log cmake version
+        run: cmake --version
 
 #      - name: Check erlang include location
 #        run:  erl -noshell -eval 'io:format("~n~s/../usr/include~n", [[code:lib_dir()]]).' -s erlang halt | tail -n 1
