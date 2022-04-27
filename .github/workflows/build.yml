@@ -45,6 +45,7 @@ jobs:
           cp .github/emqx_plugins_patch $GITHUB_WORKSPACE/build_emqx/lib-extra/plugins
 
       - name: Build emqx with aws_greengrass_emqx_auth plugin
+        run: |
           cd $GITHUB_WORKSPACE/build_emqx
           EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
 
