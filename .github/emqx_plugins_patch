@@ -4,3 +4,7 @@
   ]
 }.
 
+{elixir_plugins,
+  [
+  ]
+}.
