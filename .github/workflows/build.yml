@@ -21,6 +21,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
+      - uses: wagoid/commitlint-github-action@v4
+        if: matrix.os == 'ubuntu-latest'
 
       - name: Log cmake version
         run: cmake --version
@@ -46,6 +48,6 @@ jobs:
       - name: Build emqx with aws_greengrass_emqx_auth plugin
         run: |
           cd $GITHUB_WORKSPACE/build_emqx
-          DIAGNOSTIC=1 EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
+          EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
 
 
