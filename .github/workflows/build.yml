@@ -26,13 +26,21 @@ jobs:
       - name: Log cmake version
         run: cmake --version
 
-#      - name: Check erlang include location
-#        run:  erl -noshell -eval 'io:format("~n~s/../usr/include~n", [[code:lib_dir()]]).' -s erlang halt | tail -n 1
-
       - name: Build the plugin's native code
         run: |
-          ls
           mkdir _build && cd _build
           cmake ../port_driver/
           cmake --build .
+
+      - uses: actions/checkout@v3
+          with:
+            repository: 'emqx/emqx'
+            ref: 'main-v4.3'
+            path: 'build_emqx'
+
+      - name: link the plugin code to _checkouts
+        run: |
+          ls .
+          ls $GITHUB_WORKSPACE
+          ls $GITHUB_WORKSPACE/emqx
 
