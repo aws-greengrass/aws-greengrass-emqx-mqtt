@@ -48,12 +48,14 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
               [ClientId, ConnInfo, Props, _Env]),
 
     PeerCertEncoded = encode_peer_cert(PeerCert),
+    %% Client cert is not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
+    %% Putting the value in the erlang process's dictionary
     put(cert_pem, PeerCertEncoded),
 
     case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
         {ok, <<1>>} -> ok;
         Unexpected ->
-            logger:debug("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
     end,
     {ok, Props}.
 
@@ -65,7 +67,7 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     case port_driver_integration:on_client_connected(ClientId, PeerCertEncoded) of
         {ok, <<1>>} -> ok;
         Unexpected ->
-            logger:debug("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
     end.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
@@ -76,7 +78,7 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
     case port_driver_integration:on_client_disconnected(ClientId, PeerCertEncoded) of
         {ok, <<1>>} -> ok;
         Unexpected ->
-            logger:debug("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected])
     end.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -86,13 +88,13 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
         {ok, <<1>>} ->
-            logger:debug("Client(~s) authenticated successfully", [ClientId]),
+            logger:info("Client(~s) authenticated successfully", [ClientId]),
             {ok, Result#{auth_result => success}};
         {ok, Res} ->
-            logger:debug("Client(~s) not authenticated. Res:~p", [ClientId, Res]),
+            logger:warn("Client(~s) not authenticated. Res:~p", [ClientId, Res]),
             {stop, Result#{auth_result => not_authorized}};
         {error, Error} ->
-            logger:debug("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
+            logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
             {stop, Result#{auth_result => not_authorized}}
     end.
 
@@ -103,13 +105,13 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
         {ok, <<1>>} ->
-            logger:debug("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
+            logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
             {stop, allow};
         {ok, Res} ->
-            logger:debug("Client(~s) not authorized to perform ~p on topic ~p. Res:~p", [ClientId, PubSub, Topic, Res]),
+            logger:warn("Client(~s) not authorized to perform ~p on topic ~p. Res:~p", [ClientId, PubSub, Topic, Res]),
             {stop, deny};
         {error, Error} ->
-            logger:debug("Client(~s) not authorized to perform ~p on topic ~p. Error:~p",
+            logger:error("Client(~s) not authorized to perform ~p on topic ~p. Error:~p",
                 [ClientId, PubSub, Topic, Error]),
             {stop, deny}
     end.
@@ -134,4 +136,3 @@ unload() ->
     emqx:unhook('client.disconnected', {?MODULE, on_client_disconnected}),
     emqx:unhook('client.authenticate', {?MODULE, on_client_authenticate}),
     emqx:unhook('client.check_acl',    {?MODULE, on_client_check_acl}).
-
