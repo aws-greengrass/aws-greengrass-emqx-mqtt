@@ -24,4 +24,3 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
     aws_greengrass_emqx_auth:unload(),
     port_driver_integration:stop().
-

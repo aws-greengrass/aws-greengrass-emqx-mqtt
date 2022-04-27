@@ -3,8 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef _CDA_INTEGRATION_H_
-#define _CDA_INTEGRATION_H_
+#pragma once
 
 #include <stdbool.h>
 
@@ -36,4 +35,3 @@ bool cda_integration_close(CDA_INTEGRATION_HANDLE* handle);
 }
 #endif
 
-#endif /* #ifndef _CDA_INTEGRATION_H_ */

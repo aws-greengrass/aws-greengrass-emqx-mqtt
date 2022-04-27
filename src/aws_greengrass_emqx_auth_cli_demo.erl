@@ -14,4 +14,3 @@ cmd(["arg1", "arg2"]) ->
 
 cmd(_) ->
     emqx_ctl:usage([{"cmd arg1 arg2", "cmd demo"}]).
-

@@ -1,3 +1,8 @@
+##--------------------------------------------------------------------
+##  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+##  SPDX-License-Identifier: Apache-2.0
+##--------------------------------------------------------------------
+
 ## shallow clone for speed
 
 REBAR_GIT_CLONE_OPTIONS += --depth 1
