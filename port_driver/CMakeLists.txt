@@ -16,7 +16,7 @@ if (UNIX)
     message("Erlang include directory found: ${ERL_INCLUDES}")
 
     execute_process(
-        COMMAND erl -noshell -eval "io:format(\"~s../usr/lib\", [code:lib_dir()])" -s erlang halt
+        COMMAND erl -noshell -eval "io:format(\"~s/../usr/lib\", [code:lib_dir()])" -s erlang halt
         OUTPUT_VARIABLE ERL_LIBS
     )
     message("Erlang libs directory found: ${ERL_LIBS}")
