@@ -15,9 +15,13 @@ jobs:
     strategy:
         matrix:
             os: [ubuntu-latest]
+            otp: ['24.0']
 
     steps:
       - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
 
       - name: Run a one-line script
         run: echo Hello, world!
