@@ -42,5 +42,5 @@ jobs:
         run: |
           ls .
           ls $GITHUB_WORKSPACE
-          ls $GITHUB_WORKSPACE/emqx
+          ls $GITHUB_WORKSPACE/build_emqx
 
