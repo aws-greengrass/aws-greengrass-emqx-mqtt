@@ -1,0 +1,14 @@
+{application, aws_greengrass_emqx_auth,
+ [{description, "EMQ X Plugin for Greengrass Client Device Auth"},
+  {vsn, "1.0.0"},
+  {modules, []},
+  {registered, [aws_greengrass_emqx_auth_sup]},
+  {applications, [kernel,stdlib]},
+  {mod, {aws_greengrass_emqx_auth_app,[]}},
+  {env, []},
+  {licenses, ["Apache-2.0"]},
+  {maintainers, ["AWS Greengrass Team"]},
+  {links, [
+           {"Github", "https://github.com/aws-greengrass/aws-greengrass-emqx-mqtt"}
+          ]}
+ ]}.
