@@ -7,8 +7,17 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
 
 add_subdirectory(cda_integration)
 
+# TODO: Make work on windows
+if (UNIX)
+    execute_process (
+        COMMAND erl -noshell -eval 'io:format("~n~s/../usr/include~n", [[code:lib_dir()]]).' -s erlang halt | tail -n 1
+        OUTPUT_VARIABLE ERL_INCLUDES
+    )
+    message("Erlang include directory found: ${ERL_INCLUDE}")
+endif (UNIX)
+
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
-include_directories("${CDA_INTEGRATION_INCLUDES}")
+include_directories("${CDA_INTEGRATION_INCLUDES}" ${ERL_INCLUDE})
 
 add_library(${PROJECT_NAME} SHARED port_driver.c)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
