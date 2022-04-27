@@ -1,0 +1,48 @@
+name: Plugin build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: '*'
+
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+            os: [ubuntu-latest]
+            otp: ['24.0']
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
+      - uses: wagoid/commitlint-github-action@v4
+        if: matrix.os == 'ubuntu-latest'
+
+      - name: Log cmake version
+        run: cmake --version
+
+      - name: Build the plugin's native code
+        run: |
+          mkdir _build && cd _build
+          cmake ../port_driver/
+          cmake --build .
+
+      - name: Setup emqx to build the plugin
+        run: |
+          git clone https://github.com/emqx/emqx.git; cd emqx; git reset --hard $(cat ../emqx.commit); cd ..
+          mkdir -p $GITHUB_WORKSPACE/emqx/_checkouts
+          ln -s $GITHUB_WORKSPACE $GITHUB_WORKSPACE/emqx/_checkouts/aws_greengrass_emqx_auth
+          cp .github/emqx_plugins_patch $GITHUB_WORKSPACE/emqx/lib-extra/plugins
+
+      - name: Build emqx with aws_greengrass_emqx_auth plugin
+        run: |
+          cd $GITHUB_WORKSPACE/emqx
+          EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
+
+

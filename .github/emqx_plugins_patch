@@ -1,0 +1,10 @@
+{erlang_plugins,
+  [
+    {aws_greengrass_emqx_auth, {git, "ssh://git@github.com/aws-greengrass/aws-greengrass-emqx-mqtt", {branch, "<>"}}}
+  ]
+}.
+
+{elixir_plugins,
+  [
+  ]
+}.
