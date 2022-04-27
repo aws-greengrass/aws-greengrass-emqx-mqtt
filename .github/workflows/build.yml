@@ -38,9 +38,14 @@ jobs:
           ref: 'main-v4.3'
           path: 'build_emqx'
 
-      - name: link the plugin code to _checkouts
+      - name: Setup emqx to build the plugin
         run: |
-          ls .
-          ls $GITHUB_WORKSPACE
-          ls $GITHUB_WORKSPACE/build_emqx
+          mkdir -p $GITHUB_WORKSPACE/build_emqx/_checkouts
+          ln -s $GITHUB_WORKSPACE $GITHUB_WORKSPACE/build_emqx/_checkouts/aws_greengrass_emqx_auth
+          cp .github/emqx_plugins_patch $GITHUB_WORKSPACE/build_emqx/lib-extra/plugins
+
+      - name: Build emqx with aws_greengrass_emqx_auth plugin
+          cd $GITHUB_WORKSPACE/build_emqx
+          EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
+
 
