@@ -5,7 +5,7 @@
 
 -module(aws_greengrass_emqx_certs).
 
--export([ load/1
+-export([ load/0
 ]).
 
 -define(GG_CERT_REL_DIR, "etc/greengrass_certs/").
@@ -14,9 +14,10 @@
 -define(PEM_FILE, ?GG_CERT_REL_DIR ++ "greengrass_emqx.pem").
 
 %% Called when the plugin application start
-load(Env) ->
+load() ->
   loadAllServerCerts().
 
+%% Load in greengrass_ca.pem, greengrass_emqx.key, greengrass_emqx.pem, and reload the PEM cache
 loadAllServerCerts() ->
   CaCert = retrieveServerCert(?CA_FILE),
   writeServerCert(?CA_FILE, CaCert),
@@ -31,37 +32,41 @@ loadAllServerCerts() ->
   cleanPemCache().
 
 % Temporary function that needs to be replaced with CDA retrieval
-% Retrieves hardcoded certs from the following locations and rewrites them to the same dir without a .bak extension
 % etc/emqx.conf must be configured to accept the files with mTLS
+% Retrieves hardcoded certs from the following locations and rewrites them to the same dir without a .bak extension
 % 'etc/greengrass_certs/greengrass_ca.pem.bak'
 % 'etc/greengrass_certs/greengrass_emqx.pem.bak'
 % 'etc/greengrass_certs/greengrass_emqx.key.bak'
 retrieveServerCert(FileName) ->
   BakFileName = FileName ++ ".bak",
-  logger:info("Retrieving cert from file ~p...~n", [BakFileName]),
+  logger:debug("Retrieving cert from file ~p...", [BakFileName]),
 
   FileExists = filelib:is_regular(BakFileName),
   if
     FileExists ->
-      logger:info("Found cert file ~p", [BakFileName]);
+      logger:debug("Found cert file ~p", [BakFileName]);
     true ->
       logger:error("Cert file ~p does not exist!", [BakFileName]),
       exit("Cert file does not exist at startup: ", [BakFileName])
   end,
 
-  {ok, Data} = file:read_file(BakFileName),
-  binary:split(Data, [<<"\n">>], [global]),
-  logger:info("Read in cert file ~p", [BakFileName]),
+  RetrievedData = case file:read_file(BakFileName) of
+    {ok, Data} -> Data;
+    {error, Reason} ->
+      {"Error reading file!", error, Reason},
+      exit("Failed to read file: ", [BakFileName])
+  end,
+  logger:debug("Read in cert file ~p", [BakFileName]),
 
-  Blank = string:is_empty(string:trim(Data)),
+  IsBlank = string:is_empty(string:trim(RetrievedData)),
   if
-    Blank ->
+    IsBlank ->
       logger:error("Read cert file ~p is empty!", [BakFileName]),
       exit("Found empty cert file during startup: ", [BakFileName]);
     true ->
-      logger:info("Validated cert file is not empty")
+      logger:debug("Validated cert file is not empty")
   end,
-  Data.
+  RetrievedData.
 
 % Write server cert Data to specified location FileName
 writeServerCert(FileName, Data) ->
@@ -72,20 +77,23 @@ writeServerCert(FileName, Data) ->
       logger:error("Cert file ~p already exists!", [FileName]),
       exit("Found existing cert file during startup!: ", [FileName]);
     true ->
-      logger:info("Writing cert to file ~p...", [FileName])
+      logger:debug("Writing cert to file ~p...", [FileName])
   end,
-  file:write_file(FileName, Data),
-  logger:info("Wrote to file ~p", [FileName]).
 
-% Clean EMQX Pem Cache via the EMQX CLI
-cleanPemCache() ->
-  Cmd = "bin/emqx_ctl pem_cache clean all",
-  CacheStdout = string:trim(os:cmd(Cmd)),
-  if
-    CacheStdout == "PEM cache clean OK" ->
-      logger:info("Succesfully cleaned PEM cache");
-    true ->
-      logger:error("Error cleaning PEM cache"),
-      exit("Error cleaning PEM cache!")
+  case file:write_file(FileName, Data) of
+    ok -> ok;
+    {error, Reason} ->
+      {"Error writing to file ~p!", [FileName], error, Reason},
+      exit("Failed to write to file: ", [FileName])
   end,
-  logger:info("Finished cleaning pem cache with output ~p and status ~p", [CacheStdout, ok]).
+  logger:debug("Wrote to file ~p", [FileName]).
+
+% Clean EMQX Pem Cache
+cleanPemCache() ->
+  try
+    ok = emqx_mgmt:clean_pem_cache()
+  catch
+    error:{badmatch, ok} -> logger:error("Failed to clean PEM cache!"),
+    exit("Failed to clean PEM cache!")
+  end,
+  logger:info("Finished cleaning pem cache!").
