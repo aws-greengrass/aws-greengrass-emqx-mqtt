@@ -19,7 +19,8 @@ start(_StartType, _StartArgs) ->
     aws_greengrass_emqx_certs:load(application:get_all_env()),
     {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
     port_driver_integration:start(),
-    aws_greengrass_emqx_auth:load(application:get_all_env()),
+%%  Uncomment to load server certs in from the filesystem
+%%    aws_greengrass_emqx_auth:load(application:get_all_env()),
     {ok, Sup}.
 
 stop(_State) ->
