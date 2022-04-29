@@ -6,6 +6,8 @@ import subprocess
 
 import os
 
+from .package import do_patch
+
 
 def main():
     current_abs_path = os.path.abspath(os.getcwd())
@@ -32,9 +34,17 @@ def main():
     subprocess.check_call(f"cmake -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/", shell=True)
     subprocess.check_call("cmake --build .", shell=True)
     os.chdir(current_abs_path)
+    # Put the output library into priv which will be built into the EMQ X distribution bundle
+    shutil.copytree("_build/lib", "priv", dirs_exist_ok=True)
 
     print("Cloning EMQ X")
-    subprocess.check_call("git clone https://github.com/emqx/emqx.git", shell=True)
+    try:
+        subprocess.check_call("git clone https://github.com/emqx/emqx.git", shell=True)
+    except subprocess.CalledProcessError as e:
+        # Ignore EMQ X already cloned
+        if e.returncode != 128:
+            raise
+
     with open('emqx.commit', 'r') as file:
         emqx_commit_id = file.read().rstrip()
     os.chdir("emqx")
@@ -44,14 +54,39 @@ def main():
     shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
 
     print("Setting up EMQ X plugin checkout symlink")
-    os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
-               target_is_directory=True)
+    try:
+        os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
+                   target_is_directory=True)
+    except FileExistsError:
+        pass
 
     os.chdir("emqx")
     print("Building EMQ X")
     subprocess.check_call("make -j", shell=True,
                           env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
+    os.chdir(current_abs_path)
+    pathlib.Path("build").mkdir(parents=True, exist_ok=True)
+    try:
+        os.remove("build/emqx.zip")
+    except FileNotFoundError:
+        pass
+    print("Zipping EMQ X")
+    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
-if __name__ == '__main__':
-    main()
+    print("Patching EMQ X")
+    erts_version = None
+    with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
+        for l in file.readlines():
+            if l.startswith("ERTS_VSN"):
+                erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
+    if erts_version is None:
+        raise ValueError("Didn't find ERTS version")
+    print("ERTS version", erts_version)
+
+    add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf"}
+
+    # On Windows, bundle in msvc runtime 120
+    if os.name == 'nt':
+        add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+    do_patch("build/emqx.zip", erts_version=erts_version, add=add)
