@@ -3,12 +3,8 @@
 import pathlib
 import shutil
 import subprocess
-import patch as pypatch
+
 import os
-import io
-import zipfile
-import tempfile
-from .package import do_patch
 
 from .package import do_patch
 

@@ -6,10 +6,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/liba")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/liba)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
 add_subdirectory(cda_integration)
 
 if (APPLE)
@@ -31,9 +27,9 @@ if (UNIX)
         OUTPUT_VARIABLE ERL_LIBS
     )
     message("Erlang libs directory found: ${ERL_LIBS}")
-    
+endif (UNIX)    
 
-elseif (WIN32)
+if (WIN32)
     execute_process (
         COMMAND erl -noshell -eval "io:format('~s/../usr/include', [code:lib_dir()])" -s erlang halt
         OUTPUT_VARIABLE ERL_INCLUDES
@@ -48,7 +44,7 @@ elseif (WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /I$(ERL_INCLUDES)")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /I$(ERL_INCLUDES)")
     set(WIN32_SOCK_LIB "ws2_32.lib")
-endif ()
+endif (WIN32)
 
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
 include_directories("${CDA_INTEGRATION_INCLUDES}" "${ERL_INCLUDES}")
@@ -59,6 +55,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 
 if (WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
+    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "${WIN32_SOCK_LIB}")
+else ()
+    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
 endif ()
-
-target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "${WIN32_SOCK_LIB}")
