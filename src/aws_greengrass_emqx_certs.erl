@@ -53,7 +53,7 @@ retrieveServerCert(FileName) ->
   RetrievedData = case file:read_file(BakFileName) of
     {ok, Data} -> Data;
     {error, Reason} ->
-      {"Error reading file!", error, Reason},
+      logger:error("Error reading from file ~p with message ~p and reason ~p", [BakFileName, error, Reason]),
       exit("Failed to read file: ", [BakFileName])
   end,
   logger:debug("Read in cert file ~p", [BakFileName]),
@@ -83,7 +83,7 @@ writeServerCert(FileName, Data) ->
   case file:write_file(FileName, Data) of
     ok -> ok;
     {error, Reason} ->
-      {"Error writing to file ~p!", [FileName], error, Reason},
+      logger:error("Error writing to file ~p with message ~p and reason ~p", [FileName, error, Reason]),
       exit("Failed to write to file: ", [FileName])
   end,
   logger:debug("Wrote to file ~p", [FileName]).
