@@ -33,7 +33,13 @@
 #define RETURN_CODE_UNEXPECTED 2
 
 // TODO: Improve logging. Add timestamp to the logs
-#define LOG(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
+#define LOG_HELPER(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
+
+#if defined(_MSC_VER)
+#define LOG(fmt, ...)    LOG_HELPER(fmt, __VA_ARGS__)
+#else
+#define LOG(fmt, ...)    LOG_HELPER(fmt, ##__VA_ARGS__)
+#endif
 
 typedef struct {
     ErlDrvPort port;
@@ -43,7 +49,7 @@ typedef struct {
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char* buff)
 {
     (void)buff;
-    LOG("Starting the driver");
+    LOG("Starting the driver",);
     ei_init();
     DriverContext* context = (DriverContext*)driver_alloc(sizeof(DriverContext));
     context->port = port;
@@ -53,7 +59,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char* buff)
 
 EXPORTED void drv_stop(ErlDrvData handle)
 {
-    LOG("Stopping the driver");
+    LOG("Stopping the driver",);
     DriverContext* context = (DriverContext*)handle;
     cda_integration_close(context->cda_integration_handle);
     driver_free((char*)handle);
@@ -67,13 +73,13 @@ static unsigned int get_operation(ErlIOVec *ev) {
 static void write_bool_to_port(DriverContext* context, bool result, const char return_code) {
     ErlDrvBinary* out = driver_alloc_binary(sizeof(result));
     if(!out) {
-        LOG("Out of memory");
+        LOG("Out of memory",);
         goto cleanup;
     }
     memcpy(&out->orig_bytes[0], &result, sizeof(result));
     char return_code_temp = return_code;
     if(driver_output_binary(context->port, &return_code_temp, 1, out, 0, sizeof(result))) {
-        LOG("Out of memory");
+        LOG("Out of memory",);
         goto cleanup;
     }
 
@@ -107,13 +113,13 @@ static int get_next_entry_size(char* buff, int* index) {
 static char* get_buffer_for_next_entry(char* buff, int* index) {
     int entry_size = get_next_entry_size(buff, index);
     if(entry_size == -1) {
-        LOG("Failed to get the entry size of next entry");
+        LOG("Failed to get the entry size of next entry",);
         return NULL;
     }
 
     char* b = (char *)malloc(sizeof(char) * (entry_size + 1));
     if(!b) {
-        LOG("Out of memory");
+        LOG("Out of memory",);
     }
     return b;
 }

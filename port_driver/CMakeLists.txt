@@ -46,6 +46,7 @@ add_library(${PROJECT_NAME} SHARED port_driver.c)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 
 if (WIN32)
+    target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor)
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()
