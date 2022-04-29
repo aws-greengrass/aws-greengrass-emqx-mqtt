@@ -63,6 +63,15 @@ def main():
     subprocess.check_call("make -j", shell=True,
                           env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
+    os.chdir(current_abs_path)
+    pathlib.Path("build").mkdir(parents=True, exist_ok=True)
+    try:
+        os.remove("build/emqx.zip")
+    except FileNotFoundError:
+        pass
+    print("Zipping EMQ X")
+    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel/emqx")
+
 
 if __name__ == '__main__':
     main()
