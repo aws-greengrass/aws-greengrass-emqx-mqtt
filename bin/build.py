@@ -10,6 +10,8 @@ import zipfile
 import tempfile
 from .package import do_patch
 
+from .package import do_patch
+
 
 def main():
     current_abs_path = os.path.abspath(os.getcwd())
