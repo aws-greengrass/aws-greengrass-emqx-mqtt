@@ -7,6 +7,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
 
 add_subdirectory(cda_integration)
 
+if (APPLE)
+    # Avoid linking error on MacOS, though this likely means that the plugin won't actually work!
+    # TODO: Make it build properly on MacOS
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -undefined dynamic_lookup")
+endif (APPLE)
+
 # TODO: Make work on windows
 if (UNIX)
     execute_process (
@@ -23,7 +29,8 @@ if (UNIX)
 endif (UNIX)
 
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
-include_directories("${CDA_INTEGRATION_INCLUDES}" ${ERL_INCLUDES})
+include_directories("${CDA_INTEGRATION_INCLUDES}")
+include_directories(SYSTEM ${ERL_INCLUDES})
 
 link_directories(${ERL_LIBS})
 add_library(${PROJECT_NAME} SHARED port_driver.c)
