@@ -11,7 +11,7 @@
 #if defined(_WIN32)
     #include <BaseTsd.h>
     typedef SSIZE_T ssize_t;
-    #define EXPORTED  __declspec( dllexport ) static
+    #define EXPORTED  __declspec( dllexport )
 #else
     #include <sys/types.h>
     #define EXPORTED static
