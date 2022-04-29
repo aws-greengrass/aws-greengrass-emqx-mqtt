@@ -16,6 +16,8 @@
         , on_client_check_acl/3
         ]).
 
+-import(tls_custom_certificate_verification, [enable/0]).
+
 -export([ load/1
         , unload/0
         ]).
@@ -33,6 +35,7 @@
 
 %% Called when the plugin application start
 load(Env) ->
+    tls_custom_certificate_verification:enable(),
     emqx:hook('client.connect',      {?MODULE, on_client_connect, [Env]}),
     emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
     emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
