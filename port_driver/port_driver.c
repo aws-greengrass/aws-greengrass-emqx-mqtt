@@ -17,7 +17,7 @@
     #define EXPORTED static
 #endif
 
-#include "ei.h"
+#include <ei.h>
 #include <cda_integration.h>
 
 // OPERATIONS
