@@ -1,4 +1,8 @@
+build/
 target/
+*.dylib
+*.so
+*.dll
 *.iml
 .idea/
 _build/
