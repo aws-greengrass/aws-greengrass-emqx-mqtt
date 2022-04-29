@@ -3,9 +3,11 @@
 import pathlib
 import shutil
 import subprocess
-
+import patch as pypatch
 import os
-
+import io
+import zipfile
+import tempfile
 from .package import do_patch
 
 
@@ -31,7 +33,13 @@ def main():
     os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
-    subprocess.check_call(f"cmake -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/", shell=True)
+
+    generator = ""
+    if os.name == 'nt':
+        print("Setting generator for Windows")
+        generator = "-G \"Visual Studio 15 2017 Win64\""
+
+    subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/", shell=True)
     subprocess.check_call("cmake --build .", shell=True)
     os.chdir(current_abs_path)
     # Put the output library into priv which will be built into the EMQ X distribution bundle
@@ -61,8 +69,12 @@ def main():
         pass
 
     os.chdir("emqx")
-    print("Building EMQ X")
-    subprocess.check_call("make -j", shell=True,
+    print("Building EMQ X") 
+    additional_env_var_script = "true"        
+    if os.name == 'nt':
+        print("Setting additional env var for Windows")
+        additional_env_var_script = "vcvarsall.bat x86_amd64"
+    subprocess.check_call(f"{additional_env_var_script} && make -j", shell=True,
                           env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
     os.chdir(current_abs_path)
