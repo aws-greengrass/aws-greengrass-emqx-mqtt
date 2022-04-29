@@ -23,7 +23,8 @@ if (UNIX)
 endif (UNIX)
 
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
-include_directories("${CDA_INTEGRATION_INCLUDES}" ${ERL_INCLUDES})
+include_directories("${CDA_INTEGRATION_INCLUDES}")
+include_directories(SYSTEM ${ERL_INCLUDES})
 
 link_directories(${ERL_LIBS})
 add_library(${PROJECT_NAME} SHARED port_driver.c)

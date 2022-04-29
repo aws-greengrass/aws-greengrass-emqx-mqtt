@@ -12,24 +12,33 @@ jobs:
   build-native:
     runs-on: ${{ matrix.os }}
     strategy:
-        matrix:
-            os: [ubuntu-latest]
-            otp: ['24.0']
+      matrix:
+        os: [ ubuntu-latest ]
+        otp: [ '24.0' ]
 
     steps:
       - uses: actions/checkout@v3
         with:
+          submodules: recursive
           fetch-depth: 0
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
       - uses: wagoid/commitlint-github-action@v4
         if: matrix.os == 'ubuntu-latest'
+      - name: Copy development IPC
+        run: cp -r patches/greengrass_ipc aws-iot-device-sdk-cpp-v2
+
+      - name: Build IoT Device SDK
+        run: |
+          mkdir _build_sdk && cd _build_sdk
+          cmake -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE="Debug" ../aws-iot-device-sdk-cpp-v2
+          cmake --build . --target install
 
       - name: Build the plugin's native code
         run: |
           mkdir _build && cd _build
-          cmake ../port_driver/
+          cmake -DCMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/_build_sdk ../port_driver/
           cmake --build .
 
       - name: Setup emqx to build the plugin
@@ -46,5 +55,3 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/emqx
           EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
-
-

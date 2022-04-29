@@ -1,4 +1,6 @@
 target/
 *.iml
 .idea/
+_build/
+_build_sdk/
 
