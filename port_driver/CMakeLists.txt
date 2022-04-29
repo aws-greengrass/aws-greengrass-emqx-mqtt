@@ -7,6 +7,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
 
 add_subdirectory(cda_integration)
 
+if (APPLE)
+    # Avoid linking error on MacOS, though this likely means that the plugin won't actually work!
+    # TODO: Make it build properly on MacOS
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -undefined dynamic_lookup")
+endif (APPLE)
+
 # TODO: Make work on windows
 if (UNIX)
     execute_process (
