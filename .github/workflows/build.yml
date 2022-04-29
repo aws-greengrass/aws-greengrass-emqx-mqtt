@@ -12,39 +12,20 @@ jobs:
   build-native:
     runs-on: ${{ matrix.os }}
     strategy:
-        matrix:
-            os: [ubuntu-latest]
-            otp: ['24.0']
+      matrix:
+        os: [ ubuntu-latest ]
+        otp: [ '24.0' ]
 
     steps:
       - uses: actions/checkout@v3
         with:
+          submodules: recursive
           fetch-depth: 0
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
       - uses: wagoid/commitlint-github-action@v4
         if: matrix.os == 'ubuntu-latest'
-
-      - name: Build the plugin's native code
+      - name: Build
         run: |
-          mkdir _build && cd _build
-          cmake ../port_driver/
-          cmake --build .
-
-      - name: Setup emqx to build the plugin
-        run: |
-          git clone https://github.com/emqx/emqx.git; cd emqx; git reset --hard $(cat ../emqx.commit); cd ..
-          mkdir -p $GITHUB_WORKSPACE/emqx/_checkouts
-          # aws_greengrass_emqx_auth is declared as a plugin in lib-extra/plugins
-          cp .github/emqx_plugins_patch $GITHUB_WORKSPACE/emqx/lib-extra/plugins
-          # By having the code for plugin aws_greengrass_emqx_auth locally in _checkouts directory,
-          # build will not try to download the plugin based on the location in lib-extra/plugins
-          ln -s $GITHUB_WORKSPACE $GITHUB_WORKSPACE/emqx/_checkouts/aws_greengrass_emqx_auth
-
-      - name: Build emqx with aws_greengrass_emqx_auth plugin
-        run: |
-          cd $GITHUB_WORKSPACE/emqx
-          EMQX_EXTRA_PLUGINS=aws_greengrass_emqx_auth make
-
-
+          python3 -u bin/build.py

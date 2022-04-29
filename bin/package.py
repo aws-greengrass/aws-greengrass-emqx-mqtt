@@ -16,6 +16,7 @@ except ModuleNotFoundError or NameError:
     pip.main(['install', "patch"])
     import patch as pypatch
 
+
 def update_zip(zipname, updates, add):
     tmpfd, tmpname = tempfile.mkstemp(dir=os.path.dirname(zipname))
     os.close(tmpfd)

@@ -5,6 +5,10 @@
 
 #include <iostream>
 #include <functional>
+#include <aws/crt/Api.h>
+#include <aws/crt/io/HostResolver.h>
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
+
 #include "cda_integration.h"
 
 class ClientDeviceAuthIntegration {
