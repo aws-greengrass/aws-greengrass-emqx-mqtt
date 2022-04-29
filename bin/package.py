@@ -2,19 +2,11 @@
 #  SPDX-License-Identifier: Apache-2.0
 import io
 import os
-import zipfile
 import tempfile
-import shutil
-from pathlib import Path
-import urllib.request
-import sys
+import zipfile
 
-try:
-    import patch as pypatch
-except ModuleNotFoundError or NameError:
-    import pip
-    pip.main(['install', "patch"])
-    import patch as pypatch
+import patch as pypatch
+import sys
 
 
 def update_zip(zipname, updates, add):
@@ -49,10 +41,15 @@ def patch(original, patch_file):
     return out.getvalue().decode()
 
 
-zip_path = sys.argv[1]
-add = {}
-update_zip(zipname=zip_path, updates={
-    "emqx/erts-11.0/bin/erl.ini": lambda o: patch(o, "patches/erl.diff"),
-    "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
-    "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
-}, add=add)
+def do_patch(zip_path, erts_version="11.0", add=None):
+    if add is None:
+        add = {}
+    update_zip(zipname=zip_path, updates={
+        f"emqx/erts-{erts_version}/bin/erl.ini": lambda o: patch(o, "patches/erl.diff"),
+        "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
+        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
+    }, add=add)
+
+
+if __name__ == "__main__":
+    do_patch(zip_path=sys.argv[1])

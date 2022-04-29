@@ -6,6 +6,8 @@ import subprocess
 
 import os
 
+from .package import do_patch
+
 
 def main():
     current_abs_path = os.path.abspath(os.getcwd())
@@ -70,8 +72,21 @@ def main():
     except FileNotFoundError:
         pass
     print("Zipping EMQ X")
-    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel/emqx")
+    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
+    print("Patching EMQ X")
+    erts_version = None
+    with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
+        for l in file.readlines():
+            if l.startswith("ERTS_VSN"):
+                erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
+    if erts_version is None:
+        raise ValueError("Didn't find ERTS version")
+    print("ERTS version", erts_version)
 
-if __name__ == '__main__':
-    main()
+    add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf"}
+
+    # On Windows, bundle in msvc runtime 120
+    if os.name == 'nt':
+        add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+    do_patch("build/emqx.zip", erts_version=erts_version, add=add)

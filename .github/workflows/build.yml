@@ -28,7 +28,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
       - name: Build
         run: |
-          python3 -u bin/build.py
+          python3 -m pip install -r bin/requirements.txt
+          python3 -u -m bin
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
