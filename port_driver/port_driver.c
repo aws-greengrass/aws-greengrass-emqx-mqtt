@@ -33,7 +33,7 @@
 #define RETURN_CODE_UNEXPECTED 2
 
 // TODO: Improve logging. Add timestamp to the logs
-#define LOG(str) printf("%s",str)
+#define LOG(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
 
 typedef struct {
     ErlDrvPort port;
