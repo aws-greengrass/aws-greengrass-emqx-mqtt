@@ -18,7 +18,7 @@ def update_zip(zipname, updates, add):
         with zipfile.ZipFile(tmpname, 'w') as zout:
             zout.comment = zin.comment
             for item in zin.infolist():
-                if item.filename not in updates.keys():
+                if item.filename not in updates.keys() and item.filename not in add.keys():
                     zout.writestr(item, zin.read(item.filename))
                 else:
                     originals[item.filename] = zin.read(item.filename)
@@ -28,7 +28,8 @@ def update_zip(zipname, updates, add):
 
     with zipfile.ZipFile(zipname, mode='a', compression=zipfile.ZIP_DEFLATED) as zf:
         for k, v in originals.items():
-            zf.writestr(k, updates[k](v))
+            if k in updates.keys():
+                zf.writestr(k, updates[k](v))
         for dest, src in add.items():
             zf.write(src, dest)
 
@@ -42,14 +43,16 @@ def patch(original, patch_file):
 
 
 def do_patch(zip_path, erts_version="11.0", add=None):
-    with open("erl.ini", "w") as erl_ini:
-        erl_ini.writelines(["[erlang]",
-                            f"Bindir=.\\\\erts-{erts_version}\\\\bin",
-                            "Progname=erl",
-                            "Rootdir=.\\\\"
+    # ini file is only for windows, but we'll just throw it in no matter what. Use \r\n for windows line endings
+    with open("build/erl.ini", "w") as erl_ini:
+        erl_ini.writelines(["[erlang]\r\n",
+                            f"Bindir=.\\\\erts-{erts_version}\\\\bin\r\n",
+                            "Progname=erl\r\n",
+                            "Rootdir=.\\\\\r\n"
                             ])
     if add is None:
-        add = {f"emqx/erts-{erts_version}/bin/erl.ini": "erl.ini"}
+        add = {}
+    add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
     update_zip(zipname=zip_path, updates={
         "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
         "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
