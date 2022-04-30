@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(port_driver)
 
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/liba")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe and .dll
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/liba") # .lib and .a
 
 execute_process (
     COMMAND erl -noshell -eval "io:format('~s/../usr/include', [code:lib_dir()])" -s erlang halt
@@ -48,9 +48,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 if (WIN32)
     target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor)
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
-    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib")
-    set_target_properties(${PROJECT_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/lib")
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
