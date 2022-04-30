@@ -36,5 +36,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: Build artifact
+          name: Build artifact ${{matrix.os}}
           path: build/emqx.zip
