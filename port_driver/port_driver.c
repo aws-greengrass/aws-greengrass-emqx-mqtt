@@ -34,12 +34,7 @@
 
 // TODO: Improve logging. Add timestamp to the logs
 #define LOG_HELPER(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
-
-#if defined(_MSC_VER)
-#define LOG(fmt, ...)    LOG_HELPER(fmt, __VA_ARGS__)
-#else
-#define LOG(fmt, ...)    LOG_HELPER(fmt, ##__VA_ARGS__)
-#endif
+#define LOG(...)    LOG_HELPER(__VA_ARGS__, 1)
 
 typedef struct {
     ErlDrvPort port;
