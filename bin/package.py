@@ -42,10 +42,15 @@ def patch(original, patch_file):
 
 
 def do_patch(zip_path, erts_version="11.0", add=None):
+    with open("erl.ini", "w") as erl_ini:
+        erl_ini.writelines(["[erlang]",
+                            f"Bindir=.\\\\erts-{erts_version}\\\\bin",
+                            "Progname=erl",
+                            "Rootdir=.\\\\"
+                            ])
     if add is None:
-        add = {}
+        add = {f"emqx/erts-{erts_version}/bin/erl.ini": "erl.ini"}
     update_zip(zipname=zip_path, updates={
-        f"emqx/erts-{erts_version}/bin/erl.ini": lambda o: patch(o, "patches/erl.diff"),
         "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
         "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
     }, add=add)
