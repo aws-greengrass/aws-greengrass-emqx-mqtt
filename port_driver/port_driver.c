@@ -16,6 +16,7 @@
 #define ON_CLIENT_DISCONNECT   2
 #define ON_CLIENT_AUTHENTICATE 3
 #define ON_CLIENT_CHECK_ACL    4
+#define VERIFY_CLIENT_CERTIFICATE    5
 
 // RETURN CODES
 #define RETURN_CODE_SUCCESS    0
@@ -207,6 +208,33 @@ cleanup:
     delete_buffer(pub_sub);
 }
 
+static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *ev) {
+    char *cert_pem = NULL;
+    char return_code = RETURN_CODE_SUCCESS;
+    bool result = false;
+
+    ErlDrvBinary* bin = ev->binv[1];
+    char* buff = &bin->orig_bytes[1];
+
+    int index = 0;
+    cert_pem = get_buffer_for_next_entry(buff, &index);
+    if(!cert_pem) {
+        goto cleanup;
+    }
+    if(ei_decode_string(buff, &index, cert_pem)) {
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
+    }
+
+    result = verify_client_certificate(context->cda_integration_handle, cert_pem);
+
+respond:
+    write_bool_to_port(context, result, return_code);
+
+cleanup:
+    delete_buffer(cert_pem);
+}
+
 static void handle_unknown_op(DriverContext* context) {
     bool result = false;
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
@@ -231,6 +259,9 @@ static void drv_output(ErlDrvData handle, ErlIOVec *ev)
             break;
         case ON_CLIENT_CHECK_ACL:
             handle_check_acl(context, ev);
+            break;
+        case VERIFY_CLIENT_CERTIFICATE:
+            handle_verify_client_certificate(context, ev);
             break;
         default:
             LOG("Unknown operation: %u", op);

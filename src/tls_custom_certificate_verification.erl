@@ -9,6 +9,7 @@
 -include_lib("public_key/include/public_key.hrl").
 
 -import(os, [getenv/1]).
+-import(port_driver_integration,[verify_client_certificate/1]).
 
 -export([enable/0]).
 
@@ -44,21 +45,37 @@ add_custom_verify_to_ssl_options(Options) ->
       replace(Options, ssl_options, NewSslOpts)
   end.
 
--spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom()},
+-spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {atom(), atom()},
     InitialUserState :: term()) -> {valid, UserState :: term()} | {fail, Reason :: term()}).
-custom_verify(OtpCert, {bad_cert, _} = Reason, UserState) ->
+custom_verify(OtpCert, Reason, UserState) ->
   case Reason of
     {bad_cert, unknown_ca} -> verify_client_certificate(OtpCert, UserState);
-    {bad_cert, selfsigned_peer} -> verify_client_certificate(OtpCert, UserState)
+    {bad_cert, selfsigned_peer} -> verify_client_certificate(OtpCert, UserState);
+    {_, _} -> 
+      logger:debug("Client certificate is invalid. Reason: ~p", [Reason]),
+      {fail, "invalid certificate"}
   end.
 
 -spec(verify_client_certificate(OtpCert :: #'OTPCertificate'{}, InitialUserState :: term()) ->
   {valid, UserState :: term()} | {fail, Reason :: term()}).
 verify_client_certificate(OtpCert, UserState) ->
+  CertPem = otpcert_to_pem(OtpCert),
+  case port_driver_integration:verify_client_certificate(CertPem) of
+    {ok, <<1>>} ->
+      logger:debug("Client certificate is valid: ~p", [CertPem]),
+      {valid, UserState};
+    {ok, <<0>>} ->
+      logger:debug("Client certificate is invalid: ~p", [CertPem]),
+      {fail, "invalid certificate"};
+    {error, Error} ->
+      logger:error("Failed to verify client certificate. Error: ~p", [Error]),
+      {fail, Error}
+  end.
+
+-spec(otpcert_to_pem(OtpCert :: #'OTPCertificate'{}) -> binary()).
+otpcert_to_pem(OtpCert) ->
   Cert = public_key:pkix_encode('OTPCertificate', OtpCert, otp),
-  CertPem = base64:encode(Cert),
-  logger:debug("verify_client_identity with CertPem: ~p", [CertPem]),
-  {valid, UserState}.
+  base64:encode(Cert).
 
 -spec(start_updated_ssl_listener(emqx_listeners:listener()) -> ok | {error, any()}).
 start_updated_ssl_listener(UpdatedSslListener) ->

@@ -11,6 +11,7 @@
         , on_client_connected/2
         , on_client_disconnected/2
         , on_client_check_acl/4
+        , verify_client_certificate/1
         ]).
 
 -include("emqx.hrl").
@@ -22,6 +23,7 @@
 -define(ON_CLIENT_DISCONNECT, 2).
 -define(ON_CLIENT_AUTHENTICATE, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
+-define(VERIFY_CLIENT_CERTIFICATE, 5).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -83,11 +85,14 @@ on_client_authenticate(ClientId, CertPem) ->
 on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
     call_port({on_client_check_acl, ClientId, CertPem, Topic, PubSub}).
 
+verify_client_certificate(CertPem) ->
+  call_port({verify_client_certificate, CertPem}).
+
 call_port(Msg) ->
     process ! {call, self(), Msg},
     receive
 	{process, Data} ->
-	    logger:error("Data received from port: ~p ~n", [Data]),
+	    logger:debug("Data received from port: ~p ~n", [Data]),
 	    [ReturnCode|Result] = Data,
 	    case ReturnCode of
 	        ?RETURN_CODE_SUCCESS -> {ok, Result};
@@ -111,6 +116,9 @@ encode({on_client_check_acl, ClientId, CertPem, Topic, PubSub}) ->
     PubSubBinary = acl_action_to_binary(PubSub),
     [<<?ON_CLIENT_CHECK_ACL, ClientIdBinary/binary, CertPemBinary/binary,
         TopicBinary/binary, PubSubBinary/binary>>];
+encode({verify_client_certificate, CertPem}) ->
+    CertPemBinary = convert_to_binary({CertPem}),
+    [<<?VERIFY_CLIENT_CERTIFICATE, CertPemBinary/binary>>];
 encode({A, B, Operation}) ->
     {ABinary, BBinary} = convert_to_binary({A, B}),
     [<<Operation, ABinary/binary, BBinary/binary>>].

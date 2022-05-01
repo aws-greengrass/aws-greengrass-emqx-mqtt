@@ -20,6 +20,7 @@ public:
     bool on_client_disconnected(const char* clientId, const char* pem);
     bool on_client_authenticate(const char* clientId, const char* pem);
     bool on_check_acl(const char* clientId, const char* pem, const char* topic, const char* action);
+    bool verify_client_certificate(const char* certPem);
 };
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
@@ -53,6 +54,11 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char* clientId, const char*
     const char* action) {
     std::cout << "on_check_acl called with clientId: " << clientId << " and pem: "<< pem << " and topic: " << topic <<
     " and action: " << action << std::endl;
+    return true;
+}
+
+bool ClientDeviceAuthIntegration::verify_client_certificate(const char* certPem) {
+    std::cout << "verify_client_certificate called with certPem: " << certPem << std::endl;
     return true;
 }
 
@@ -140,3 +146,12 @@ bool on_check_acl(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const ch
         };
     return execute_with_handle(handle, on_check_acl_func);
 }
+
+bool verify_client_certificate(CDA_INTEGRATION_HANDLE* handle, const char* certPem) {
+    const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> verify_client_certificate_func =
+    [certPem] (ClientDeviceAuthIntegration* cda_integ) {
+        return cda_integ->verify_client_certificate(certPem);
+    };
+    return execute_with_handle(handle, verify_client_certificate_func);
+}
+

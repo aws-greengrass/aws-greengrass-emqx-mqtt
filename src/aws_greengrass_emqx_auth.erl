@@ -35,12 +35,20 @@
 
 %% Called when the plugin application start
 load(Env) ->
-    tls_custom_certificate_verification:enable(),
-    emqx:hook('client.connect',      {?MODULE, on_client_connect, [Env]}),
-    emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
-    emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
-    emqx:hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
-    emqx:hook('client.check_acl',    {?MODULE, on_client_check_acl, [Env]}).
+  case tls_custom_certificate_verification:enable() of
+    ok -> attach_hooks(Env);
+    nossl -> attach_hooks(Env);
+    {error, Reason} -> 
+      ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s", [Reason]),
+      throw({error, ErrorString})
+  end.
+
+attach_hooks(Env) ->
+  emqx:hook('client.connect',      {?MODULE, on_client_connect, [Env]}),
+  emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
+  emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
+  emqx:hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
+  emqx:hook('client.check_acl',    {?MODULE, on_client_check_acl, [Env]}).
 
 %%--------------------------------------------------------------------
 %% Client Lifecycle Hooks Impl
