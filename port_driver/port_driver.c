@@ -222,7 +222,6 @@ cleanup:
 
 static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *ev) {
     char *cert_pem = NULL;
-    char return_code = RETURN_CODE_FAILED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
@@ -234,8 +233,7 @@ static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *e
 	return;
     }
     if(ei_decode_string(buff, &index, cert_pem)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        write_bool_to_port(context, result, return_code);
+        write_bool_to_port(context, result, RETURN_CODE_UNEXPECTED);
 	delete_buffer(cert_pem);
 	return;
     }
