@@ -7,6 +7,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include <erl_driver.h>
+
+#if defined(_WIN32)
+    #include <BaseTsd.h>
+    typedef SSIZE_T ssize_t;
+    #define EXPORTED  __declspec( dllexport )
+#else
+    #include <sys/types.h>
+    #define EXPORTED static
+#endif
+
 #include <ei.h>
 #include <cda_integration.h>
 
@@ -24,14 +34,15 @@
 #define RETURN_CODE_UNEXPECTED 2
 
 // TODO: Improve logging. Add timestamp to the logs
-#define LOG(str,args...) printf("%s:%d %s() "str"\n",__FILE__,__LINE__,__func__, ##args)
+#define LOG_HELPER(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
+#define LOG(...)    LOG_HELPER(__VA_ARGS__, 1)
 
 typedef struct {
     ErlDrvPort port;
     CDA_INTEGRATION_HANDLE* cda_integration_handle;
 } DriverContext;
 
-static ErlDrvData drv_start(ErlDrvPort port, char* buff)
+EXPORTED ErlDrvData drv_start(ErlDrvPort port, char* buff)
 {
     (void)buff;
     LOG("Starting the driver");
@@ -42,7 +53,7 @@ static ErlDrvData drv_start(ErlDrvPort port, char* buff)
     return (ErlDrvData)context;
 }
 
-static void drv_stop(ErlDrvData handle)
+EXPORTED void drv_stop(ErlDrvData handle)
 {
     LOG("Stopping the driver");
     DriverContext* context = (DriverContext*)handle;
@@ -240,7 +251,7 @@ static void handle_unknown_op(DriverContext* context) {
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
 }
 
-static void drv_output(ErlDrvData handle, ErlIOVec *ev)
+EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev)
 {
     DriverContext* context = (DriverContext*)handle;
     const unsigned int op = get_operation(ev);
@@ -270,37 +281,31 @@ static void drv_output(ErlDrvData handle, ErlIOVec *ev)
 }
 
 ErlDrvEntry driver_entry = {
-    NULL,			/* F_PTR init, called when driver is loaded */
-    drv_start,		/* L_PTR start, called when port is opened */
-    drv_stop,		/* F_PTR stop, called when port is closed */
-    NULL,   		/* F_PTR output, called when erlang has sent */
-    NULL,			/* F_PTR ready_input, called when input descriptor ready */
-    NULL,			/* F_PTR ready_output, called when output descriptor ready */
-    "port_driver",	/* char *driver_name, the argument to open_port */
-    NULL,			/* F_PTR finish, called when unloaded */
-    NULL,                       /* void *handle, Reserved by VM */
-    NULL,			/* F_PTR control, port_command callback */
-    NULL,			/* F_PTR timeout, reserved */
-    drv_output,		/* F_PTR outputv, reserved */
-    NULL,                       /* F_PTR ready_async, only for async drivers */
-    NULL,                       /* F_PTR flush, called when port is about
-				   to be closed, but there is data in driver
-				   queue */
-    NULL,                       /* F_PTR call, much like control, sync call
-				   to driver */
+    NULL,           /* F_PTR init, called when driver is loaded */
+    drv_start,      /* L_PTR start, called when port is opened */
+    drv_stop,       /* F_PTR stop, called when port is closed */
+    NULL,           /* F_PTR output, called when erlang has sent */
+    NULL,           /* F_PTR ready_input, called when input descriptor ready */
+    NULL,           /* F_PTR ready_output, called when output descriptor ready */
+    "port_driver",  /* char *driver_name, the argument to open_port */
+    NULL,           /* F_PTR finish, called when unloaded */
+    NULL,           /* void *handle, Reserved by VM */
+    NULL,           /* F_PTR control, port_command callback */
+    NULL,           /* F_PTR timeout, reserved */
+    drv_output,     /* F_PTR outputv, reserved */
+    NULL,           /* F_PTR ready_async, only for async drivers */
+    NULL,           /* F_PTR flush, called when port is about to be closed, 
+                       but there is data in driver
+                       queue */
+    NULL,           /* F_PTR call, much like control, sync call to driver */
     NULL,                       /* unused */
-    ERL_DRV_EXTENDED_MARKER,    /* int extended marker, Should always be
-				   set to indicate driver versioning */
-    ERL_DRV_EXTENDED_MAJOR_VERSION, /* int major_version, should always be
-				       set to this value */
-    ERL_DRV_EXTENDED_MINOR_VERSION, /* int minor_version, should always be
-				       set to this value */
-    0,                          /* int driver_flags, see documentation */
-    NULL,                       /* void *handle2, reserved for VM use */
-    NULL,                       /* F_PTR process_exit, called when a
-				   monitored process dies */
-    NULL                        /* F_PTR stop_select, called to close an
-				   event object */
+    ERL_DRV_EXTENDED_MARKER,    /* int extended marker, Should always be set to indicate driver versioning */
+    ERL_DRV_EXTENDED_MAJOR_VERSION, /* int major_version, should always be set to this value */
+    ERL_DRV_EXTENDED_MINOR_VERSION, /* int minor_version, should always be set to this value */
+    0,              /* int driver_flags, see documentation */
+    NULL,           /* void *handle2, reserved for VM use */
+    NULL,           /* F_PTR process_exit, called when a monitored process dies */
+    NULL            /* F_PTR stop_select, called to close an event object */
 };
 
 DRIVER_INIT(port_driver) /* must match name in driver_entry */
