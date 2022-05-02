@@ -7,13 +7,11 @@
 
 -include("emqx.hrl").
 
--import(base64, [encode/1]).
-
--import(port_driver_integration,[ on_client_authenticate/1
+-import(port_driver_integration,[ on_client_authenticate/2
         , on_client_connect/2
         , on_client_connected/2
         , on_client_disconnected/2
-        , on_client_check_acl/3
+        , on_client_check_acl/4
         ]).
 
 -export([ load/1
