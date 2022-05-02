@@ -88,6 +88,7 @@ call_port(Msg) ->
     receive
 	{process, Data} ->
 	    logger:error("Data received from port: ~p ~n", [Data]),
+      logger:debug("Testing output avipinku"),
 	    [ReturnCode|Result] = Data,
 	    case ReturnCode of
 	        ?RETURN_CODE_SUCCESS -> {ok, Result};

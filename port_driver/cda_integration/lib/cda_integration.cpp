@@ -10,6 +10,7 @@
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
 #include "cda_integration.h"
+#include "ipc_connect.cpp"
 
 class ClientDeviceAuthIntegration {
 public:
@@ -31,6 +32,8 @@ bool ClientDeviceAuthIntegration::close() const {
 
 bool ClientDeviceAuthIntegration::on_client_connect(const char* clientId, const char* pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: "<< pem << std::endl;
+    testConnect();
+    std::cout << "on_client_connect called avipinku: " << std::endl;
     return true;
 }
 
@@ -140,3 +143,5 @@ bool on_check_acl(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const ch
         };
     return execute_with_handle(handle, on_check_acl_func);
 }
+
+

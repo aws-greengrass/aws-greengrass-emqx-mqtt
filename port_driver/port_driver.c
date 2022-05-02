@@ -34,6 +34,7 @@ static ErlDrvData drv_start(ErlDrvPort port, char* buff)
 {
     (void)buff;
     LOG("Starting the driver");
+    LOG("avipinku");
     ei_init();
     DriverContext* context = (DriverContext*)driver_alloc(sizeof(DriverContext));
     context->port = port;
