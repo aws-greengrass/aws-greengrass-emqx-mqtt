@@ -48,6 +48,7 @@ add_custom_verify_to_ssl_options(Options) ->
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {atom(), atom()},
     InitialUserState :: term()) -> {valid, UserState :: term()} | {fail, Reason :: term()}).
 custom_verify(OtpCert, Reason, UserState) ->
+  logger:debug("Verifying client certificate for reason: ~p", [Reason]),
   case Reason of
     {bad_cert, unknown_ca} -> verify_client_certificate(OtpCert, UserState);
     {bad_cert, selfsigned_peer} -> verify_client_certificate(OtpCert, UserState);
@@ -79,9 +80,9 @@ otpcert_to_pem(OtpCert) ->
 
 -spec(start_updated_ssl_listener(emqx_listeners:listener()) -> ok | {error, any()}).
 start_updated_ssl_listener(UpdatedSslListener) ->
-  case start_ssl_listener(UpdatedSslListener) of
+  case restart_ssl_listener(UpdatedSslListener) of
     ok ->
-      logger:info("Started ~p ~w listener on port ~w with custom certificate verification",
+      logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
         [maps:get(name, UpdatedSslListener),
           maps:get(proto, UpdatedSslListener),
           maps:get(listen_on, UpdatedSslListener)]),
@@ -96,8 +97,8 @@ start_updated_ssl_listener(UpdatedSslListener) ->
       {error, Reason}
   end.
 
--spec(start_ssl_listener(emqx_listeners:listener()) -> ok | {error, any()}).
-start_ssl_listener(UpdatedSslListener) ->
+-spec(restart_ssl_listener(emqx_listeners:listener()) -> ok | {error, any()}).
+restart_ssl_listener(UpdatedSslListener) ->
   case stop_existing_ssl_listener() of
     ok -> start_listener(UpdatedSslListener);
     {error, Reason} -> {error, Reason}

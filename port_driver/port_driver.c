@@ -21,17 +21,18 @@
 #include <cda_integration.h>
 
 // OPERATIONS
-#define ON_CLIENT_CONNECT      0
-#define ON_CLIENT_CONNECTED    1
-#define ON_CLIENT_DISCONNECT   2
-#define ON_CLIENT_AUTHENTICATE 3
-#define ON_CLIENT_CHECK_ACL    4
-#define VERIFY_CLIENT_CERTIFICATE    5
+#define ON_CLIENT_CONNECT         0
+#define ON_CLIENT_CONNECTED       1
+#define ON_CLIENT_DISCONNECT      2
+#define ON_CLIENT_AUTHENTICATE    3
+#define ON_CLIENT_CHECK_ACL       4
+#define VERIFY_CLIENT_CERTIFICATE 5
 
 // RETURN CODES
 #define RETURN_CODE_SUCCESS    0
 #define RETURN_CODE_UNKNOWN_OP 1
 #define RETURN_CODE_UNEXPECTED 2
+#define RETURN_CODE_FAILED    -1
 
 // TODO: Improve logging. Add timestamp to the logs
 #define LOG_HELPER(fmt,...) printf("%s:%d %s() "fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
@@ -127,7 +128,7 @@ static void delete_buffer(char* buff) {
 static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
         bool (*func)(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem)) {
     char *client_id, *pem = NULL;
-    char return_code = RETURN_CODE_SUCCESS;
+    char return_code = RETURN_CODE_FAILED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
@@ -164,7 +165,7 @@ cleanup:
 
 static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
     char *client_id, *pem, *topic, *pub_sub = NULL;
-    char return_code = RETURN_CODE_SUCCESS;
+    char return_code = RETURN_CODE_FAILED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
@@ -221,7 +222,7 @@ cleanup:
 
 static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *ev) {
     char *cert_pem = NULL;
-    char return_code = RETURN_CODE_SUCCESS;
+    char return_code = RETURN_CODE_FAILED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
@@ -230,20 +231,16 @@ static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *e
     int index = 0;
     cert_pem = get_buffer_for_next_entry(buff, &index);
     if(!cert_pem) {
-        goto cleanup;
+        delete_buffer(cert_pem);
+	return;
     }
     if(ei_decode_string(buff, &index, cert_pem)) {
         return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
+        write_bool_to_port(context, result, return_code);
+	return;
     }
 
     result = verify_client_certificate(context->cda_integration_handle, cert_pem);
-
-respond:
-    write_bool_to_port(context, result, return_code);
-
-cleanup:
-    delete_buffer(cert_pem);
 }
 
 static void handle_unknown_op(DriverContext* context) {

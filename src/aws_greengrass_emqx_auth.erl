@@ -16,8 +16,6 @@
         , on_client_check_acl/3
         ]).
 
--import(tls_custom_certificate_verification, [enable/0]).
-
 -export([ load/1
         , unload/0
         ]).
@@ -35,15 +33,6 @@
 
 %% Called when the plugin application start
 load(Env) ->
-  case tls_custom_certificate_verification:enable() of
-    ok -> attach_hooks(Env);
-    nossl -> attach_hooks(Env);
-    {error, Reason} -> 
-      ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s", [Reason]),
-      throw({error, ErrorString})
-  end.
-
-attach_hooks(Env) ->
   emqx:hook('client.connect',      {?MODULE, on_client_connect, [Env]}),
   emqx:hook('client.connected',    {?MODULE, on_client_connected, [Env]}),
   emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
