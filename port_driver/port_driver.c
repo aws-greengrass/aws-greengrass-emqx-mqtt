@@ -231,12 +231,12 @@ static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *e
     int index = 0;
     cert_pem = get_buffer_for_next_entry(buff, &index);
     if(!cert_pem) {
-        delete_buffer(cert_pem);
 	return;
     }
     if(ei_decode_string(buff, &index, cert_pem)) {
         return_code = RETURN_CODE_UNEXPECTED;
         write_bool_to_port(context, result, return_code);
+	delete_buffer(cert_pem);
 	return;
     }
 
