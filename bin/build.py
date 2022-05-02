@@ -31,7 +31,14 @@ def main():
     os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
-    subprocess.check_call(f"cmake -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/", shell=True)
+
+    generator = ""
+    if os.name == 'nt':
+        print("Setting generator for Windows")
+        generator = "-G \"Visual Studio 16 2019\" -A x64"
+
+    subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+                          shell=True)
     subprocess.check_call("cmake --build .", shell=True)
     os.chdir(current_abs_path)
     # Put the output library into priv which will be built into the EMQ X distribution bundle
@@ -62,8 +69,23 @@ def main():
 
     os.chdir("emqx")
     print("Building EMQ X")
-    subprocess.check_call("make -j", shell=True,
-                          env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
+    if os.name == 'nt':
+        print("Setting additional env var for Windows")
+        vs_paths = {"C:\\Program Files (x86)\\Microsoft Visual "
+                    "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat",
+                    "C:\\Program Files (x86)\\Microsoft Visual "
+                    "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat"}
+        for vs_path in vs_paths:
+            if os.path.exists(vs_path):
+                break
+        else:
+            raise FileNotFoundError("Unable to find where VS is installed!")
+        additional_env_var_script = f'call "{vs_path}" x86_amd64'
+        subprocess.check_call(f"{additional_env_var_script} && make -j", shell=True,
+                              env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
+    else:
+        subprocess.check_call(f"make -j", shell=True,
+                              env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
     os.chdir(current_abs_path)
     pathlib.Path("build").mkdir(parents=True, exist_ok=True)

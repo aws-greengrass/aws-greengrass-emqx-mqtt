@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-latest, windows-2019 ]  # windows-latest does not have visual studio 2017
         otp: [ '24.0' ]
 
     steps:
@@ -26,6 +26,9 @@ jobs:
           otp-version: ${{matrix.otp}}
       - uses: wagoid/commitlint-github-action@v4
         if: matrix.os == 'ubuntu-latest'
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
       - name: Build
         run: |
           python3 -m pip install -r bin/requirements.txt
@@ -33,5 +36,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: Build artifact
+          name: Build artifact ${{matrix.os}}
           path: build/emqx.zip
