@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(port_driver)
 
+option(BUILD_TESTS "Build the tests." ON)
+
 if (WIN32)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
 else()
@@ -56,3 +58,7 @@ if (WIN32)
 else ()
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
 endif ()
+
+if(BUILD_TESTS)
+	add_subdirectory(tests/unit)
+endif()
