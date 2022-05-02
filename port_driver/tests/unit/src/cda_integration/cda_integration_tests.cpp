@@ -31,7 +31,7 @@ namespace port_driver {
 
             TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectTest) {
                 CDA_INTEGRATION_HANDLE* handle = cda_integration_init();
-                EXPECT_TRUE(on_client_connect(handle, test_client_id.c_str(), test_client_pem.c_str()));
+                EXPECT_TRUE(on_client_connect(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
                 EXPECT_TRUE(cda_integration_close(handle));
             }
         }
