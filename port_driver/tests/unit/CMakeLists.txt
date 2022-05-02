@@ -13,7 +13,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Configure Compiler flags
 if (WIN32)
     set(CUSTOM_COMPILER_FLAGS "/W4")
-else
+else ()
     set(CUSTOM_COMPILER_FLAGS "-fno-exceptions -Wall -Werror")
 endif ()
 
@@ -40,9 +40,7 @@ set(UNIT_TEST_TARGET_NAME port_driver_unit_tests)
 
 add_executable(${UNIT_TEST_TARGET_NAME} hello_test.cc)
 target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main)
-
-#include(GoogleTest)
-#gtest_discover_tests(hello_test)
+target_link_libraries(${UNIT_TEST_TARGET_NAME} ${PORT_DRIVER_TARGET_NAME})
 
 set_property(TARGET ${UNIT_TEST_TARGET_NAME} APPEND_STRING PROPERTY COMPILE_FLAGS ${CUSTOM_COMPILER_FLAGS})
 
