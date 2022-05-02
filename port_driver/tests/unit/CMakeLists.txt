@@ -38,7 +38,8 @@ add_subdirectory(${CMAKE_BINARY_DIR}/third_party/googletest/src
 enable_testing()
 set(UNIT_TEST_TARGET_NAME port_driver_unit_tests)
 
-add_executable(${UNIT_TEST_TARGET_NAME} hello_test.cc)
+file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/tests/unit/src/*.cpp)
+add_executable(${UNIT_TEST_TARGET_NAME} ${UNIT_TEST_SOURCES})
 target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main)
 target_link_libraries(${UNIT_TEST_TARGET_NAME} ${PORT_DRIVER_TARGET_NAME})
 
