@@ -154,6 +154,7 @@ static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
     }
 
     result = (*func)(context->cda_integration_handle, client_id, pem);
+    return_code = RETURN_CODE_SUCCESS;
 
 respond:
     write_bool_to_port(context, result, return_code);
@@ -209,6 +210,7 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
     }
 
     result = on_check_acl(context->cda_integration_handle, client_id, pem, topic, pub_sub);
+    return_code = RETURN_CODE_SUCCESS;
 
 respond:
     write_bool_to_port(context, result, return_code);
@@ -222,6 +224,7 @@ cleanup:
 
 static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *ev) {
     char *cert_pem = NULL;
+    char return_code = RETURN_CODE_FAILED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
@@ -230,15 +233,21 @@ static void handle_verify_client_certificate(DriverContext* context, ErlIOVec *e
     int index = 0;
     cert_pem = get_buffer_for_next_entry(buff, &index);
     if(!cert_pem) {
-	return;
+	goto cleanup;
     }
     if(ei_decode_string(buff, &index, cert_pem)) {
-        write_bool_to_port(context, result, RETURN_CODE_UNEXPECTED);
-	delete_buffer(cert_pem);
-	return;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
 
     result = verify_client_certificate(context->cda_integration_handle, cert_pem);
+    return_code = RETURN_CODE_SUCCESS;
+
+respond:
+    write_bool_to_port(context, result, return_code);
+
+cleanup:
+    delete_buffer(cert_pem);
 }
 
 static void handle_unknown_op(DriverContext* context) {
