@@ -34,7 +34,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
     aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
 
-    LOG("Starting the driver");
+    LOG("Starting AWS Greengrass auth driver");
     ei_init();
     auto *context = (DriverContext *) driver_alloc(sizeof(DriverContext));
     context->port = port;
@@ -43,7 +43,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
 }
 
 EXPORTED void drv_stop(ErlDrvData handle) {
-    LOG("Stopping the driver");
+    LOG("Stopping AWS Greengrass auth driver");
     auto *context = (DriverContext *) handle;
     cda_integration_close(context->cda_integration_handle);
     driver_free((char *) handle);
