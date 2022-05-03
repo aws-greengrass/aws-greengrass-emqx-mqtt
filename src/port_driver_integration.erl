@@ -29,17 +29,27 @@
 -define(RETURN_CODE_SUCCESS, 0).
 
 start() ->
-    PortDriverDir = getenv("PORT_DRIVER_DIR"),
-    PortDriverName = getenv("PORT_DRIVER_NAME"),
-    logger:debug("Loading port driver ~p from dir ~p", [PortDriverName, PortDriverDir]),
+    Dir = case code:priv_dir(aws_greengrass_emqx_auth) of
+            {error, bad_name} ->
+              case code:which(aws_greengrass_emqx_auth) of
+                Filename when is_list(Filename) ->
+                  filename:join(
+                    [filename:dirname(Filename), "../priv"]);
+                _ ->
+                  "../priv"
+              end;
+            Priv -> Priv
+          end,
+    Port = "port_driver",
+    logger:info("Loading port driver ~p from dir ~p", [Port, Dir]),
 
-    case erl_ddll:load_driver(PortDriverDir, PortDriverName) of
+    case erl_ddll:load_driver(Dir, Port) of
         ok -> ok;
         {error, already_loaded} -> ok;
         _ -> exit({error, could_not_load_driver})
     end,
     logger:debug("Loaded port_driver"),
-    spawn(?MODULE, init, [PortDriverName]).
+    spawn(?MODULE, init, [Port]).
 
 stop() ->
     logger:info("Stopping port driver integration"),
