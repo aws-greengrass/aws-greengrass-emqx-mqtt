@@ -11,13 +11,12 @@ namespace port_driver {
     namespace tests {
         namespace unit {
             class CDAIntegrationTester : public ::testing::Test {
-            private:
-                static const std::string TEST_CLIENT_ID;
-                static const std::string TEST_CLIENT_PEM;
-
             protected:
                 CDAIntegrationTester() {
                 }
+
+                static const std::string TEST_CLIENT_ID;
+                static const std::string TEST_CLIENT_PEM;
             };
 
             const std::string CDAIntegrationTester::TEST_CLIENT_ID = "test_client_id";
