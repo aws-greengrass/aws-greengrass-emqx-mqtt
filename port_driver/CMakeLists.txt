@@ -46,8 +46,12 @@ include_directories("${CDA_INTEGRATION_INCLUDES}")
 include_directories(SYSTEM ${ERL_INCLUDES})
 
 link_directories("${ERL_LIBS}")
-add_library(${PROJECT_NAME} SHARED port_driver.c)
+add_library(${PROJECT_NAME} SHARED port_driver.cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+
+find_package(aws-crt-cpp REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE AWS::aws-crt-cpp)
 
 if (APPLE)
     # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
@@ -55,7 +59,8 @@ if (APPLE)
 endif()
 
 if (WIN32)
-    target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor)
+    # Enable to output preprocessed file to a .i file
+    # set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/P")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()
