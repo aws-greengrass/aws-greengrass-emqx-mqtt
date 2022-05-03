@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.20)
 
 project(port_driver)
 
+option(BUILD_TESTS "Build the tests." ON)
+
 if (WIN32)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
 else()
@@ -45,14 +47,20 @@ cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_in
 include_directories("${CDA_INTEGRATION_INCLUDES}")
 include_directories(SYSTEM ${ERL_INCLUDES})
 
+set(PORT_DRIVER_TARGET_NAME "${PROJECT_NAME}")
 link_directories("${ERL_LIBS}")
-add_library(${PROJECT_NAME} SHARED port_driver.c)
-set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
+add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.c)
+set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES PREFIX "")
 
 if (WIN32)
-    target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor)
-    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
-    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
+    target_compile_options(${PORT_DRIVER_TARGET_NAME} PRIVATE /Zc:preprocessor)
+    set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
+    target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()
-    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
+    target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC cda_integration ei)
 endif ()
+
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests/unit)
+endif()

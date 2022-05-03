@@ -27,7 +27,21 @@ def main():
     subprocess.check_call("cmake --build . --target install", shell=True)
 
     # Build plugin
+    os.chdir(current_abs_path)
     print("Building native plugin")
+    run_unit_test = (os.name != 'nt')
+    enable_unit_test = ""
+    if run_unit_test:
+        # enabled by default
+        print("Enabling unit tests")
+        # install lcov
+        subprocess.check_call("wget 'https://github.com/linux-test-project/lcov/archive/master.zip'", shell=True)
+        subprocess.check_call("unzip master.zip", shell=True)
+        os.chdir("lcov-master")
+        subprocess.check_call("sudo make install", shell=True)
+    else:
+        enable_unit_test = "-DBUILD_TESTS=OFF"
+
     os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
@@ -37,9 +51,12 @@ def main():
         print("Setting generator for Windows")
         generator = "-G \"Visual Studio 16 2019\" -A x64"
 
-    subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+    subprocess.check_call(f"cmake {generator} {enable_unit_test} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
     subprocess.check_call("cmake --build .", shell=True)
+    if run_unit_test:
+        print("Running unit tests with coverage")
+        subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
     os.chdir(current_abs_path)
     # Put the output library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/lib", "priv", dirs_exist_ok=True)
