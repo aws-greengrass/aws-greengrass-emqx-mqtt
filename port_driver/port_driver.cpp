@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cstdlib>
+#include <cstdio>
 
 #include "port_driver.h"
 #include <cda_integration.h>
@@ -113,7 +113,8 @@ static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
     int index = 0;
     client_id = get_buffer_for_next_entry(buff, &index);
     if(!client_id) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, client_id)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -122,7 +123,8 @@ static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
 
     pem = get_buffer_for_next_entry(buff, &index);
     if(!pem) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, pem)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -133,13 +135,11 @@ static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
 
 respond:
     write_bool_to_port(context, result, return_code);
-
-cleanup:
-    {
-        if (client_id != nullptr)
-            free(client_id);
-        if (pem != nullptr)
-            free(pem);
+    if (client_id != nullptr) {
+        free(client_id);
+    }
+    if (pem != nullptr) {
+        free(pem);
     }
 }
 
@@ -154,7 +154,8 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
     int index = 0;
     client_id = get_buffer_for_next_entry(buff, &index);
     if(!client_id) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, client_id)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -163,7 +164,8 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
 
     pem = get_buffer_for_next_entry(buff, &index);
     if(!pem) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, pem)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -172,7 +174,8 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
 
     topic = get_buffer_for_next_entry(buff, &index);
     if(!topic) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, topic)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -181,7 +184,8 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
 
     pub_sub = get_buffer_for_next_entry(buff, &index);
     if(!pub_sub) {
-        goto cleanup;
+        return_code = RETURN_CODE_UNEXPECTED;
+        goto respond;
     }
     if(ei_decode_string(buff, &index, pub_sub)) {
         return_code = RETURN_CODE_UNEXPECTED;
@@ -193,16 +197,17 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
 respond:
     write_bool_to_port(context, result, return_code);
 
-cleanup:
-    {
-        if (client_id != nullptr)
-            free(client_id);
-        if (pem != nullptr)
-            free(pem);
-        if (topic != nullptr)
-            free(topic);
-        if (pub_sub != nullptr)
-            free(pub_sub);
+    if (client_id != nullptr) {
+        free(client_id);
+    }
+    if (pem != nullptr) {
+        free(pem);
+    }
+    if (topic != nullptr) {
+        free(topic);
+    }
+    if (pub_sub != nullptr) {
+        free(pub_sub);
     }
 }
 
