@@ -42,6 +42,10 @@ def patch(original, patch_file):
     return out.getvalue().decode()
 
 
+def append(original, addition):
+    return original.decode('utf-8') + addition
+
+
 def do_patch(zip_path, erts_version="11.0", add=None):
     # ini file is only for windows, but we'll just throw it in no matter what. Use \r\n for windows line endings
     with open("build/erl.ini", "w") as erl_ini:
@@ -55,7 +59,8 @@ def do_patch(zip_path, erts_version="11.0", add=None):
     add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
     update_zip(zipname=zip_path, updates={
         "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
-        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
+        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff"),
+        "emqx/data/loaded_plugins": lambda o: append(o, "{aws_greengrass_emqx_auth, true}.\n")
     }, add=add)
 
 
