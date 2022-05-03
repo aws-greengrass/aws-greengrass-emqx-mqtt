@@ -8,9 +8,10 @@
 extern "C" {
 
 void driver_free_binary(ErlDrvBinary *bin) {
+    (void)bin;
 }
 
-void int driver_output_binary(ErlDrvPort port, char *hbuf, ErlDrvSizeT hlen, ErlDrvBinary* bin, ErlDrvSizeT offset, ErlDrvSizeT len) {
+int driver_output_binary(ErlDrvPort port, char *hbuf, ErlDrvSizeT hlen, ErlDrvBinary* bin, ErlDrvSizeT offset, ErlDrvSizeT len) {
     (void)port;
     (void)hbuf;
     (void)hlen;
@@ -18,11 +19,6 @@ void int driver_output_binary(ErlDrvPort port, char *hbuf, ErlDrvSizeT hlen, Erl
     (void)offset;
     (void)len;
     return 0;
-}
-
-void *driver_alloc(ErlDrvSizeT size) {
-    (void)size;
-    return NULL;
 }
 
 void *driver_alloc(ErlDrvSizeT size) {
