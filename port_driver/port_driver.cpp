@@ -9,24 +9,9 @@
 #include <cda_integration.h>
 #include <cstring>
 
-#if defined(__clang__)
-#define COMPILER clang
-#elif defined(__GNUC__) || defined(__GNUG__)
-#define COMPILER GCC
-#elif defined(_MSC_VER)
-#define COMPILER MSVC
-#endif
-
-
-
 // TODO: Improve logging. Add timestamp to the logs
 #if defined(_MSC_VER)
-#define LOG_HELPER(fmt,...) do { \
-    _Pragma("warning(suppress: 4474)")                                    \
-    printf("%s:%d %s() " fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__); \
-} while (0)
-#define LOG(...)    LOG_HELPER(__VA_ARGS__, 1)
-
+#define LOG(fmt,...) printf("%s:%d %s() " fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
 #else
 #define LOG(fmt, ...) printf("%s:%d %s() " fmt"\n",__FILE__,__LINE__,__func__, ##__VA_ARGS__)
 #endif

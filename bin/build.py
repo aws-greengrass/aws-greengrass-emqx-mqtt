@@ -35,7 +35,7 @@ def main():
     generator = ""
     if os.name == 'nt':
         print("Setting generator for Windows")
-        generator = "-G \"Visual Studio 16 2019\" -A x64"
+        generator = "-A x64"
 
     subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)

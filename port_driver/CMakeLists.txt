@@ -56,7 +56,8 @@ if (APPLE)
 endif()
 
 if (WIN32)
-    # target_compile_options(${PROJECT_NAME} PRIVATE /Zc:preprocessor)
+    # Enable to output preprocessed file to a .i file
+    # set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/P")
     set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
     target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()

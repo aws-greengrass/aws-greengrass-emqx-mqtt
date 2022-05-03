@@ -7,14 +7,13 @@
 #include <erl_driver.h>
 
 #if defined(_WIN32)
-#include <BaseTsd.h>
+#include <cstring> // need memcpy for the DRIVER_INIT macro
+#include <basetsd.h>
 typedef SSIZE_T ssize_t;
 #define EXPORTED  __declspec( dllexport )
 #else
 
 #include <sys/types.h>
-#include <cstring>
-
 #define EXPORTED static
 #endif
 
