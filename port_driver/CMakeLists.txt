@@ -5,12 +5,15 @@ project(port_driver)
 option(BUILD_TESTS "Build the tests." ON)
 
 if (WIN32)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .dll
 else()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe and .dll
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe
 endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/liba") # .lib and .a
+set(DRIVER_GENERATED_DIR_PATH "$<0:>${CMAKE_BINARY_DIR}/lib")
+set(DRIVER_OUTPUT_DIR_PATH "$<0:>${CMAKE_BINARY_DIR}/driver_lib")
+file(MAKE_DIRECTORY ${DRIVER_OUTPUT_DIR_PATH})
 
 execute_process (
     COMMAND erl -noshell -eval "io:format('~s/../usr/include', [code:lib_dir()])" -s erlang halt
@@ -59,6 +62,11 @@ if (WIN32)
 else ()
     target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC cda_integration ei)
 endif ()
+
+add_custom_command(TARGET ${PORT_DRIVER_TARGET_NAME}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${DRIVER_GENERATED_DIR_PATH}/$<TARGET_FILE_NAME:${PORT_DRIVER_TARGET_NAME}> ${DRIVER_OUTPUT_DIR_PATH}/$<TARGET_FILE_NAME:${PORT_DRIVER_TARGET_NAME}>
+)
 
 if(BUILD_TESTS)
     enable_testing()

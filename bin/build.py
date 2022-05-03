@@ -58,8 +58,8 @@ def main():
         print("Running unit tests with coverage")
         subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
     os.chdir(current_abs_path)
-    # Put the output library into priv which will be built into the EMQ X distribution bundle
-    shutil.copytree("_build/lib", "priv", dirs_exist_ok=True)
+    # Put the output driver library into priv which will be built into the EMQ X distribution bundle
+    shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
 
     print("Cloning EMQ X")
     try:
