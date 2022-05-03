@@ -60,6 +60,7 @@ static unsigned int get_operation(ErlIOVec *ev) {
 }
 
 static void write_bool_to_port(DriverContext *context, bool result, const char return_code) {
+    // TODO: Only allocate once?
     ErlDrvBinary *out = driver_alloc_binary(sizeof(result));
     if (!out) {
         LOG("Out of memory");
