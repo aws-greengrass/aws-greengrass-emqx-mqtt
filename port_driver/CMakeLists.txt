@@ -12,7 +12,7 @@ endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/liba") # .lib and .a
 set(DRIVER_GENERATED_DIR_PATH "$<0:>${CMAKE_BINARY_DIR}/lib")
-set(DRIVER_OUTPUT_DIR_PATH "$<0:>${CMAKE_BINARY_DIR}/driver_lib")
+set(DRIVER_OUTPUT_DIR_PATH "${CMAKE_BINARY_DIR}/driver_lib")
 file(MAKE_DIRECTORY ${DRIVER_OUTPUT_DIR_PATH})
 
 execute_process (
