@@ -39,6 +39,10 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
     auto *context = (DriverContext *) driver_alloc(sizeof(DriverContext));
     context->port = port;
     context->cda_integration_handle = cda_integration_init();
+    if (context->cda_integration_handle == nullptr) {
+        // return value -1 means failure
+        return (ErlDrvData) -1;
+    }
     return (ErlDrvData) context;
 }
 
