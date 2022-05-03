@@ -37,9 +37,20 @@ def main():
         print("Setting generator for Windows")
         generator = "-G \"Visual Studio 16 2019\" -A x64"
 
-    subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+    run_unit_test = (os.name != 'nt')
+    enable_unit_test = ""
+    if run_unit_test:
+        # enabled by default
+        print("Building native unit tests")
+    else
+        enable_unit_test = "-DBUILD_TESTS=OFF"
+
+    subprocess.check_call(f"cmake {generator} {enable_unit_test} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
     subprocess.check_call("cmake --build .", shell=True)
+    if run_unit_test:
+        print("Running native tests")
+        subprocess.check_call("make test", shell=True)
     os.chdir(current_abs_path)
     # Put the output library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/lib", "priv", dirs_exist_ok=True)

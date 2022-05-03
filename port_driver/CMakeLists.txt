@@ -61,5 +61,6 @@ else ()
 endif ()
 
 if(BUILD_TESTS)
+    enable_testing()
 	add_subdirectory(tests/unit)
 endif()
