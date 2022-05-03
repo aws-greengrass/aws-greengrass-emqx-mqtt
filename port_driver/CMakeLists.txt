@@ -50,6 +50,9 @@ add_library(${PROJECT_NAME} SHARED port_driver.cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
 
+find_package(aws-crt-cpp REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE AWS::aws-crt-cpp)
+
 if (APPLE)
     # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".so")

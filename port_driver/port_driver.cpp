@@ -6,25 +6,34 @@
 #include <cstdio>
 
 #include "port_driver.h"
+#include <aws/crt/Api.h>
 #include <cda_integration.h>
 #include <cstring>
 #include <memory>
 
-// TODO: Improve logging. Add timestamp to the logs
-#if defined(_MSC_VER)
-#define LOG(fmt,...) printf("%s:%d %s() " fmt"\n",__FILE__,__LINE__,__func__, __VA_ARGS__)
-#else
-#define LOG(fmt, ...) printf("%s:%d %s() " fmt"\n",__FILE__,__LINE__,__func__, ##__VA_ARGS__)
-#endif
+enum log_subject {
+    PORT_DRIVER_SUBJECT = AWS_LOG_SUBJECT_BEGIN_RANGE(100),
+};
+
+#define LOG(...) AWS_LOGF_INFO(PORT_DRIVER_SUBJECT, __VA_ARGS__)
 
 typedef struct {
     ErlDrvPort port;
     CDA_INTEGRATION_HANDLE* cda_integration_handle;
 } DriverContext;
 
+static struct aws_logger our_logger{};
+
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char* buff)
 {
     (void)buff;
+    struct aws_logger_standard_options logger_options = {
+            .level = AWS_LL_TRACE,
+            .filename = "crt.log",
+    };
+    aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
+    aws_logger_set(&our_logger);
+
     LOG("Starting the driver");
     ei_init();
     auto* context = (DriverContext*)driver_alloc(sizeof(DriverContext));
@@ -39,6 +48,7 @@ EXPORTED void drv_stop(ErlDrvData handle)
     auto* context = (DriverContext*)handle;
     cda_integration_close(context->cda_integration_handle);
     driver_free((char*)handle);
+    aws_logger_clean_up(&our_logger);
 }
 
 static unsigned int get_operation(ErlIOVec *ev) {
@@ -110,9 +120,10 @@ static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
 
     int index = 0;
     auto client_id = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if(client_id && ei_decode_string(buff, &index, client_id.get())) {
+    if(client_id && ei_decode_string(buff, &index, client_id.get()) == 0) {
         auto pem = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-        if(pem && ei_decode_string(buff, &index, pem.get())) {
+        if(pem && ei_decode_string(buff, &index, pem.get()) == 0) {
+            LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
             result = (*func)(context->cda_integration_handle, client_id, pem);
             return_code = RETURN_CODE_SUCCESS;
         }
@@ -130,13 +141,15 @@ static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
 
     int index = 0;
     auto client_id = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (client_id && ei_decode_string(buff, &index, client_id.get())) {
+    if (client_id && ei_decode_string(buff, &index, client_id.get()) == 0) {
         auto pem = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-        if (pem && ei_decode_string(buff, &index, pem.get())) {
+        if (pem && ei_decode_string(buff, &index, pem.get()) == 0) {
             auto topic = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-            if (topic && ei_decode_string(buff, &index, topic.get())) {
+            if (topic && ei_decode_string(buff, &index, topic.get()) == 0) {
                 auto pub_sub = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-                if (pub_sub && ei_decode_string(buff, &index, pub_sub.get())) {
+                if (pub_sub && ei_decode_string(buff, &index, pub_sub.get()) == 0) {
+                    LOG("Handling acl request with client id %s, pem %s, for topic %s, and action %s",
+                        client_id.get(), pem.get(), topic.get(), pub_sub.get())
                     result = on_check_acl(context->cda_integration_handle, std::move(client_id),
                                           std::move(pem), std::move(topic),
                                           std::move(pub_sub));
@@ -160,18 +173,23 @@ EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev)
     const unsigned int op = get_operation(ev);
     switch(op) {
         case ON_CLIENT_CONNECT:
+            LOG("ON_CLIENT_CONNECT")
             handle_client_id_and_pem(context, ev, &on_client_connect);
             break;
         case ON_CLIENT_CONNECTED:
+            LOG("ON_CLIENT_CONNECTED")
             handle_client_id_and_pem(context, ev, &on_client_connected);
             break;
         case ON_CLIENT_DISCONNECT:
+            LOG("ON_CLIENT_DISCONNECT")
             handle_client_id_and_pem(context, ev, &on_client_disconnected);
             break;
         case ON_CLIENT_AUTHENTICATE:
+            LOG("ON_CLIENT_AUTHENTICATE")
             handle_client_id_and_pem(context, ev, &on_client_authenticate);
             break;
         case ON_CLIENT_CHECK_ACL:
+            LOG("ON_CLIENT_CHECK_ACL")
             handle_check_acl(context, ev);
             break;
         default:
