@@ -42,7 +42,7 @@ def main():
     if run_unit_test:
         # enabled by default
         print("Building native unit tests")
-    else
+    else:
         enable_unit_test = "-DBUILD_TESTS=OFF"
 
     subprocess.check_call(f"cmake {generator} {enable_unit_test} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
