@@ -8,6 +8,7 @@
 #include "port_driver.h"
 #include <cda_integration.h>
 #include <cstring>
+#include <memory>
 
 // TODO: Improve logging. Add timestamp to the logs
 #if defined(_MSC_VER)
@@ -49,18 +50,16 @@ static void write_bool_to_port(DriverContext* context, bool result, const char r
     ErlDrvBinary* out = driver_alloc_binary(sizeof(result));
     if(!out) {
         LOG("Out of memory");
-        goto cleanup;
-    }
-    {
-        memcpy(&out->orig_bytes[0], &result, sizeof(result));
-        char return_code_temp = return_code;
-        if (driver_output_binary(context->port, &return_code_temp, 1, out, 0, sizeof(result))) {
-            LOG("Out of memory");
-            goto cleanup;
-        }
+        return;
     }
 
-cleanup:
+    memcpy(&out->orig_bytes[0], &result, sizeof(result));
+    char return_code_temp = return_code;
+    if (driver_output_binary(context->port, &return_code_temp, 1, out, 0, sizeof(result))) {
+        LOG("Out of memory");
+        driver_free_binary(out);
+    }
+
     driver_free_binary(out);
 }
 
@@ -102,113 +101,52 @@ static char* get_buffer_for_next_entry(char* buff, int* index) {
 }
 
 static void handle_client_id_and_pem(DriverContext* context, ErlIOVec *ev,
-        bool (*func)(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem)) {
-    char *client_id, *pem = nullptr;
-    char return_code = RETURN_CODE_SUCCESS;
+        bool (*func)(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem)) {
+    char return_code = RETURN_CODE_UNEXPECTED;
     bool result = false;
 
     ErlDrvBinary* bin = ev->binv[1];
     char* buff = &bin->orig_bytes[1];
 
     int index = 0;
-    client_id = get_buffer_for_next_entry(buff, &index);
-    if(!client_id) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, client_id)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-
-    pem = get_buffer_for_next_entry(buff, &index);
-    if(!pem) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, pem)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
+    auto client_id = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+    if(client_id && ei_decode_string(buff, &index, client_id.get())) {
+        auto pem = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+        if(pem && ei_decode_string(buff, &index, pem.get())) {
+            result = (*func)(context->cda_integration_handle, client_id, pem);
+            return_code = RETURN_CODE_SUCCESS;
+        }
     }
 
-    result = (*func)(context->cda_integration_handle, client_id, pem);
-
-respond:
     write_bool_to_port(context, result, return_code);
-    if (client_id != nullptr) {
-        free(client_id);
-    }
-    if (pem != nullptr) {
-        free(pem);
-    }
 }
 
 static void handle_check_acl(DriverContext* context, ErlIOVec *ev) {
-    char *client_id, *pem, *topic, *pub_sub = nullptr;
-    char return_code = RETURN_CODE_SUCCESS;
+    char return_code = RETURN_CODE_UNEXPECTED;
     bool result = false;
 
-    ErlDrvBinary* bin = ev->binv[1];
-    char* buff = &bin->orig_bytes[1];
+    ErlDrvBinary *bin = ev->binv[1];
+    char *buff = &bin->orig_bytes[1];
 
     int index = 0;
-    client_id = get_buffer_for_next_entry(buff, &index);
-    if(!client_id) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, client_id)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-
-    pem = get_buffer_for_next_entry(buff, &index);
-    if(!pem) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, pem)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
+    auto client_id = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+    if (client_id && ei_decode_string(buff, &index, client_id.get())) {
+        auto pem = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+        if (pem && ei_decode_string(buff, &index, pem.get())) {
+            auto topic = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+            if (topic && ei_decode_string(buff, &index, topic.get())) {
+                auto pub_sub = std::shared_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+                if (pub_sub && ei_decode_string(buff, &index, pub_sub.get())) {
+                    result = on_check_acl(context->cda_integration_handle, std::move(client_id),
+                                          std::move(pem), std::move(topic),
+                                          std::move(pub_sub));
+                    return_code = RETURN_CODE_SUCCESS;
+                }
+            }
+        }
     }
 
-    topic = get_buffer_for_next_entry(buff, &index);
-    if(!topic) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, topic)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-
-    pub_sub = get_buffer_for_next_entry(buff, &index);
-    if(!pub_sub) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-    if(ei_decode_string(buff, &index, pub_sub)) {
-        return_code = RETURN_CODE_UNEXPECTED;
-        goto respond;
-    }
-
-    result = on_check_acl(context->cda_integration_handle, client_id, pem, topic, pub_sub);
-
-respond:
     write_bool_to_port(context, result, return_code);
-
-    if (client_id != nullptr) {
-        free(client_id);
-    }
-    if (pem != nullptr) {
-        free(pem);
-    }
-    if (topic != nullptr) {
-        free(topic);
-    }
-    if (pub_sub != nullptr) {
-        free(pub_sub);
-    }
 }
 
 static void handle_unknown_op(DriverContext* context) {

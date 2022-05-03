@@ -15,11 +15,12 @@ class ClientDeviceAuthIntegration {
 public:
     ClientDeviceAuthIntegration();
     bool close() const;
-    bool on_client_connect(const char* clientId, const char* pem);
-    bool on_client_connected(const char* clientId, const char* pem);
-    bool on_client_disconnected(const char* clientId, const char* pem);
-    bool on_client_authenticate(const char* clientId, const char* pem);
-    bool on_check_acl(const char* clientId, const char* pem, const char* topic, const char* action);
+    bool on_client_connect(std::shared_ptr<char> clientId, std::shared_ptr<char> pem);
+    bool on_client_connected(std::shared_ptr<char> clientId, std::shared_ptr<char> pem);
+    bool on_client_disconnected(std::shared_ptr<char> clientId, std::shared_ptr<char> pem);
+    bool on_client_authenticate(std::shared_ptr<char> clientId, std::shared_ptr<char> pem);
+    bool on_check_acl(std::shared_ptr<char> clientId, std::shared_ptr<char> pem,
+                      std::shared_ptr<char> topic, std::shared_ptr<char> action);
 };
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
@@ -29,28 +30,29 @@ bool ClientDeviceAuthIntegration::close() const {
     return true;
 }
 
-bool ClientDeviceAuthIntegration::on_client_connect(const char* clientId, const char* pem) {
+bool ClientDeviceAuthIntegration::on_client_connect(std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: "<< pem << std::endl;
     return true;
 }
 
-bool ClientDeviceAuthIntegration::on_client_connected(const char* clientId, const char* pem) {
+bool ClientDeviceAuthIntegration::on_client_connected(std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     std::cout << "on_client_connected called with clientId: " << clientId << " and pem: "<< pem << std::endl;
     return true;
 }
 
-bool ClientDeviceAuthIntegration::on_client_disconnected(const char* clientId, const char* pem) {
+bool ClientDeviceAuthIntegration::on_client_disconnected(std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     std::cout << "on_client_disconnected called with clientId: " << clientId << " and pem: "<< pem << std::endl;
     return true;
 }
 
-bool ClientDeviceAuthIntegration::on_client_authenticate(const char* clientId, const char* pem) {
+bool ClientDeviceAuthIntegration::on_client_authenticate(std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     std::cout << "on_client_authenticate called with clientId: " << clientId << " and pem: "<< pem << std::endl;
     return true;
 }
 
-bool ClientDeviceAuthIntegration::on_check_acl(const char* clientId, const char* pem, const char* topic,
-    const char* action) {
+bool ClientDeviceAuthIntegration::on_check_acl(std::shared_ptr<char> clientId, std::shared_ptr<char> pem,
+                                               std::shared_ptr<char> topic,
+                                               std::shared_ptr<char> action) {
     std::cout << "on_check_acl called with clientId: " << clientId << " and pem: "<< pem << " and topic: " << topic <<
     " and action: " << action << std::endl;
     return true;
@@ -100,7 +102,7 @@ bool cda_integration_close(CDA_INTEGRATION_HANDLE* handle) {
     return execute_with_handle(handle, close);
 }
 
-bool on_client_connect(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem) {
+bool on_client_connect(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> on_connect = [clientId, pem]
     (ClientDeviceAuthIntegration* cda_integ) {
         return cda_integ->on_client_connect(clientId, pem);
@@ -108,7 +110,7 @@ bool on_client_connect(CDA_INTEGRATION_HANDLE* handle, const char* clientId, con
     return execute_with_handle(handle, on_connect);
 }
 
-bool on_client_connected(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem) {
+bool on_client_connected(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> on_connected = [clientId, pem]
     (ClientDeviceAuthIntegration* cda_integ) {
             return cda_integ->on_client_connected(clientId, pem);
@@ -116,7 +118,7 @@ bool on_client_connected(CDA_INTEGRATION_HANDLE* handle, const char* clientId, c
     return execute_with_handle(handle, on_connected);
 }
 
-bool on_client_disconnected(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem) {
+bool on_client_disconnected(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> on_disconnected = [clientId, pem]
     (ClientDeviceAuthIntegration* cda_integ) {
             return cda_integ->on_client_disconnected(clientId, pem);
@@ -124,7 +126,7 @@ bool on_client_disconnected(CDA_INTEGRATION_HANDLE* handle, const char* clientId
     return execute_with_handle(handle, on_disconnected);
 }
 
-bool on_client_authenticate(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem) {
+bool on_client_authenticate(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem) {
     const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> on_authenticate = [clientId, pem]
     (ClientDeviceAuthIntegration* cda_integ) {
             return cda_integ->on_client_authenticate(clientId, pem);
@@ -132,11 +134,12 @@ bool on_client_authenticate(CDA_INTEGRATION_HANDLE* handle, const char* clientId
     return execute_with_handle(handle, on_authenticate);
 }
 
-bool on_check_acl(CDA_INTEGRATION_HANDLE* handle, const char* clientId, const char* pem, const char* topic,
-    const char* action) {
-    const std::function<bool (ClientDeviceAuthIntegration* cda_integ)> on_check_acl_func = [clientId, pem, topic,
-    action] (ClientDeviceAuthIntegration* cda_integ) {
-            return cda_integ->on_check_acl(clientId, pem, topic, action);
-        };
+bool on_check_acl(CDA_INTEGRATION_HANDLE* handle, std::shared_ptr<char> clientId, std::shared_ptr<char> pem,
+                  std::shared_ptr<char> topic, std::shared_ptr<char> action) {
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_check_acl_func =
+            [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_check_acl(std::move(clientId), std::move(pem), std::move(topic),
+                                               std::move(action));
+            };
     return execute_with_handle(handle, on_check_acl_func);
 }
