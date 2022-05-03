@@ -5,6 +5,11 @@
 
 #include <erl_driver.h>
 
+/*
+ Library erl_driver is not available to link against.
+ It is available at runtime when running in erlang runtime.
+*/
+
 extern "C" {
 
 void driver_free_binary(ErlDrvBinary *bin) {
