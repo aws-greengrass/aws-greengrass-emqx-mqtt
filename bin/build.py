@@ -10,6 +10,12 @@ import wget
 
 from .package import do_patch
 
+def change_dir_permissions_recursive(path, mode):
+    for root, dirs, files in os.walk(path, topdown=False):
+        for dir in [os.path.join(root,d) for d in dirs]:
+            os.chmod(dir, mode)
+    for file in [os.path.join(root, f) for f in files]:
+        os.chmod(file, mode)
 
 def main():
     # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
@@ -37,6 +43,9 @@ def main():
 
     # Build plugin
     os.chdir(current_abs_path)
+    pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
+    os.chdir("_build")
+
     print("Building native plugin")
     run_unit_test = not quick_mode
     enable_unit_test = ""
@@ -50,15 +59,15 @@ def main():
             os.remove(zip_name)
         if os.path.isdir(dir_name):
             shutil.rmtree(dir_name)
-        wget.download('https://github.com/linux-test-project/lcov/archive/master.zip')
+        wget.download("https://github.com/linux-test-project/lcov/archive/master.zip")
         shutil.unpack_archive(zip_name, ".")
         os.chdir(dir_name)
+        change_dir_permissions_recursive("bin", 0o777)
         subprocess.check_call("sudo make install", shell=True)
     else:
         enable_unit_test = "-DBUILD_TESTS=OFF"
 
     os.chdir(current_abs_path)
-    pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
     generator = ""
