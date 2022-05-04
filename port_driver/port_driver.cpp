@@ -114,9 +114,9 @@ static char *get_buffer_for_next_entry(char *buff, int *index) {
     return b;
 }
 
-static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
-                                     OperationResult (*func)(CDA_INTEGRATION_HANDLE *handle, 
-				     const char *clientId, const char *pem)) {
+static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev, 
+				     OperationResult (*func)(CDA_INTEGRATION_HANDLE *handle, 
+					                     const char *clientId, const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
     OperationResult result = OperationResult::UNKNOWN;
 
@@ -202,8 +202,8 @@ static void handle_verify_client_certificate(DriverContext *context, ErlIOVec *e
     int index = 0;
     auto cert_pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
     if (!cert_pem || ei_decode_string(buff, &index, cert_pem.get()) != 0) { 
-	result = OperationResult::FAIL;
-	return; 
+        result = OperationResult::FAIL;
+        return; 
     }
 
     LOG("Handling verify_client_certificate request with cert_pem %s", cert_pem.get())

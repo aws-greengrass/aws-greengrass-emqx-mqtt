@@ -8,7 +8,6 @@
 -include("emqx.hrl").
 -include_lib("public_key/include/public_key.hrl").
 
--import(os, [getenv/1]).
 -import(port_driver_integration,[verify_client_certificate/1]).
 
 -export([enable/0]).

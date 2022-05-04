@@ -23,7 +23,9 @@ start(_StartType, _StartArgs) ->
   port_driver_integration:start(),
   case tls_custom_certificate_verification:enable() of
     ok -> ok;
-    nossl -> ok;
+    nossl -> 
+      ErrorString = io_lib:format("Could not find active Ssl listener"),
+      throw({error, ErrorString});
     {error, Reason} ->
       ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s", 
 				  [Reason]),

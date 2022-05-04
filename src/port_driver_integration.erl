@@ -91,7 +91,8 @@ on_client_connect(ClientId, CertPem) ->
         {ok, ?OPERATION_RESULT_PASS} -> pass;
         {ok, ?OPERATION_RESULT_FAIL} -> fail;
         {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
-        {error, Error} -> Error
+        {error, Error} -> Error;
+	{_, _} -> fail
     end.
 
 on_client_connected(ClientId, CertPem) ->
@@ -100,7 +101,8 @@ on_client_connected(ClientId, CertPem) ->
         {ok, ?OPERATION_RESULT_PASS} -> pass;
         {ok, ?OPERATION_RESULT_FAIL} -> fail;
         {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
-        {error, Error} -> Error
+        {error, Error} -> Error;
+	{_, _} -> fail
     end.
 
 on_client_disconnected(ClientId, CertPem) ->
@@ -109,7 +111,8 @@ on_client_disconnected(ClientId, CertPem) ->
         {ok, ?OPERATION_RESULT_PASS} -> pass;
         {ok, ?OPERATION_RESULT_FAIL} -> fail;
         {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
-        {error, Error} -> Error
+        {error, Error} -> Error;
+	{_, _} -> fail
     end.
 
 on_client_authenticate(ClientId, CertPem) ->
@@ -118,7 +121,8 @@ on_client_authenticate(ClientId, CertPem) ->
         {ok, ?OPERATION_RESULT_PASS} -> {ok, valid_client};
         {ok, ?OPERATION_RESULT_FAIL} -> {ok, invalid_client};
         {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, invalid_client};
-        {error, Error} -> {error, Error}
+        {error, Error} -> {error, Error};
+	{_, _} -> {ok, invalid_client}
     end.
 
 on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
@@ -127,7 +131,8 @@ on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
         {ok, ?OPERATION_RESULT_PASS} -> {ok, authorized};
         {ok, ?OPERATION_RESULT_FAIL} -> {ok, unauthorized};
         {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, unauthorized};
-        {error, Error} -> {error, Error}
+        {error, Error} -> {error, Error};
+	{_, _} -> {ok, unauthorized}
     end.
 
 verify_client_certificate(CertPem) ->
@@ -136,7 +141,8 @@ verify_client_certificate(CertPem) ->
         {ok, ?OPERATION_RESULT_PASS} -> {ok, valid_cert};
         {ok, ?OPERATION_RESULT_FAIL} -> {ok, invalid_cert};
         {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, invalid_cert};
-        {error, Error} -> {error, Error}
+        {error, Error} -> {error, Error};
+        {_, _} -> {ok, invalid_cert}
     end.
 
 call_port(Msg) ->

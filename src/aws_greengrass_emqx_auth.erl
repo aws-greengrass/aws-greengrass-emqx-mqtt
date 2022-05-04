@@ -53,13 +53,12 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
     put(cert_pem, PeerCertEncoded),
 
     case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
-        pass -> ok;
+        pass -> {ok, Props};
 	fail -> stop;
         Unexpected ->
             logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected]),
 	    stop
-    end,
-    {ok, Props}.
+    end.
 
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     logger:debug("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n, Env:~n~p~n",
