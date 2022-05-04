@@ -25,6 +25,11 @@
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
 
+%% OPERATION RESULTS
+-define(OPERATION_RESULT_FAIL, 0).
+-define(OPERATION_RESULT_PASS, 1).
+-define(OPERATION_RESULT_UNKNOWN, 2).
+
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
 
@@ -81,28 +86,64 @@ loop(Port) ->
     end.
 
 on_client_connect(ClientId, CertPem) ->
-    call_port({on_client_connect, ClientId, CertPem}).
+    {ReturnCode, ResultBinary} = call_port({on_client_connect, ClientId, CertPem}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> pass;
+        {ok, ?OPERATION_RESULT_FAIL} -> fail;
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
+        {error, Error} -> Error
+    end.
 
 on_client_connected(ClientId, CertPem) ->
-    call_port({on_client_connected, ClientId, CertPem}).
+    {ReturnCode, ResultBinary} = call_port({on_client_connected, ClientId, CertPem}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> pass;
+        {ok, ?OPERATION_RESULT_FAIL} -> fail;
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
+        {error, Error} -> Error
+    end.
 
 on_client_disconnected(ClientId, CertPem) ->
-    call_port({on_client_disconnected, ClientId, CertPem}).
+    {ReturnCode, ResultBinary} = call_port({on_client_disconnected, ClientId, CertPem}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> pass;
+        {ok, ?OPERATION_RESULT_FAIL} -> fail;
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> fail;
+        {error, Error} -> Error
+    end.
 
 on_client_authenticate(ClientId, CertPem) ->
-    call_port({on_client_authenticate, ClientId, CertPem}).
+    {ReturnCode, ResultBinary} = call_port({on_client_authenticate, ClientId, CertPem}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> {ok, valid_client};
+        {ok, ?OPERATION_RESULT_FAIL} -> {ok, invalid_client};
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, invalid_client};
+        {error, Error} -> {error, Error}
+    end.
 
 on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
-    call_port({on_client_check_acl, ClientId, CertPem, Topic, PubSub}).
+    {ReturnCode, ResultBinary} = call_port({on_client_check_acl, ClientId, CertPem, Topic, PubSub}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> {ok, authorized};
+        {ok, ?OPERATION_RESULT_FAIL} -> {ok, unauthorized};
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, unauthorized};
+        {error, Error} -> {error, Error}
+    end.
 
 verify_client_certificate(CertPem) ->
-    call_port({verify_client_certificate, CertPem}).
+    {ReturnCode, ResultBinary} = call_port({verify_client_certificate, CertPem}),
+    case {ReturnCode, operation_result(ResultBinary)} of
+        {ok, ?OPERATION_RESULT_PASS} -> {ok, valid_cert};
+        {ok, ?OPERATION_RESULT_FAIL} -> {ok, invalid_cert};
+        {ok, ?OPERATION_RESULT_UNKNOWN} -> {ok, invalid_cert};
+        {error, Error} -> {error, Error}
+    end.
 
 call_port(Msg) ->
     process ! {call, self(), Msg},
     receive
 	{process, Data} ->
-	    logger:error("Data received from port: ~p ~n", [Data]),
+	    logger:debug("Data received from port: ~p ~n", [Data]),
 	    [ReturnCode|Result] = Data,
 	    case ReturnCode of
 	        ?RETURN_CODE_SUCCESS -> {ok, Result};
@@ -111,6 +152,17 @@ call_port(Msg) ->
 	            {error, error_from_driver}
 	    end
     end.
+
+operation_result(Result) when is_binary(Result) ->
+    % assuming the size of result-type returned by port-driver is platform dependent 
+    % check the first byte of binary result, ignoring rest of the zero-bytes
+    case binary:at(Result, 0) of
+	?OPERATION_RESULT_PASS -> ?OPERATION_RESULT_PASS;
+	?OPERATION_RESULT_FAIL -> ?OPERATION_RESULT_FAIL;
+	?OPERATION_RESULT_UNKNOWN -> ?OPERATION_RESULT_UNKNOWN
+    end;
+operation_result(Result) -> Result.
+	
 
 encode({on_client_connect, ClientId, CertPem}) ->
     encode({ClientId, CertPem, ?ON_CLIENT_CONNECT});

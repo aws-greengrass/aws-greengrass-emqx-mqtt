@@ -59,7 +59,7 @@ static unsigned int get_operation(ErlIOVec *ev) {
     return bin->orig_bytes[0];
 }
 
-static void write_bool_to_port(DriverContext *context, bool result, const char return_code) {
+static void write_result_to_port(DriverContext *context, OperationResult result, const char return_code) {
     // TODO: Only allocate once?
     ErlDrvBinary *out = driver_alloc_binary(sizeof(result));
     if (!out) {
@@ -115,26 +115,28 @@ static char *get_buffer_for_next_entry(char *buff, int *index) {
 }
 
 static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
-                                     bool (*func)(CDA_INTEGRATION_HANDLE *handle, const char *clientId,
-                                                  const char *pem)) {
+                                     OperationResult (*func)(CDA_INTEGRATION_HANDLE *handle, 
+				     const char *clientId, const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    OperationResult result = OperationResult::UNKNOWN;
 
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[1];
 
     defer {
-        write_bool_to_port(context, result, return_code);
+        write_result_to_port(context, result, return_code);
     };
 
     int index = 0;
     auto client_id = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
     if (!client_id || ei_decode_string(buff, &index, client_id.get()) != 0) {
+        result = OperationResult::FAIL;
         return;
     }
 
     auto pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
     if (!pem || ei_decode_string(buff, &index, pem.get()) != 0) {
+	result = OperationResult::FAIL;
         return;
     }
     LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
@@ -144,27 +146,39 @@ static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
 
 static void handle_check_acl(DriverContext *context, ErlIOVec *ev) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    OperationResult result = OperationResult::UNKNOWN;
 
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[1];
 
     defer {
-        write_bool_to_port(context, result, return_code);
+        write_result_to_port(context, result, return_code);
     };
 
     int index = 0;
     auto client_id = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!client_id || ei_decode_string(buff, &index, client_id.get()) != 0) { return; }
+    if (!client_id || ei_decode_string(buff, &index, client_id.get()) != 0) { 
+        result = OperationResult::FAIL;
+	return; 
+    }
 
     auto pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!pem || ei_decode_string(buff, &index, pem.get()) != 0) { return; }
+    if (!pem || ei_decode_string(buff, &index, pem.get()) != 0) { 
+	result = OperationResult::FAIL;
+	return; 
+    }
 
     auto topic = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!topic || ei_decode_string(buff, &index, topic.get()) != 0) { return; }
+    if (!topic || ei_decode_string(buff, &index, topic.get()) != 0) { 
+	result = OperationResult::FAIL;
+	return; 
+    }
 
     auto pub_sub = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!pub_sub || ei_decode_string(buff, &index, pub_sub.get()) != 0) { return; }
+    if (!pub_sub || ei_decode_string(buff, &index, pub_sub.get()) != 0) { 
+	result = OperationResult::FAIL;
+	return; 
+    }
 
     LOG("Handling acl request with client id %s, pem %s, for topic %s, and action %s",
         client_id.get(), pem.get(), topic.get(), pub_sub.get())
@@ -176,18 +190,21 @@ static void handle_check_acl(DriverContext *context, ErlIOVec *ev) {
 
 static void handle_verify_client_certificate(DriverContext *context, ErlIOVec *ev) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    OperationResult result = OperationResult::FAIL;
 
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[1];
 
     defer {
-        write_bool_to_port(context, result, return_code);
+        write_result_to_port(context, result, return_code);
     };
 
     int index = 0;
     auto cert_pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!cert_pem || ei_decode_string(buff, &index, cert_pem.get()) != 0) { return; }
+    if (!cert_pem || ei_decode_string(buff, &index, cert_pem.get()) != 0) { 
+	result = OperationResult::FAIL;
+	return; 
+    }
 
     LOG("Handling verify_client_certificate request with cert_pem %s", cert_pem.get())
     result = verify_client_certificate(context->cda_integration_handle, cert_pem.get());
@@ -195,8 +212,8 @@ static void handle_verify_client_certificate(DriverContext *context, ErlIOVec *e
 }
 
 static void handle_unknown_op(DriverContext *context) {
-    bool result = false;
-    write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
+    OperationResult result = OperationResult::UNKNOWN;
+    write_result_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
 }
 
 EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev) {

@@ -53,9 +53,11 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
     put(cert_pem, PeerCertEncoded),
 
     case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        pass -> ok;
+	fail -> stop;
         Unexpected ->
-            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected]),
+	    stop
     end,
     {ok, Props}.
 
@@ -65,9 +67,11 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_connected(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        pass -> ok;
+	fail -> stop;
         Unexpected ->
-            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected]),
+	    stop
     end.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
@@ -76,9 +80,11 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_disconnected(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        pass -> ok;
+	fail -> stop;
         Unexpected ->
-            logger:error("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected])
+            logger:error("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected]),
+	    stop
     end.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -86,11 +92,12 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
               [ClientId, ClientInfo, Result, _Env]),
 
     PeerCertEncoded = get(cert_pem),
-    case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} ->
+    {Ret, Res} = port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded),
+    case {Ret, Res} of
+        {ok, valid_client} ->
             logger:info("Client(~s) authenticated successfully", [ClientId]),
             {ok, Result#{auth_result => success}};
-        {ok, Res} ->
+        {ok, invalid_client} ->
             logger:warn("Client(~s) not authenticated. Res:~p", [ClientId, Res]),
             {stop, Result#{auth_result => not_authorized}};
         {error, Error} ->
@@ -103,11 +110,12 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
               [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
 
     PeerCertEncoded = get(cert_pem),
-    case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
-        {ok, <<1>>} ->
+    {Ret, Res} = port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub),
+    case {Ret, Res} of
+        {ok, authorized} ->
             logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
             {stop, allow};
-        {ok, Res} ->
+        {ok, unauthorized} ->
             logger:warn("Client(~s) not authorized to perform ~p on topic ~p. Res:~p", [ClientId, PubSub, Topic, Res]),
             {stop, deny};
         {error, Error} ->

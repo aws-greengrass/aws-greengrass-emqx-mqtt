@@ -62,10 +62,10 @@ custom_verify(OtpCert, Reason, UserState) ->
 verify_client_certificate(OtpCert, UserState) ->
   CertPem = otpcert_to_pem(OtpCert),
   case port_driver_integration:verify_client_certificate(CertPem) of
-    {ok, <<1>>} ->
+    {ok, valid_cert} ->
       logger:debug("Client certificate is valid: ~p", [CertPem]),
       {valid, UserState};
-    {ok, <<0>>} ->
+    {ok, invalid_cert} ->
       logger:debug("Client certificate is invalid: ~p", [CertPem]),
       {fail, "invalid certificate"};
     {error, Error} ->
