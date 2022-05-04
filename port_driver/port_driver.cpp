@@ -174,6 +174,26 @@ static void handle_check_acl(DriverContext *context, ErlIOVec *ev) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
+static void handle_verify_client_certificate(DriverContext *context, ErlIOVec *ev) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    bool result = false;
+
+    ErlDrvBinary *bin = ev->binv[1];
+    char *buff = &bin->orig_bytes[1];
+
+    defer {
+        write_bool_to_port(context, result, return_code);
+    };
+
+    int index = 0;
+    auto cert_pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
+    if (!cert_pem || ei_decode_string(buff, &index, cert_pem.get()) != 0) { return; }
+
+    LOG("Handling verify_client_certificate request with cert_pem %s", cert_pem.get())
+    result = verify_client_certificate(context->cda_integration_handle, cert_pem.get());
+    return_code = RETURN_CODE_SUCCESS;
+}
+
 static void handle_unknown_op(DriverContext *context) {
     bool result = false;
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
@@ -197,6 +217,9 @@ EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev) {
             break;
         case ON_CLIENT_CHECK_ACL: LOG("ON_CLIENT_CHECK_ACL")
             handle_check_acl(context, ev);
+            break;
+        case VERIFY_CLIENT_CERTIFICATE: LOG("VERIFY_CLIENT_CERTIFICATE")
+            handle_verify_client_certificate(context, ev);
             break;
         default: LOG("Unknown operation: %u", op);
             handle_unknown_op(context);

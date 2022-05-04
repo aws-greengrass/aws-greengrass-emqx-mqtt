@@ -23,4 +23,6 @@ bool on_client_authenticate(CDA_INTEGRATION_HANDLE *handle, const char *clientId
 bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem,
                   const char *topic, const char *action);
 
+bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem);
+
 bool cda_integration_close(CDA_INTEGRATION_HANDLE *handle);
