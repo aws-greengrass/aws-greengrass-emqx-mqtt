@@ -97,6 +97,7 @@ static char* decode_string(char *buff, int *index) {
             memset((void *) b, 0, sizeof(char) * (entry_size + 1));
             if (ei_decode_binary(buff, index, (void *) b, (long *) &entry_size)) {
                 LOG("Failed decoding binary");
+                delete[] b;
                 return nullptr;
             }
             break;
@@ -104,6 +105,7 @@ static char* decode_string(char *buff, int *index) {
         case ERL_STRING_EXT: {
             if (ei_decode_string(buff, index, (char *) b)) {
                 LOG("Failed decoding string");
+                delete[] b;
                 return nullptr;
             }
             break;
@@ -111,13 +113,15 @@ static char* decode_string(char *buff, int *index) {
         case ERL_ATOM_EXT: {
             if (ei_decode_atom(buff, index, b)) {
                 LOG("Failed decoding atom");
+                delete[] b;
                 return nullptr;
             }
             break;
         }
         default: {
             LOG("Missing branch decoding string");
-            break;
+            delete[] b;
+            return nullptr;
         }
     }
     return b;
@@ -187,18 +191,31 @@ static void handle_unknown_op(DriverContext *context) {
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
 }
 
-EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev) {
+static unsigned long decode_operation_header(const char *buff, int* index) {
+    // Input must look like: [{OperationULong, ...Operation specific inputs}]
+
+    int version = 0;
+    // Read out the version header. The version doesn't matter to us, but we need to read it to advance the index.
+    ei_decode_version(buff, index, &version);
+    int arity = 0;
+
+    // Decode the first thing, which must be a list
+    ei_decode_list_header(buff, index, &arity);
+    // Decode the first member of the list which must be a tuple
+    ei_decode_tuple_header(buff, index, &arity);
+    unsigned long op;
+    // Decode the first member of the tuple which must be the operation
+    ei_decode_ulong(buff, index, &op);
+    return op;
+}
+
+void drv_output(ErlDrvData handle, ErlIOVec *ev) {
+    // Input must look like: [{OperationUlong, ...Operation specific inputs}]
     auto *context = (DriverContext *) handle;
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[0];
     int index = 0;
-    int version = 0;
-    ei_decode_version(buff, &index, &version);
-    int arity = 0;
-    ei_decode_list_header(buff, &index, &arity);
-    unsigned long op;
-    ei_decode_tuple_header(buff, &index, &arity);
-    ei_decode_ulong(buff, &index, &op);
+    unsigned long op = decode_operation_header(buff, &index);
 
     switch (op) {
         case ON_CLIENT_CONNECT: LOG("ON_CLIENT_CONNECT")
