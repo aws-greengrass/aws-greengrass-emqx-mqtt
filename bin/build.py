@@ -6,6 +6,7 @@ import subprocess
 
 import os
 import sys
+import wget
 
 from .package import do_patch
 
@@ -37,15 +38,21 @@ def main():
     # Build plugin
     os.chdir(current_abs_path)
     print("Building native plugin")
-    run_unit_test = (os.name != 'nt') and not quick_mode
+    run_unit_test = not quick_mode
     enable_unit_test = ""
     if run_unit_test:
         # enabled by default
         print("Enabling unit tests")
         # install lcov
-        subprocess.check_call("wget 'https://github.com/linux-test-project/lcov/archive/master.zip'", shell=True)
-        subprocess.check_call("unzip -o master.zip", shell=True)
-        os.chdir("lcov-master")
+        zip_name = "lcov-master.zip"
+        dir_name = "lcov-master"
+        if os.path.isfile(zip_name):
+            os.remove(zip_name)
+        if os.path.isdir(dir_name):
+            shutil.rmtree(dir_name)
+        wget.download('https://github.com/linux-test-project/lcov/archive/master.zip')
+        shutil.unpack_archive(zip_name, ".")
+        os.chdir(dir_name)
         subprocess.check_call("sudo make install", shell=True)
     else:
         enable_unit_test = "-DBUILD_TESTS=OFF"
