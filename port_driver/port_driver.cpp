@@ -25,6 +25,13 @@ typedef struct {
 
 static struct aws_logger our_logger{};
 
+struct atoms {
+    ErlDrvTermData data;
+    ErlDrvTermData true_;
+    ErlDrvTermData false_;
+};
+static struct atoms ATOMS{};
+
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
     (void) buff;
     struct aws_logger_standard_options logger_options = {
@@ -36,6 +43,12 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
 
     LOG("Starting AWS Greengrass auth driver");
     ei_init();
+
+    // Setup static atoms
+    ATOMS.data = driver_mk_atom((char *) "data");
+    ATOMS.true_ = driver_mk_atom((char *) "true");
+    ATOMS.false_ = driver_mk_atom((char *) "false");
+
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = (DriverContext *) driver_alloc(sizeof(DriverContext));
     context->port = port;
@@ -63,12 +76,11 @@ static void write_bool_to_port(DriverContext *context, bool result, const char r
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
     // The follow code encodes this Erlang term: {Port, {data, [return code integer, true or false atom]}}
 
-    // TODO: create atoms only once and reuse them
     ErlDrvTermData spec[] = {
             ERL_DRV_PORT, port,
-                ERL_DRV_ATOM, driver_mk_atom((char *) "data"),
+                ERL_DRV_ATOM, ATOMS.data,
                         ERL_DRV_INT, (ErlDrvTermData) return_code,
-                        ERL_DRV_ATOM, result ? driver_mk_atom((char *) "true") : driver_mk_atom((char *) "false"),
+                        ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
                     ERL_DRV_LIST, 2,
                 ERL_DRV_TUPLE, 2,
             ERL_DRV_TUPLE, 2
