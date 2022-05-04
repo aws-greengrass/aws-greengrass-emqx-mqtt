@@ -78,12 +78,34 @@ static void write_bool_to_port(DriverContext *context, bool result, const char r
 
     ErlDrvTermData spec[] = {
             ERL_DRV_PORT, port,
-                ERL_DRV_ATOM, ATOMS.data,
-                        ERL_DRV_INT, (ErlDrvTermData) return_code,
-                        ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
-                    ERL_DRV_LIST, 2,
-                ERL_DRV_TUPLE, 2,
+            ERL_DRV_ATOM, ATOMS.data,
+            ERL_DRV_INT, (ErlDrvTermData) return_code,
+            ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
+            ERL_DRV_LIST, 2,
+            ERL_DRV_TUPLE, 2,
             ERL_DRV_TUPLE, 2
+    };
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG("Failed outputting term");
+    }
+}
+
+static void
+write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, bool result, const char returnCode) {
+    auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, true or false atom]}}
+
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT, port,
+            ERL_DRV_INT64, (ErlDrvTermData) requestId,
+            ERL_DRV_ATOM, ATOMS.data,
+            ERL_DRV_INT, (ErlDrvTermData) returnCode,
+            ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
+            ERL_DRV_LIST, 2,
+            ERL_DRV_TUPLE, 2,
+            ERL_DRV_TUPLE, 3
     };
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
         LOG("Failed outputting term");
@@ -193,6 +215,63 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
+struct packer {
+    std::unique_ptr<char[]> client_id;
+    std::unique_ptr<char[]> pem;
+    DriverContext *context;
+    bool result = false;
+    char returnCode = RETURN_CODE_UNEXPECTED;
+    EI_LONGLONG requestId;
+};
+
+void client_connect(void *buf) {
+    auto pack = (packer *) buf;
+
+    LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
+    bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
+    pack->result = result;
+    pack->returnCode = RETURN_CODE_SUCCESS;
+}
+
+void client_connect_complete(void *buf) {
+    auto pack = (packer *) buf;
+
+    defer {
+        delete pack;
+    };
+
+    write_async_bool_to_port(pack->context, pack->requestId, pack->result, pack->returnCode);
+}
+
+void handle_on_client_connect(DriverContext *context, char *buff, int index) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    bool result = false;
+
+    defer {
+        write_bool_to_port(context, result, return_code);
+    };
+    auto client_id = decode_string(buff, &index);
+    if (!client_id) {
+        return;
+    }
+    auto pem = decode_string(buff, &index);
+    if (!pem) {
+        return;
+    }
+    auto packed = new packer{
+            .client_id = std::move(client_id),
+            .pem = std::move(pem),
+            .context = context,
+    };
+    // Decode the request ID which is used to identify the caller back in Erlang
+    if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
+        return;
+    }
+    driver_async(context->port, nullptr, &client_connect, packed, &client_connect_complete);
+    result = true;
+    return_code = RETURN_CODE_ASYNC;
+}
+
 static void handle_unknown_op(DriverContext *context) {
     bool result = false;
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
@@ -237,9 +316,11 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     }
 
     switch (op) {
-        case ON_CLIENT_CONNECT: LOG("ON_CLIENT_CONNECT")
-            handle_client_id_and_pem(context, buff, index, &on_client_connect);
+        case ON_CLIENT_CONNECT: {
+            LOG("ON_CLIENT_CONNECT")
+            handle_on_client_connect(context, buff, index);
             break;
+        }
         case ON_CLIENT_CONNECTED: LOG("ON_CLIENT_CONNECTED")
             handle_client_id_and_pem(context, buff, index, &on_client_connected);
             break;

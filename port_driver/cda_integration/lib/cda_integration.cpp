@@ -15,6 +15,8 @@ class ClientDeviceAuthIntegration {
 public:
     ClientDeviceAuthIntegration();
 
+    ~ClientDeviceAuthIntegration();
+
     bool close() const;
 
     bool on_client_connect(const char *clientId, const char *pem);
@@ -27,9 +29,15 @@ public:
 
     bool on_check_acl(const char *clientId, const char *pem,
                       const char *topic, const char *action);
+
+private:
+
 };
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
+}
+
+ClientDeviceAuthIntegration::~ClientDeviceAuthIntegration() {
 }
 
 bool ClientDeviceAuthIntegration::close() const {
@@ -37,7 +45,8 @@ bool ClientDeviceAuthIntegration::close() const {
 }
 
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
-    std::cout << "on_client_connect called with clientId: " << clientId << " and pem: " << pem << std::endl;
+    AWS_LOGF_INFO(100, "onconnect in thread");
+    std::this_thread::sleep_for(std::chrono::seconds{5});
     return true;
 }
 

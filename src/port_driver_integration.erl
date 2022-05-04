@@ -24,6 +24,7 @@
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
+-define(RETURN_CODE_ASYNC, 100).
 
 start() ->
   Dir = case code:priv_dir(aws_greengrass_emqx_auth) of
@@ -58,14 +59,32 @@ init(PortDriver) ->
   loop(Port).
 
 loop(Port) ->
+  loop(Port, maps:new(), counters:new(1, [atomics])).
+
+loop(Port, Inflight, Counter) ->
   receive
+    {call, Caller, Msg, async} ->
+      RequestId = counters:get(Counter, 1),
+      counters:add(Counter, 1, 1),
+      Port ! {self(), {command, term_to_binary([Msg, RequestId])}},
+      receive
+        {Port, {data, Data}} ->
+          Caller ! {process, Data},
+          NewInflight = maps:put(RequestId, Caller, Inflight),
+          loop(Port, NewInflight, Counter)
+      end;
+    {Port, Id, {data, Data}} ->
+      Caller = maps:get(Id, Inflight),
+      NewInflight = maps:remove(Id, Inflight),
+      Caller ! {process, Data},
+      loop(Port, NewInflight, Counter);
     {call, Caller, Msg} ->
       Port ! {self(), {command, term_to_binary([Msg])}},
       receive
         {Port, {data, Data}} ->
           Caller ! {process, Data}
       end,
-      loop(Port);
+      loop(Port, Inflight, Counter);
     stop ->
       Port ! {self(), close},
       receive
@@ -78,7 +97,7 @@ loop(Port) ->
   end.
 
 on_client_connect(ClientId, CertPem) ->
-  call_port({?ON_CLIENT_CONNECT, ClientId, CertPem}).
+  call_port({?ON_CLIENT_CONNECT, ClientId, CertPem}, async).
 
 on_client_connected(ClientId, CertPem) ->
   call_port({?ON_CLIENT_CONNECTED, ClientId, CertPem}).
@@ -95,15 +114,32 @@ on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
 receive_back() ->
   receive
     {process, Data} ->
-      logger:debug("Data received from port: ~p ~n", [Data]),
+      logger:error("Data received from port: ~p ~n", [Data]),
       [ReturnCode | Result] = Data,
       case ReturnCode of
         ?RETURN_CODE_SUCCESS -> {ok, Result};
+        ?RETURN_CODE_ASYNC ->
+          logger:error("Got async, sync call, waiting now"),
+          receive
+            {process, NewData} ->
+              logger:error("Data received from port: ~p ~n", [NewData]),
+              [ReturnCode2 | Result2] = NewData,
+              case ReturnCode2 of
+                ?RETURN_CODE_SUCCESS -> {ok, Result2};
+                ErrorReturnCode ->
+                  logger:error("Error from driver. Code: ~p ~n", [ErrorReturnCode]),
+                  {error, error_from_driver}
+              end
+          end;
         ErrorReturnCode ->
           logger:error("Error from driver. Code: ~p ~n", [ErrorReturnCode]),
           {error, error_from_driver}
       end
   end.
+
+call_port(Msg, async) ->
+  process ! {call, self(), Msg, async},
+  receive_back().
 
 call_port(Msg) ->
   process ! {call, self(), Msg},
