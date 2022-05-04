@@ -198,22 +198,29 @@ static void handle_unknown_op(DriverContext *context) {
     write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
 }
 
-static unsigned long decode_operation_header(const char *buff, int *index) {
+static bool decode_operation_header(const char *buff, int *index, unsigned long *op) {
     // Input must look like: [{OperationULong, ...Operation specific inputs}]
 
     int version = 0;
     // Read out the version header. The version doesn't matter to us, but we need to read it to advance the index.
-    ei_decode_version(buff, index, &version);
+    if (ei_decode_version(buff, index, &version) != 0) {
+        return false;
+    }
     int arity = 0;
 
     // Decode the first thing, which must be a list
-    ei_decode_list_header(buff, index, &arity);
+    if (ei_decode_list_header(buff, index, &arity) < 0) {
+        return false;
+    }
     // Decode the first member of the list which must be a tuple
-    ei_decode_tuple_header(buff, index, &arity);
-    unsigned long op;
+    if (ei_decode_tuple_header(buff, index, &arity) < 0) {
+        return false;
+    }
     // Decode the first member of the tuple which must be the operation
-    ei_decode_ulong(buff, index, &op);
-    return op;
+    if (ei_decode_ulong(buff, index, op) < 0) {
+        return false;
+    }
+    return true;
 }
 
 void drv_output(ErlDrvData handle, ErlIOVec *ev) {
@@ -222,7 +229,12 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[0];
     int index = 0;
-    unsigned long op = decode_operation_header(buff, &index);
+    unsigned long op;
+    if (!decode_operation_header(buff, &index, &op)) {
+        LOG("Failed to parse operation input");
+        handle_unknown_op(context);
+        return;
+    }
 
     switch (op) {
         case ON_CLIENT_CONNECT: LOG("ON_CLIENT_CONNECT")
