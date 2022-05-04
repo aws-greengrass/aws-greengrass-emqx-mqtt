@@ -44,7 +44,7 @@ def main():
         print("Enabling unit tests")
         # install lcov
         subprocess.check_call("wget 'https://github.com/linux-test-project/lcov/archive/master.zip'", shell=True)
-        subprocess.check_call("unzip master.zip", shell=True)
+        subprocess.check_call("unzip -o master.zip", shell=True)
         os.chdir("lcov-master")
         subprocess.check_call("sudo make install", shell=True)
     else:
