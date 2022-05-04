@@ -84,9 +84,12 @@ static char* decode_string(char *buff, int *index) {
         return nullptr;
     }
 
-    char *b = (char *) malloc(sizeof(char) * (entry_size + 1));
-    if (!b) {
-        LOG("Out of memory");
+    char *b;
+    try {
+        b = new char[entry_size + 1];
+    } catch (...) {
+        LOG("Out of memory allocating %d", entry_size + 1);
+        return nullptr;
     }
     switch(type) {
         case ERL_BINARY_EXT: {
@@ -134,12 +137,12 @@ static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
         write_bool_to_port(context, result, return_code);
     };
 
-    auto client_id = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto client_id = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!client_id) {
         return;
     }
 
-    auto pem = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto pem = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!pem) {
         return;
     }
@@ -159,16 +162,16 @@ static void handle_check_acl(DriverContext *context, ErlIOVec *ev, int index) {
         write_bool_to_port(context, result, return_code);
     };
 
-    auto client_id = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto client_id = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!client_id) { return; }
 
-    auto pem = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto pem = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!pem) { return; }
 
-    auto topic = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto topic = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!topic) { return; }
 
-    auto pub_sub = std::unique_ptr<char>{decode_string(buff, &index)};
+    auto pub_sub = std::unique_ptr<char[]>{decode_string(buff, &index)};
     if (!pub_sub) { return; }
 
     LOG("Handling acl request with client id %s, pem %s, for topic %s, and action %s",
