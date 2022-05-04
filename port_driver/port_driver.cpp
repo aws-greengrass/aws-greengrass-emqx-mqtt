@@ -36,10 +36,13 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
 
     LOG("Starting AWS Greengrass auth driver");
     ei_init();
+    set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = (DriverContext *) driver_alloc(sizeof(DriverContext));
     context->port = port;
     context->cda_integration_handle = cda_integration_init();
     if (context->cda_integration_handle == nullptr) {
+        LOG("Failed to initialize CDA handle");
+
         // return value -1 means failure
         return (ErlDrvData) -1;
     }
@@ -54,56 +57,30 @@ EXPORTED void drv_stop(ErlDrvData handle) {
     aws_logger_clean_up(&our_logger);
 }
 
-static unsigned int get_operation(ErlIOVec *ev) {
-    ErlDrvBinary *bin = ev->binv[1];
-    return bin->orig_bytes[0];
-}
-
 static void write_bool_to_port(DriverContext *context, bool result, const char return_code) {
-    // TODO: Only allocate once?
-    ErlDrvBinary *out = driver_alloc_binary(sizeof(result));
-    if (!out) {
-        LOG("Out of memory");
-        return;
+    auto port = driver_mk_port(context->port);
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT, port,
+                ERL_DRV_ATOM, driver_mk_atom((char*)"data"),
+                    ERL_DRV_INT, (ErlDrvTermData)return_code,
+                    ERL_DRV_ATOM, result ? driver_mk_atom((char*)"true") : driver_mk_atom((char*)"false"),
+                    ERL_DRV_LIST, 2,
+                ERL_DRV_TUPLE, 2,
+            ERL_DRV_TUPLE, 2
+    };
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG("Failed outputting term");
     }
-
-    memcpy(&out->orig_bytes[0], &result, sizeof(result));
-    char return_code_temp = return_code;
-    if (driver_output_binary(context->port, &return_code_temp, 1, out, 0, sizeof(result))) {
-        LOG("Out of memory");
-        driver_free_binary(out);
-    }
-
-    driver_free_binary(out);
 }
 
-static int decode_version(char *buff, int *index) {
-    // read and discard
-    int version = 0;
-    if (ei_decode_version(buff, index, &version)) {
-        return -1;
-    }
-    return version;
-}
-
-static int get_next_entry_size(char *buff, int *index) {
-    // decode and discard
-    if (decode_version(buff, index) == -1) {
-        return -1;
-    }
-
+static char* decode_string(char *buff, int *index) {
     int type;
     int entry_size;
     if (ei_get_type(buff, index, &type, &entry_size)) {
-        return -1;
+        return nullptr;
     }
-    return entry_size;
-}
-
-static char *get_buffer_for_next_entry(char *buff, int *index) {
-    int entry_size = get_next_entry_size(buff, index);
-    if (entry_size == -1) {
-        LOG("Failed to get the entry size of next entry");
+    if (type != ERL_BINARY_EXT && type != ERL_STRING_EXT && type != ERL_ATOM_EXT) {
+        LOG("Wrong type %c, expected %c, %c, or %c", (char)type, ERL_BINARY_EXT, ERL_STRING_EXT, ERL_ATOM_EXT);
         return nullptr;
     }
 
@@ -111,30 +88,59 @@ static char *get_buffer_for_next_entry(char *buff, int *index) {
     if (!b) {
         LOG("Out of memory");
     }
+    switch(type) {
+        case ERL_BINARY_EXT: {
+            // Zero out the memory as decode_binary won't insert the null char
+            memset((void *) b, 0, sizeof(char) * (entry_size + 1));
+            if (ei_decode_binary(buff, index, (void *) b, (long *) &entry_size)) {
+                LOG("Failed decoding binary");
+                return nullptr;
+            }
+            break;
+        }
+        case ERL_STRING_EXT: {
+            if (ei_decode_string(buff, index, (char *) b)) {
+                LOG("Failed decoding string");
+                return nullptr;
+            }
+            break;
+        }
+        case ERL_ATOM_EXT: {
+            if (ei_decode_atom(buff, index, b)) {
+                LOG("Failed decoding atom");
+                return nullptr;
+            }
+            break;
+        }
+        default: {
+            LOG("Missing branch decoding string");
+            break;
+        }
+    }
     return b;
 }
 
 static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
+                                     int index,
                                      bool (*func)(CDA_INTEGRATION_HANDLE *handle, const char *clientId,
                                                   const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
     bool result = false;
 
     ErlDrvBinary *bin = ev->binv[1];
-    char *buff = &bin->orig_bytes[1];
+    char *buff = &bin->orig_bytes[0];
 
     defer {
         write_bool_to_port(context, result, return_code);
     };
 
-    int index = 0;
-    auto client_id = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!client_id || ei_decode_string(buff, &index, client_id.get()) != 0) {
+    auto client_id = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!client_id) {
         return;
     }
 
-    auto pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!pem || ei_decode_string(buff, &index, pem.get()) != 0) {
+    auto pem = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!pem) {
         return;
     }
     LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
@@ -142,29 +148,28 @@ static void handle_client_id_and_pem(DriverContext *context, ErlIOVec *ev,
     return_code = RETURN_CODE_SUCCESS;
 }
 
-static void handle_check_acl(DriverContext *context, ErlIOVec *ev) {
+static void handle_check_acl(DriverContext *context, ErlIOVec *ev, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
     bool result = false;
 
     ErlDrvBinary *bin = ev->binv[1];
-    char *buff = &bin->orig_bytes[1];
+    char *buff = &bin->orig_bytes[0];
 
     defer {
         write_bool_to_port(context, result, return_code);
     };
 
-    int index = 0;
-    auto client_id = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!client_id || ei_decode_string(buff, &index, client_id.get()) != 0) { return; }
+    auto client_id = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!client_id) { return; }
 
-    auto pem = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!pem || ei_decode_string(buff, &index, pem.get()) != 0) { return; }
+    auto pem = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!pem) { return; }
 
-    auto topic = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!topic || ei_decode_string(buff, &index, topic.get()) != 0) { return; }
+    auto topic = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!topic) { return; }
 
-    auto pub_sub = std::unique_ptr<char>{get_buffer_for_next_entry(buff, &index)};
-    if (!pub_sub || ei_decode_string(buff, &index, pub_sub.get()) != 0) { return; }
+    auto pub_sub = std::unique_ptr<char>{decode_string(buff, &index)};
+    if (!pub_sub) { return; }
 
     LOG("Handling acl request with client id %s, pem %s, for topic %s, and action %s",
         client_id.get(), pem.get(), topic.get(), pub_sub.get())
@@ -181,22 +186,32 @@ static void handle_unknown_op(DriverContext *context) {
 
 EXPORTED void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     auto *context = (DriverContext *) handle;
-    const unsigned int op = get_operation(ev);
+    ErlDrvBinary *bin = ev->binv[1];
+    char *buff = &bin->orig_bytes[0];
+    int index = 0;
+    int version = 0;
+    ei_decode_version(buff, &index, &version);
+    int arity = 0;
+    ei_decode_list_header(buff, &index, &arity);
+    unsigned long op;
+    ei_decode_tuple_header(buff, &index, &arity);
+    ei_decode_ulong(buff, &index, &op);
+
     switch (op) {
         case ON_CLIENT_CONNECT: LOG("ON_CLIENT_CONNECT")
-            handle_client_id_and_pem(context, ev, &on_client_connect);
+            handle_client_id_and_pem(context, ev, index, &on_client_connect);
             break;
         case ON_CLIENT_CONNECTED: LOG("ON_CLIENT_CONNECTED")
-            handle_client_id_and_pem(context, ev, &on_client_connected);
+            handle_client_id_and_pem(context, ev, index, &on_client_connected);
             break;
         case ON_CLIENT_DISCONNECT: LOG("ON_CLIENT_DISCONNECT")
-            handle_client_id_and_pem(context, ev, &on_client_disconnected);
+            handle_client_id_and_pem(context, ev, index, &on_client_disconnected);
             break;
         case ON_CLIENT_AUTHENTICATE: LOG("ON_CLIENT_AUTHENTICATE")
-            handle_client_id_and_pem(context, ev, &on_client_authenticate);
+            handle_client_id_and_pem(context, ev, index, &on_client_authenticate);
             break;
         case ON_CLIENT_CHECK_ACL: LOG("ON_CLIENT_CHECK_ACL")
-            handle_check_acl(context, ev);
+            handle_check_acl(context, ev, index);
             break;
         default: LOG("Unknown operation: %u", op);
             handle_unknown_op(context);

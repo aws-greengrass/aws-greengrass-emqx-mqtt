@@ -53,7 +53,7 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
     put(cert_pem, PeerCertEncoded),
 
     case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        {ok, true} -> ok;
         Unexpected ->
             logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
     end,
@@ -65,7 +65,7 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_connected(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        {ok, true} -> ok;
         Unexpected ->
             logger:error("Client(~s). Failed to call driver. Unexpected:~p", [ClientId, Unexpected])
     end.
@@ -76,7 +76,7 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_disconnected(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} -> ok;
+        {ok, true} -> ok;
         Unexpected ->
             logger:error("Client(~s). Failed to call driver. Error:~p", [ClientId, Unexpected])
     end.
@@ -87,7 +87,7 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
-        {ok, <<1>>} ->
+        {ok, true} ->
             logger:info("Client(~s) authenticated successfully", [ClientId]),
             {ok, Result#{auth_result => success}};
         {ok, Res} ->
@@ -104,7 +104,7 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
-        {ok, <<1>>} ->
+        {ok, true} ->
             logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
             {stop, allow};
         {ok, Res} ->
