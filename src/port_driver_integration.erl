@@ -69,9 +69,15 @@ loop(Port, Inflight, Counter) ->
       Port ! {self(), {command, term_to_binary([Msg, RequestId])}},
       receive
         {Port, {data, Data}} ->
-          Caller ! {process, Data},
-          NewInflight = maps:put(RequestId, Caller, Inflight),
-          loop(Port, NewInflight, Counter)
+          [ReturnCode | _] = Data,
+          case ReturnCode of
+            ?RETURN_CODE_ASYNC ->
+              NewInflight = maps:put(RequestId, Caller, Inflight),
+              loop(Port, NewInflight, Counter);
+            _OtherReturnCode ->
+              Caller ! {process, Data},
+              loop(Port, Inflight, Counter)
+          end
       end;
     {Port, Id, {data, Data}} ->
       Caller = maps:get(Id, Inflight),
@@ -118,19 +124,6 @@ receive_back() ->
       [ReturnCode | Result] = Data,
       case ReturnCode of
         ?RETURN_CODE_SUCCESS -> {ok, Result};
-        ?RETURN_CODE_ASYNC ->
-          logger:error("Got async, sync call, waiting now"),
-          receive
-            {process, NewData} ->
-              logger:error("Data received from port: ~p ~n", [NewData]),
-              [ReturnCode2 | Result2] = NewData,
-              case ReturnCode2 of
-                ?RETURN_CODE_SUCCESS -> {ok, Result2};
-                ErrorReturnCode ->
-                  logger:error("Error from driver. Code: ~p ~n", [ErrorReturnCode]),
-                  {error, error_from_driver}
-              end
-          end;
         ErrorReturnCode ->
           logger:error("Error from driver. Code: ~p ~n", [ErrorReturnCode]),
           {error, error_from_driver}

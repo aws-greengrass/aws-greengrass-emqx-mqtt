@@ -95,11 +95,11 @@ write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, bool res
     auto port = driver_mk_port(context->port);
 
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, {data, [return code integer, true or false atom]}}
+    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false atom]}}
 
     ErlDrvTermData spec[] = {
             ERL_DRV_PORT, port,
-            ERL_DRV_INT64, (ErlDrvTermData) requestId,
+            ERL_DRV_INT64, (ErlDrvTermData) &requestId,
             ERL_DRV_ATOM, ATOMS.data,
             ERL_DRV_INT, (ErlDrvTermData) returnCode,
             ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
