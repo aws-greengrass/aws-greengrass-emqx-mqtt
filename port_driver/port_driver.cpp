@@ -59,13 +59,17 @@ EXPORTED void drv_stop(ErlDrvData handle) {
 
 static void write_bool_to_port(DriverContext *context, bool result, const char return_code) {
     auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, true or false atom]}}
+
     ErlDrvTermData spec[] = {
             ERL_DRV_PORT, port,
-            ERL_DRV_ATOM, driver_mk_atom((char *) "data"),
-            ERL_DRV_INT, (ErlDrvTermData) return_code,
-            ERL_DRV_ATOM, result ? driver_mk_atom((char *) "true") : driver_mk_atom((char *) "false"),
-            ERL_DRV_LIST, 2,
-            ERL_DRV_TUPLE, 2,
+                ERL_DRV_ATOM, driver_mk_atom((char *) "data"),
+                        ERL_DRV_INT, (ErlDrvTermData) return_code,
+                        ERL_DRV_ATOM, result ? driver_mk_atom((char *) "true") : driver_mk_atom((char *) "false"),
+                    ERL_DRV_LIST, 2,
+                ERL_DRV_TUPLE, 2,
             ERL_DRV_TUPLE, 2
     };
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
