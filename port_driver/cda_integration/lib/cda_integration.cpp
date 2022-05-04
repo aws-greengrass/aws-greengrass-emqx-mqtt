@@ -35,8 +35,13 @@ public:
     bool on_check_acl(const char *clientId, const char *pem,
                       const char *topic, const char *action);
 
-    int test_publish();
+//    int test_publish();
+
+    int testCdaCertRetrieval();
 };
+
+String topic =  "test/topic";
+String message = "Hello World";
 
 /*
  * Inheriting from ConnectionLifecycleHandler allows us to define callbacks that are
@@ -61,57 +66,116 @@ class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler{
         }
 };
 
-int ClientDeviceAuthIntegration::test_publish(){
-     fprintf(stdout, "test_publish()\n");
-     String topic =  "test/topic";
-     String message = "Hello World";
+//int ClientDeviceAuthIntegration::test_publish(){
+//     fprintf(stdout, "test_publish()\n");
+//
+//    fprintf(stdout, "Attempting to reuse IPC client \n");
+//    auto publishOperation = ipcClient->NewPublishToIoTCore();
+//    fprintf(stdout, "Created publish operation \n");
+//    PublishToIoTCoreRequest publishRequest;
+//    publishRequest.SetTopicName(topic);
+//    Vector<uint8_t> payload(message.begin(), message.end());
+//    publishRequest.SetPayload(payload);
+//    publishRequest.SetQos(QOS_AT_LEAST_ONCE);
+//
+//    fprintf(stdout, "Attempting to publish to %s topic\n", topic.c_str());
+//    auto requestStatus = publishOperation->Activate(publishRequest).get();
+//    if (!requestStatus){
+//        fprintf(
+//            stderr,
+//            "Failed to publish to %s topic with error %s\n",
+//            topic.c_str(),
+//            requestStatus.StatusToString().c_str());
+//        exit(-1);
+//    }
+//
+//    auto publishResultFuture = publishOperation->GetResult();
+//    auto publishResult = publishResultFuture.get();
+//    if (publishResult){
+//        fprintf(stdout, "Successfully published to %s topic\n", topic.c_str());
+//        auto *response = publishResult.GetOperationResponse();
+//        (void)response;
+//    }
+//    else{
+//        auto errorType = publishResult.GetResultType();
+//        if (errorType == OPERATION_ERROR){
+//            OperationError *error = publishResult.GetOperationError();
+//            /*
+//             * This pointer can be casted to any error type like so:
+//             * if(error->GetModelName() == UnauthorizedError::MODEL_NAME)
+//             *    UnauthorizedError *unauthorizedError = static_cast<UnauthorizedError*>(error);
+//             */
+//            if (error->GetMessage().has_value())
+//                fprintf(stderr, "Greengrass Core responded with an error: %s\n", error->GetMessage().value().c_str());
+//        }
+//        else{
+//            fprintf(
+//                stderr,
+//                "Attempting to receive the response from the server failed with error code %s\n",
+//                publishResult.GetRpcError().StatusToString().c_str());
+//        }
+//    }
+//    return 0;
+//}
 
-    fprintf(stdout, "Attempting to reuse IPC client \n");
-    auto publishOperation = ipcClient->NewPublishToIoTCore();
-    fprintf(stdout, "Created publish operation \n");
-    PublishToIoTCoreRequest publishRequest;
-    publishRequest.SetTopicName(topic);
-    Vector<uint8_t> payload(message.begin(), message.end());
-    publishRequest.SetPayload(payload);
-    publishRequest.SetQos(QOS_AT_LEAST_ONCE);
+int ClientDeviceAuthIntegration::testCdaCertRetrieval(){
 
-    fprintf(stdout, "Attempting to publish to %s topic\n", topic.c_str());
-    auto requestStatus = publishOperation->Activate(publishRequest).get();
-    if (!requestStatus){
-        fprintf(
-            stderr,
-            "Failed to publish to %s topic with error %s\n",
-            topic.c_str(),
-            requestStatus.StatusToString().c_str());
+    class CertificateUpdatesStreamHandler : public SubscribeToCertificateUpdatesStreamHandler {
+        void OnStreamEvent(CertificateUpdateEvent *response) override {
+            auto certUpdate = response->GetCertificateUpdate();
+            auto privateKey = certUpdate->GetPrivateKey();
+            fprintf(stdout, "Private key: \n %s \n", privateKey.value().c_str());
+            auto publicKey = certUpdate->GetPublicKey();
+            fprintf(stdout, "Public key: \n %s \n", publicKey.value().c_str());
+            auto caCert = certUpdate->GetCertificate();
+            fprintf(stdout, "Ca cert: \n %s \n", caCert.value().c_str());
+            auto allCas = certUpdate->GetCaCertificates();
+            fprintf(stdout, "Ca certs size: \n %ld \n", allCas.value().size());
+            fprintf(stdout, "Ca certs 1: \n %s \n", allCas.value().front().c_str());
+            fprintf(stdout, "Retrieved all certs\n");
+        }
+
+        bool OnStreamError(OperationError *error) override {
+            // Handle error.
+            return false; // Return true to close stream, false to keep stream open.
+        }
+
+        void OnStreamClosed() override {
+            // Handle close.
+        }
+    };
+
+    SubscribeToCertificateUpdatesRequest request;
+    CertificateOptions* options = new CertificateOptions();
+    options->SetCertificateType(CERTIFICATE_TYPE_SERVER);
+    request.SetCertificateOptions(*options);
+
+    shared_ptr<CertificateUpdatesStreamHandler> streamHandler(new CertificateUpdatesStreamHandler());
+    auto operation = ipcClient->NewSubscribeToCertificateUpdates(streamHandler);
+    auto activate = operation->Activate(request, nullptr);
+    activate.wait();
+
+    auto responseFuture = operation->GetResult();
+    if (responseFuture.wait_for(std::chrono::seconds(10)) == std::future_status::timeout) {
+        std::cerr << "Operation timed out while waiting for response from Greengrass Core." << std::endl;
         exit(-1);
     }
-
-    auto publishResultFuture = publishOperation->GetResult();
-    auto publishResult = publishResultFuture.get();
-    if (publishResult){
-        fprintf(stdout, "Successfully published to %s topic\n", topic.c_str());
-        auto *response = publishResult.GetOperationResponse();
-        (void)response;
-    }
-    else{
-        auto errorType = publishResult.GetResultType();
-        if (errorType == OPERATION_ERROR){
-            OperationError *error = publishResult.GetOperationError();
-            /*
-             * This pointer can be casted to any error type like so:
-             * if(error->GetModelName() == UnauthorizedError::MODEL_NAME)
-             *    UnauthorizedError *unauthorizedError = static_cast<UnauthorizedError*>(error);
-             */
-            if (error->GetMessage().has_value())
-                fprintf(stderr, "Greengrass Core responded with an error: %s\n", error->GetMessage().value().c_str());
+    auto response = responseFuture.get();
+    fprintf(stdout, "Received response...\n");
+    if (!response) {
+        fprintf(stderr, "Empty response\n");
+        // Handle error.
+        auto errorType = response.GetResultType();
+        fprintf(stdout, "Subscribe error %d\n", errorType);
+        if (errorType == OPERATION_ERROR) {
+            auto *error = response.GetOperationError();
+            // Handle operation error.
+        } else {
+            // Handle RPC error.
         }
-        else{
-            fprintf(
-                stderr,
-                "Attempting to receive the response from the server failed with error code %s\n",
-                publishResult.GetRpcError().StatusToString().c_str());
-        }
+        return -1;
     }
+    fprintf(stdout, "Done subscribing\n");
     return 0;
 }
 
@@ -144,8 +208,10 @@ bool ClientDeviceAuthIntegration::close() const {
 
 bool ClientDeviceAuthIntegration::on_client_connect(const char* clientId, const char* pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: "<< pem << std::endl;
-    int publish_return = ClientDeviceAuthIntegration::test_publish();
-    std::cout << "Published to IoT Core with status : " << publish_return << std::endl;
+//    int publish_return = ClientDeviceAuthIntegration::test_publish();
+//    std::cout << "Published to IoT Core with status : " << publish_return << std::endl;
+    int subscribe_return = ClientDeviceAuthIntegration::testCdaCertRetrieval();
+    std::cout << "Retrieved certs from CDA with status : " << subscribe_return << std::endl;
     return true;
 }
 
