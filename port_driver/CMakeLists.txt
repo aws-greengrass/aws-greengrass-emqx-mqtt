@@ -52,11 +52,21 @@ include_directories(SYSTEM ${ERL_INCLUDES})
 
 set(PORT_DRIVER_TARGET_NAME "${PROJECT_NAME}")
 link_directories("${ERL_LIBS}")
-add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.c)
+add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp)
 set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES PREFIX "")
+set_property(TARGET ${PORT_DRIVER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
+
+find_package(aws-crt-cpp REQUIRED)
+target_link_libraries(${PORT_DRIVER_TARGET_NAME} PRIVATE AWS::aws-crt-cpp)
+
+if (APPLE)
+    # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
+    set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES SUFFIX ".so")
+endif()
 
 if (WIN32)
-    target_compile_options(${PORT_DRIVER_TARGET_NAME} PRIVATE /Zc:preprocessor)
+    # Enable to output preprocessed file to a .i file
+    # set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES COMPILE_FLAGS "/P")
     set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
     target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC cda_integration ei "ws2_32.lib")
 else ()
