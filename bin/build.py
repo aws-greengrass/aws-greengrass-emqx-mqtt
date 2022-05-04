@@ -37,7 +37,7 @@ def main():
     # Build plugin
     os.chdir(current_abs_path)
     print("Building native plugin")
-    run_unit_test = (os.name != 'nt')
+    run_unit_test = (os.name != 'nt') and not quick_mode
     enable_unit_test = ""
     if run_unit_test:
         # enabled by default
