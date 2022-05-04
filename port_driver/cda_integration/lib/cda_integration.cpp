@@ -18,6 +18,7 @@ using namespace std;
 class ClientDeviceAuthIntegration {
 private:
     unique_ptr<GreengrassCoreIpcClient> ipcClient;
+    unique_ptr<ApiHandle> apiHandle;
 public:
     ClientDeviceAuthIntegration();
 
@@ -34,19 +35,16 @@ public:
     bool on_check_acl(const char *clientId, const char *pem,
                       const char *topic, const char *action);
 
-    unique_ptr<GreengrassCoreIpcClient> createIpcClient();
-
     int test_publish();
-
 };
 
 /*
  * Inheriting from ConnectionLifecycleHandler allows us to define callbacks that are
  * called upon when connection lifecycle events occur.
  */
-class SampleLifecycleHandler : public ConnectionLifecycleHandler{
+class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler{
     public:
-        SampleLifecycleHandler() {}
+        TestConnectionLifecycleHandler() {}
         void OnConnectCallback() override { fprintf(stdout, "Connected to Greengrass Core\n"); }
         void OnDisconnectCallback(RpcError status) override{
             if (!status){
@@ -63,44 +61,8 @@ class SampleLifecycleHandler : public ConnectionLifecycleHandler{
         }
 };
 
-unique_ptr<GreengrassCoreIpcClient> ClientDeviceAuthIntegration::createIpcClient(){
-
-    fprintf(stdout, "avipinku testconnect hippo");
-
-    /************************ Setup the Lib ****************************/
-    /*
-     * Do the global initialization for the API.
-     */
-     ApiHandle apiHandle;
-     if (apiHandle.GetOrCreateStaticDefaultClientBootstrap()->LastError() != AWS_ERROR_SUCCESS){
-        fprintf(
-            stderr,
-            "ClientBootstrap failed with error %s\n",
-            ErrorDebugString(apiHandle.GetOrCreateStaticDefaultClientBootstrap()->LastError()));
-        exit(-1);
-    }
-
-    /*
-     * Note: The lifecycle handler should be declared before the client
-     * so that it is destroyed AFTER the client is destroyed.
-     */
-    SampleLifecycleHandler lifecycleHandler;
-    unique_ptr<GreengrassCoreIpcClient> client(new GreengrassCoreIpcClient(*apiHandle.GetOrCreateStaticDefaultClientBootstrap()));
-    auto connectionStatus = client->Connect(lifecycleHandler).get();
-
-    if (!connectionStatus)
-    {
-        fprintf(stderr, "Failed to establish connection with error %s\n", connectionStatus.StatusToString().c_str());
-        exit(-1);
-    }
-
-    return client;
-}
-
-
 int ClientDeviceAuthIntegration::test_publish(){
-    std::cout << "test_publish() called lion!" << std::endl;
-    /* Publish to the same topic that is currently subscribed to. */
+     fprintf(stdout, "test_publish()\n");
      String topic =  "test/topic";
      String message = "Hello World";
 
@@ -115,8 +77,7 @@ int ClientDeviceAuthIntegration::test_publish(){
 
     fprintf(stdout, "Attempting to publish to %s topic\n", topic.c_str());
     auto requestStatus = publishOperation->Activate(publishRequest).get();
-    if (!requestStatus)
-    {
+    if (!requestStatus){
         fprintf(
             stderr,
             "Failed to publish to %s topic with error %s\n",
@@ -126,27 +87,15 @@ int ClientDeviceAuthIntegration::test_publish(){
     }
 
     auto publishResultFuture = publishOperation->GetResult();
-    /*
-    // To avoid throwing exceptions, wait on the result for a specified timeout:
-    if (publishResultFuture.wait_for(std::chrono::seconds(10)) == std::future_status::timeout)
-    {
-        fprintf(stderr, "Timed out while waiting for response from Greengrass Core\n");
-        exit(-1);
-    }
-    */
-
     auto publishResult = publishResultFuture.get();
-    if (publishResult)
-    {
+    if (publishResult){
         fprintf(stdout, "Successfully published to %s topic\n", topic.c_str());
         auto *response = publishResult.GetOperationResponse();
         (void)response;
     }
-    else
-    {
+    else{
         auto errorType = publishResult.GetResultType();
-        if (errorType == OPERATION_ERROR)
-        {
+        if (errorType == OPERATION_ERROR){
             OperationError *error = publishResult.GetOperationError();
             /*
              * This pointer can be casted to any error type like so:
@@ -156,8 +105,7 @@ int ClientDeviceAuthIntegration::test_publish(){
             if (error->GetMessage().has_value())
                 fprintf(stderr, "Greengrass Core responded with an error: %s\n", error->GetMessage().value().c_str());
         }
-        else
-        {
+        else{
             fprintf(
                 stderr,
                 "Attempting to receive the response from the server failed with error code %s\n",
@@ -168,14 +116,25 @@ int ClientDeviceAuthIntegration::test_publish(){
 }
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
-    try{
-        ipcClient = ClientDeviceAuthIntegration::createIpcClient();
-        std::cout << "client created~~" << std::endl;
-        int publish_return = ClientDeviceAuthIntegration::test_publish();
-        std::cout << "on_client_connect called avipinku2: " << publish_return << std::endl;
-    } catch(exception& e){
-        std::cerr << "caught exception! " << e.what() << std::endl;
+    fprintf(stdout, "Attempting to initialize Greengrass IPC client...\n" );
+    apiHandle = unique_ptr<ApiHandle>(new ApiHandle{g_allocator});
+    if (apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError() != AWS_ERROR_SUCCESS){
+        fprintf(
+            stderr,
+            "ClientBootstrap failed with error %s\n",
+            ErrorDebugString(apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError()));
+        exit(-1);
     }
+    ipcClient = unique_ptr<GreengrassCoreIpcClient>(new GreengrassCoreIpcClient(*apiHandle->GetOrCreateStaticDefaultClientBootstrap()));
+
+    TestConnectionLifecycleHandler lifecycleHandler;
+    auto connectionStatus = ipcClient->Connect(lifecycleHandler).get();
+    if (!connectionStatus)
+    {
+        fprintf(stderr, "Failed to establish connection with error %s\n", connectionStatus.StatusToString().c_str());
+        exit(-1);
+    }
+    fprintf(stdout, "Greengrass IPC Client created and connected successfully!" );
 }
 
 bool ClientDeviceAuthIntegration::close() const {
@@ -186,7 +145,7 @@ bool ClientDeviceAuthIntegration::close() const {
 bool ClientDeviceAuthIntegration::on_client_connect(const char* clientId, const char* pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: "<< pem << std::endl;
     int publish_return = ClientDeviceAuthIntegration::test_publish();
-    std::cout << "on_client_connect called avipinku66666: " << publish_return << std::endl;
+    std::cout << "Published to IoT Core with status : " << publish_return << std::endl;
     return true;
 }
 
