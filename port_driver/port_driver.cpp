@@ -63,6 +63,7 @@ static void write_bool_to_port(DriverContext *context, bool result, const char r
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
     // The follow code encodes this Erlang term: {Port, {data, [return code integer, true or false atom]}}
 
+    // TODO: create atoms only once and reuse them
     ErlDrvTermData spec[] = {
             ERL_DRV_PORT, port,
                 ERL_DRV_ATOM, driver_mk_atom((char *) "data"),
