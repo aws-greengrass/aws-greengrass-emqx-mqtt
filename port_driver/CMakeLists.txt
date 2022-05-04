@@ -2,8 +2,26 @@ cmake_minimum_required(VERSION 3.20)
 
 project(port_driver)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -I$(ERL_INCLUDE) -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
+if (WIN32)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib")
+else()
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe and .dll
+endif()
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/liba") # .lib and .a
+
+execute_process (
+    COMMAND erl -noshell -eval "io:format('~s/../usr/include', [code:lib_dir()])" -s erlang halt
+    OUTPUT_VARIABLE ERL_INCLUDES
+)
+message("Erlang include directory found: ${ERL_INCLUDES}")
+
+execute_process(
+    COMMAND erl -noshell -eval "io:format('~s/../usr/lib', [code:lib_dir()])" -s erlang halt
+    OUTPUT_VARIABLE ERL_LIBS
+)
+message("Erlang libs directory found: ${ERL_LIBS}")
+
 
 add_subdirectory(cda_integration)
 
@@ -13,26 +31,38 @@ if (APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -undefined dynamic_lookup")
 endif (APPLE)
 
-# TODO: Make work on windows
 if (UNIX)
-    execute_process (
-        COMMAND erl -noshell -eval "io:format(\"~s/../usr/include\", [code:lib_dir()])" -s erlang halt
-        OUTPUT_VARIABLE ERL_INCLUDES
-    )
-    message("Erlang include directory found: ${ERL_INCLUDES}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
+endif (UNIX)    
 
-    execute_process(
-        COMMAND erl -noshell -eval "io:format(\"~s/../usr/lib\", [code:lib_dir()])" -s erlang halt
-        OUTPUT_VARIABLE ERL_LIBS
-    )
-    message("Erlang libs directory found: ${ERL_LIBS}")
-endif (UNIX)
+if (WIN32)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+endif (WIN32)
 
 cmake_path(APPEND CDA_INTEGRATION_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}" "cda_integration" "include")
 include_directories("${CDA_INTEGRATION_INCLUDES}")
 include_directories(SYSTEM ${ERL_INCLUDES})
 
-link_directories(${ERL_LIBS})
-add_library(${PROJECT_NAME} SHARED port_driver.c)
+link_directories("${ERL_LIBS}")
+add_library(${PROJECT_NAME} SHARED port_driver.cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
-target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+
+find_package(aws-crt-cpp REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE AWS::aws-crt-cpp)
+
+if (APPLE)
+    # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".so")
+endif()
+
+if (WIN32)
+    # Enable to output preprocessed file to a .i file
+    # set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/P")
+    set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/WHOLEARCHIVE:ei")
+    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei "ws2_32.lib")
+else ()
+    target_link_libraries(${PROJECT_NAME} PUBLIC cda_integration ei)
+endif ()

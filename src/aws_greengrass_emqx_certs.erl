@@ -61,8 +61,8 @@ retrieveServerCert(FileName) ->
   IsBlank = string:is_empty(string:trim(RetrievedData)),
   if
     IsBlank ->
-      logger:error("Read cert file ~p is empty!", [BakFileName]),
-      exit("Found empty cert file during startup: ", [BakFileName]);
+      logger:error("Read cert file ~p is empty!", [BakFileName]);
+%%      exit("Found empty cert file during startup: ", [BakFileName]);
     true ->
       logger:debug("Validated cert file is not empty")
   end,
@@ -74,8 +74,8 @@ writeServerCert(FileName, Data) ->
   if
     FileExists ->
       %Until we have proper cert rotation in place, just exit
-      logger:error("Cert file ~p already exists!", [FileName]),
-      exit("Found existing cert file during startup!: ", [FileName]);
+      logger:error("Cert file ~p already exists!", [FileName]);
+%%      exit("Found existing cert file during startup!: ", [FileName]);
     true ->
       logger:debug("Writing cert to file ~p...", [FileName])
   end,
