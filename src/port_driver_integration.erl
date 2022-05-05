@@ -120,7 +120,7 @@ on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
 receive_back() ->
   receive
     {process, Data} ->
-      logger:error("Data received from port: ~p ~n", [Data]),
+      logger:debug("Data received from port: ~p ~n", [Data]),
       [ReturnCode | Result] = Data,
       case ReturnCode of
         ?RETURN_CODE_SUCCESS -> {ok, Result};
