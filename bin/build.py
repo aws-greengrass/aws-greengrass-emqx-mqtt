@@ -42,26 +42,11 @@ def main():
         subprocess.check_call("cmake --build . --target install", shell=True)
 
     # Build plugin
-    os.chdir(current_abs_path)
     print("Building native plugin")
-    run_unit_test = (os.name != 'nt')
-    enable_unit_test = ""
-    if run_unit_test:
-        # enabled by default
-        print("Enabling unit tests")
-        # install lcov
-        subprocess.check_call("wget 'https://github.com/linux-test-project/lcov/archive/master.zip'", shell=True)
-        subprocess.check_call("unzip master.zip", shell=True)
-        os.chdir("lcov-master")
-        subprocess.check_call("sudo make install", shell=True)
-    else:
-        enable_unit_test = "-DBUILD_TESTS=OFF"
-
     os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
-    print("Building native plugin")
     enable_unit_test_flag = ""
     if not quick_mode:
         # enabled by default
