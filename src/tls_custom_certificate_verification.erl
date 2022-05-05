@@ -61,21 +61,24 @@ custom_verify(OtpCert, Reason, UserState) ->
 verify_client_certificate(OtpCert, UserState) ->
   CertPem = otpcert_to_pem(OtpCert),
   case port_driver_integration:verify_client_certificate(CertPem) of
-    {ok, valid_cert} ->
+    {ok, valid} ->
       logger:debug("Client certificate is valid: ~p", [CertPem]),
       {valid, UserState};
-    {ok, invalid_cert} ->
+    {ok, invalid} ->
       logger:debug("Client certificate is invalid: ~p", [CertPem]),
       {fail, "invalid certificate"};
     {error, Error} ->
       logger:error("Failed to verify client certificate. Error: ~p", [Error]),
-      {fail, Error}
+      {fail, Error};
+    {_, _} ->
+      logger:debug("Client certificate is invalid: ~p", [CertPem]),
+      {fail, "invalid certificate"}
   end.
 
--spec(otpcert_to_pem(OtpCert :: #'OTPCertificate'{}) -> binary()).
+-spec(otpcert_to_pem(OtpCert :: #'OTPCertificate'{}) -> base64:base64_string()).
 otpcert_to_pem(OtpCert) ->
   Cert = public_key:pkix_encode('OTPCertificate', OtpCert, otp),
-  base64:encode(Cert).
+  base64:encode_to_string(Cert).
 
 -spec(start_updated_ssl_listener(emqx_listeners:listener()) -> ok | {error, any()}).
 start_updated_ssl_listener(UpdatedSslListener) ->

@@ -11,6 +11,7 @@
   , on_client_connected/2
   , on_client_disconnected/2
   , on_client_check_acl/4
+  , verify_client_certificate/1
 ]).
 
 -include("emqx.hrl").
@@ -22,11 +23,6 @@
 -define(ON_CLIENT_AUTHENTICATE, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
-
-%% OPERATION RESULTS
--define(OPERATION_RESULT_FAIL, 0).
--define(OPERATION_RESULT_PASS, 1).
--define(OPERATION_RESULT_UNKNOWN, 2).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -97,6 +93,9 @@ on_client_authenticate(ClientId, CertPem) ->
 
 on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
   call_port({?ON_CLIENT_CHECK_ACL, ClientId, CertPem, Topic, PubSub}).
+
+verify_client_certificate(CertPem) ->
+  call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}).
 
 receive_back() ->
   receive
