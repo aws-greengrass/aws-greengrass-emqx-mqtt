@@ -29,6 +29,11 @@ jobs:
       - uses: actions/setup-python@v3
         with:
           python-version: '3.x'
+      - name: cppcheck
+        uses: deep5050/cppcheck-action@main
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          check_library: enable
       - name: Build
         run: |
           python3 -m pip install -r bin/requirements.txt
