@@ -43,5 +43,27 @@ void driver_free(void *ptr) {
     (void)ptr;
 }
 
+ErlDrvTermData driver_mk_atom(char* string) {
+    (void)string;
+    return 0;
+}
+
+ErlDrvTermData driver_mk_port(ErlDrvPort port) {
+    (void)port;
+    return 0;
+}
+
+int erl_drv_output_term(ErlDrvTermData port, ErlDrvTermData* term, int n) {
+    (void)port;
+    (void)term;
+    (void)n;
+    return 0;
+}
+
+void set_port_control_flags(ErlDrvPort port, int flags) {
+    (void)port;
+    (void)flags;
+}
+
 }
 #endif
