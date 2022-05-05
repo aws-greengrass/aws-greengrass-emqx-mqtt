@@ -45,8 +45,7 @@ bool ClientDeviceAuthIntegration::close() const {
 }
 
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
-    AWS_LOGF_INFO(100, "onconnect in thread");
-    std::this_thread::sleep_for(std::chrono::seconds{5});
+    std::cout << "on_client_connect called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
 }
 
