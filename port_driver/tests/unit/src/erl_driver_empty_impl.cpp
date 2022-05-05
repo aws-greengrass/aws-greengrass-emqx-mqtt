@@ -43,4 +43,5 @@ void driver_free(void *ptr) {
     (void)ptr;
 }
 
+}
 #endif
