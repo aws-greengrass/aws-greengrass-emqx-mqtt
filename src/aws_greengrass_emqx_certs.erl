@@ -20,6 +20,7 @@ load() ->
 %% Load in greengrass_ca.pem, greengrass_emqx.key, greengrass_emqx.pem, and reload the PEM cache
 loadAllServerCerts() ->
   CaCert = retrieveServerCert(?CA_FILE),
+  timer:sleep(5000),
   writeServerCert(?CA_FILE, CaCert),
 
   Key = retrieveServerCert(?KEY_FILE),
@@ -46,8 +47,8 @@ retrieveServerCert(FileName) ->
     FileExists ->
       logger:debug("Found cert file ~p", [BakFileName]);
     true ->
-      logger:error("Cert file ~p does not exist!", [BakFileName]),
-      exit("Cert file does not exist at startup: ", [BakFileName])
+      logger:error("Cert file ~p does not exist!", [BakFileName])
+%%      exit("Cert file does not exist at startup: ", [BakFileName])
   end,
 
   RetrievedData = case file:read_file(BakFileName) of
@@ -77,16 +78,15 @@ writeServerCert(FileName, Data) ->
       logger:error("Cert file ~p already exists!", [FileName]);
 %%      exit("Found existing cert file during startup!: ", [FileName]);
     true ->
-      logger:debug("Writing cert to file ~p...", [FileName])
-  end,
-
-  case file:write_file(FileName, Data) of
-    ok -> ok;
-    {error, Reason} ->
-      logger:error("Error writing to file ~p with message ~p and reason ~p", [FileName, error, Reason]),
-      exit("Failed to write to file: ", [FileName])
-  end,
-  logger:debug("Wrote to file ~p", [FileName]).
+      logger:debug("NOT Writing cert to file ~p...", [FileName])
+%%      case file:write_file(FileName, Data) of
+%%        ok -> ok;
+%%        {error, Reason} ->
+%%          logger:error("Error writing to file ~p with message ~p and reason ~p", [FileName, error, Reason]),
+%%          exit("Failed to write to file: ", [FileName])
+%%      end,
+%%      logger:debug("Wrote to file ~p", [FileName])
+  end.
 
 % Clean EMQX Pem Cache
 cleanPemCache() ->

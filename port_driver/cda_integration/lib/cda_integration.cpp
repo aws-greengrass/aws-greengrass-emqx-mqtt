@@ -4,6 +4,9 @@
  */
 
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <string>
 #include <functional>
 #include <aws/crt/Api.h>
 #include <aws/crt/io/HostResolver.h>
@@ -14,6 +17,10 @@
 using namespace Aws::Crt;
 using namespace Aws::Greengrass;
 using namespace std;
+
+const string EMQX_KEY_PATH = "/etc/greengrass_certs/greengrass_emqx.key";
+const string EMQX_PEM_PATH = "/etc/greengrass_certs/greengrass_emqx.pem";
+const string EMQX_CA_PATH = "/etc/greengrass_certs/greengrass_ca.pem";
 
 class ClientDeviceAuthIntegration {
 private:
@@ -67,7 +74,6 @@ class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler{
 };
 
 //int ClientDeviceAuthIntegration::test_publish(){
-//     fprintf(stdout, "test_publish()\n");
 //
 //    fprintf(stdout, "Attempting to reuse IPC client \n");
 //    auto publishOperation = ipcClient->NewPublishToIoTCore();
@@ -122,25 +128,34 @@ int ClientDeviceAuthIntegration::testCdaCertRetrieval(){
 
     class CertificateUpdatesStreamHandler : public SubscribeToCertificateUpdatesStreamHandler {
         void OnStreamEvent(CertificateUpdateEvent *response) override {
+            fprintf(stdout, "Retrieving all certs...\n");
             auto certUpdate = response->GetCertificateUpdate();
             auto privateKey = certUpdate->GetPrivateKey();
-            fprintf(stdout, "Private key: \n %s \n", privateKey.value().c_str());
-            auto publicKey = certUpdate->GetPublicKey();
-            fprintf(stdout, "Public key: \n %s \n", publicKey.value().c_str());
-            auto caCert = certUpdate->GetCertificate();
-            fprintf(stdout, "Ca cert: \n %s \n", caCert.value().c_str());
+            auto cert = certUpdate->GetCertificate();
             auto allCas = certUpdate->GetCaCertificates();
-            fprintf(stdout, "Ca certs size: \n %ld \n", allCas.value().size());
-            fprintf(stdout, "Ca certs 1: \n %s \n", allCas.value().front().c_str());
-            fprintf(stdout, "Retrieved all certs\n");
+            fprintf(stdout, "Retrieved all certs from response...\n");
+
+            auto cwd = std::filesystem::current_path().string();
+            fprintf(stdout, "Current working directory is: %s \n", cwd.c_str());
+            ofstream out_key(cwd + EMQX_KEY_PATH);
+            out_key << privateKey.value().c_str();
+            out_key.close();
+            ofstream out_pem(cwd + EMQX_PEM_PATH);
+            out_pem << cert.value().c_str();
+            out_pem.close();
+            ofstream out_ca(cwd + EMQX_CA_PATH);
+            out_ca << allCas.value().front().c_str();
+            out_ca.close();
+            fprintf(stdout, "Wrote all certs!\n");
         }
 
         bool OnStreamError(OperationError *error) override {
-            // Handle error.
+            fprintf(stderr, "OnStream error %s\n", error->GetMessage().value().c_str());
             return false; // Return true to close stream, false to keep stream open.
         }
 
         void OnStreamClosed() override {
+            fprintf(stdout, "Stream closed\n");
             // Handle close.
         }
     };
@@ -161,7 +176,7 @@ int ClientDeviceAuthIntegration::testCdaCertRetrieval(){
         exit(-1);
     }
     auto response = responseFuture.get();
-    fprintf(stdout, "Received response...\n");
+    fprintf(stdout, "Received response from CDA...\n");
     if (!response) {
         fprintf(stderr, "Empty response\n");
         // Handle error.
@@ -169,7 +184,7 @@ int ClientDeviceAuthIntegration::testCdaCertRetrieval(){
         fprintf(stdout, "Subscribe error %d\n", errorType);
         if (errorType == OPERATION_ERROR) {
             auto *error = response.GetOperationError();
-            // Handle operation error.
+            fprintf(stderr, "Cert subscribe response error %s\n", error->GetMessage().value().c_str());
         } else {
             // Handle RPC error.
         }
@@ -198,7 +213,9 @@ ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
         fprintf(stderr, "Failed to establish connection with error %s\n", connectionStatus.StatusToString().c_str());
         exit(-1);
     }
-    fprintf(stdout, "Greengrass IPC Client created and connected successfully!" );
+    fprintf(stdout, "Greengrass IPC Client created and connected successfully!\n" );
+    int subscribe_return = ClientDeviceAuthIntegration::testCdaCertRetrieval();
+    std::cout << "Retrieved certs from CDA with status : " << subscribe_return << std::endl;
 }
 
 bool ClientDeviceAuthIntegration::close() const {
@@ -210,8 +227,6 @@ bool ClientDeviceAuthIntegration::on_client_connect(const char* clientId, const 
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: "<< pem << std::endl;
 //    int publish_return = ClientDeviceAuthIntegration::test_publish();
 //    std::cout << "Published to IoT Core with status : " << publish_return << std::endl;
-    int subscribe_return = ClientDeviceAuthIntegration::testCdaCertRetrieval();
-    std::cout << "Retrieved certs from CDA with status : " << subscribe_return << std::endl;
     return true;
 }
 
