@@ -333,7 +333,7 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
         case ON_CLIENT_CHECK_ACL: LOG("ON_CLIENT_CHECK_ACL")
             handle_check_acl(context, buff, index);
             break;
-        default: LOG("Unknown operation: %u", op);
+        default: LOG("Unknown operation: %lu", op);
             handle_unknown_op(context);
     }
 }
