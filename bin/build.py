@@ -65,7 +65,7 @@ def main():
             change_dir_permissions_recursive("bin", 0o777)
             subprocess.check_call("sudo make install", shell=True)
     else:
-        enable_unit_test = "-DBUILD_TESTS=OFF"
+        enable_unit_test_flag = "-DBUILD_TESTS=OFF"
 
     os.chdir(current_abs_path)
     os.chdir("_build")
