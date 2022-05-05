@@ -6,9 +6,16 @@ import subprocess
 
 import os
 import sys
+import wget
 
 from .package import do_patch
 
+def change_dir_permissions_recursive(path, mode):
+    for root, dirs, files in os.walk(path, topdown=False):
+        for dir in [os.path.join(root,d) for d in dirs]:
+            os.chmod(dir, mode)
+    for file in [os.path.join(root, f) for f in files]:
+        os.chmod(file, mode)
 
 def main():
     # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
@@ -40,17 +47,47 @@ def main():
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
+    enable_unit_test_flag = ""
+    if not quick_mode:
+        # enabled by default
+        print("Enabling unit tests")
+        if os.name != 'nt':
+            # install lcov on non-windows for coverage
+            zip_name = "lcov-master.zip"
+            dir_name = "lcov-master"
+            if os.path.isfile(zip_name):
+                os.remove(zip_name)
+            if os.path.isdir(dir_name):
+                shutil.rmtree(dir_name)
+            wget.download("https://github.com/linux-test-project/lcov/archive/master.zip")
+            shutil.unpack_archive(zip_name, ".")
+            os.chdir(dir_name)
+            change_dir_permissions_recursive("bin", 0o777)
+            subprocess.check_call("sudo make install", shell=True)
+    else:
+        enable_unit_test_flag = "-DBUILD_TESTS=OFF"
+
+    os.chdir(current_abs_path)
+    os.chdir("_build")
+
     generator = ""
     if os.name == 'nt':
         print("Setting generator for Windows")
         generator = "-A x64"
 
-    subprocess.check_call(f"cmake {generator} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
     subprocess.check_call("cmake --build .", shell=True)
+    if not quick_mode:
+        print("Running unit tests")
+        if os.name != 'nt':
+            # run UTs with coverage
+            subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
+        else:
+            subprocess.check_call("ctest -C Debug --output-on-failure", shell=True)
     os.chdir(current_abs_path)
-    # Put the output library into priv which will be built into the EMQ X distribution bundle
-    shutil.copytree("_build/lib", "priv", dirs_exist_ok=True)
+    # Put the output driver library into priv which will be built into the EMQ X distribution bundle
+    shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
 
     if not quick_mode:
         print("Cloning EMQ X")
