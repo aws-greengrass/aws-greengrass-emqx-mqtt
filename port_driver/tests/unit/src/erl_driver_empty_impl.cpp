@@ -10,6 +10,9 @@
  It is available at runtime when running in erlang runtime.
 */
 
+// Need empty impl for erl_driver to make ld (linux) happy while linking unit tests
+#ifndef _WIN32
+
 extern "C" {
 
 void driver_free_binary(ErlDrvBinary *bin) {
@@ -40,4 +43,4 @@ void driver_free(void *ptr) {
     (void)ptr;
 }
 
-}
+#endif

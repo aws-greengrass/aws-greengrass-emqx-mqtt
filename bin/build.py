@@ -52,7 +52,7 @@ def main():
         # enabled by default
         print("Enabling unit tests")
         if os.name != 'nt':
-            # install lcov
+            # install lcov on non-windows for coverage
             zip_name = "lcov-master.zip"
             dir_name = "lcov-master"
             if os.path.isfile(zip_name):
@@ -81,9 +81,10 @@ def main():
     if not quick_mode:
         print("Running unit tests")
         if os.name != 'nt':
+            # run UTs with coverage
             subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
         else:
-            subprocess.check_call("make test", shell=True)
+            subprocess.check_call("ctest -C Debug --output-on-failure", shell=True)
     os.chdir(current_abs_path)
     # Put the output driver library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
