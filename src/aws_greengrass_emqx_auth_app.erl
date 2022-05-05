@@ -18,7 +18,6 @@
 
 start(_StartType, _StartArgs) ->
 %%  Uncomment to load server certs in from the filesystem
-%%  aws_greengrass_emqx_certs:load(),
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
   port_driver_integration:start(),
   case tls_custom_certificate_verification:enable() of
@@ -32,6 +31,7 @@ start(_StartType, _StartArgs) ->
       throw({error, ErrorString})
   end,
   aws_greengrass_emqx_auth:load(application:get_all_env()),
+  aws_greengrass_emqx_certs:load(),
   {ok, Sup}.
 
 stop(_State) ->
