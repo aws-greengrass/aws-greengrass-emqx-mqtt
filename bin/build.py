@@ -43,6 +43,21 @@ def main():
 
     # Build plugin
     os.chdir(current_abs_path)
+    print("Building native plugin")
+    run_unit_test = (os.name != 'nt')
+    enable_unit_test = ""
+    if run_unit_test:
+        # enabled by default
+        print("Enabling unit tests")
+        # install lcov
+        subprocess.check_call("wget 'https://github.com/linux-test-project/lcov/archive/master.zip'", shell=True)
+        subprocess.check_call("unzip master.zip", shell=True)
+        os.chdir("lcov-master")
+        subprocess.check_call("sudo make install", shell=True)
+    else:
+        enable_unit_test = "-DBUILD_TESTS=OFF"
+
+    os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
@@ -137,31 +152,37 @@ def main():
             subprocess.check_call(f"make -j", shell=True,
                                   env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
+        os.chdir(current_abs_path)
+        pathlib.Path("build").mkdir(parents=True, exist_ok=True)
+        try:
+            os.remove("build/emqx.zip")
+        except FileNotFoundError:
+            pass
+        print("Zipping EMQ X")
+        shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
+
+        print("Patching EMQ X")
+        erts_version = None
+        with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
+            for l in file.readlines():
+                if l.startswith("ERTS_VSN"):
+                    erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
+        if erts_version is None:
+            raise ValueError("Didn't find ERTS version")
+        print("ERTS version", erts_version)
+
+        add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf"}
+
+        # On Windows, bundle in msvc runtime 120
+        if os.name == 'nt':
+            add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+        do_patch("build/emqx.zip", erts_version=erts_version, add=add)
+
     os.chdir(current_abs_path)
-    pathlib.Path("build").mkdir(parents=True, exist_ok=True)
-    try:
-        os.remove("build/emqx.zip")
-    except FileNotFoundError:
-        pass
-    print("Zipping EMQ X")
-    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
-
-    print("Patching EMQ X")
-    erts_version = None
-    with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
-        for l in file.readlines():
-            if l.startswith("ERTS_VSN"):
-                erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
-    if erts_version is None:
-        raise ValueError("Didn't find ERTS version")
-    print("ERTS version", erts_version)
-
-    add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf"}
-
-    # On Windows, bundle in msvc runtime 120
-    if os.name == 'nt':
-        add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
-    do_patch("build/emqx.zip", erts_version=erts_version, add=add)
+    if quick_mode:
+        subprocess.check_call("rebar3 compile", shell=True)
+        shutil.copytree("_build/default/lib/aws_greengrass_emqx_auth/ebin",
+                        "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/ebin", dirs_exist_ok=True),
 
     # If EMQ X is already unzipped into build, then update our built plugin native code so we don't need to unzip again
     if os.path.exists("build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv"):
