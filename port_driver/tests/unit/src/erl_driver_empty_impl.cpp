@@ -44,9 +44,8 @@ void set_port_control_flags(ErlDrvPort port, int flags) {
     (void)flags;
 }
 
-long driver_async([[maybe_unused]] ErlDrvPort port, [[maybe_unused]]  unsigned int* key,
-                  void (*async_invoke)(void*), void* async_data,
-                  void (*async_free)(void*)) {
+long driver_async([[maybe_unused]] ErlDrvPort port, [[maybe_unused]] unsigned int *key, void (*async_invoke)(void *),
+                  void *async_data, void (*async_free)(void *)) {
     if (async_invoke != nullptr) {
         async_invoke(async_data);
     }
@@ -55,6 +54,5 @@ long driver_async([[maybe_unused]] ErlDrvPort port, [[maybe_unused]]  unsigned i
     }
     return 0;
 }
-
 }
 #endif

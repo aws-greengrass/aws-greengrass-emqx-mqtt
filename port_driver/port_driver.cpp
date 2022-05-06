@@ -89,23 +89,22 @@ static void write_bool_to_port(DriverContext *context, bool result, const char r
     }
 }
 
-static void
-write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, bool result, const char returnCode) {
+static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, bool result,
+                                     const char returnCode) {
     auto port = driver_mk_port(context->port);
 
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false atom]}}
+    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false
+    // atom]}}
 
-    ErlDrvTermData spec[] = {
-            ERL_DRV_PORT, port,
-            ERL_DRV_INT64, (ErlDrvTermData) &requestId,
-            ERL_DRV_ATOM, ATOMS.data,
-            ERL_DRV_INT, (ErlDrvTermData) returnCode,
-            ERL_DRV_ATOM, result ? ATOMS.true_ : ATOMS.false_,
-            ERL_DRV_LIST, 2,
-            ERL_DRV_TUPLE, 2,
-            ERL_DRV_TUPLE, 3
-    };
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,
+                             ERL_DRV_INT64, (ErlDrvTermData)&requestId,
+                             ERL_DRV_ATOM,  ATOMS.data,
+                             ERL_DRV_INT,   (ErlDrvTermData)returnCode,
+                             ERL_DRV_ATOM,  result ? ATOMS.true_ : ATOMS.false_,
+                             ERL_DRV_LIST,  2,
+                             ERL_DRV_TUPLE, 2,
+                             ERL_DRV_TUPLE, 3};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
         LOG("Failed outputting term");
     }
@@ -226,7 +225,7 @@ struct packer {
 };
 
 void client_connect(void *buf) {
-    auto pack = (packer *) buf;
+    auto pack = (packer *)buf;
 
     LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
     bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
@@ -235,11 +234,9 @@ void client_connect(void *buf) {
 }
 
 void client_connect_complete(void *buf) {
-    auto pack = (packer *) buf;
+    auto pack = (packer *)buf;
 
-    defer {
-        delete pack;
-    };
+    defer { delete pack; };
 
     write_async_bool_to_port(pack->context, pack->requestId, pack->result, pack->returnCode);
 }
@@ -248,9 +245,7 @@ void handle_on_client_connect(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
     bool result = false;
 
-    defer {
-        write_bool_to_port(context, result, return_code);
-    };
+    defer { write_bool_to_port(context, result, return_code); };
     auto client_id = decode_string(buff, &index);
     if (!client_id) {
         return;
@@ -260,9 +255,9 @@ void handle_on_client_connect(DriverContext *context, char *buff, int index) {
         return;
     }
     auto packed = new packer{
-            .client_id = std::move(client_id),
-            .pem = std::move(pem),
-            .context = context,
+        .client_id = std::move(client_id),
+        .pem = std::move(pem),
+        .context = context,
     };
     // Decode the request ID which is used to identify the caller back in Erlang
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
