@@ -30,9 +30,12 @@ message("Erlang libs directory found: ${ERL_LIBS}")
 
 add_subdirectory(cda_integration)
 
+if (CLANG_TIDY)
+    set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+endif()
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -fPIC")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC -Wconversion -Werror -Wno-missing-field-initializers")
 endif (UNIX)    
 
 if (WIN32)

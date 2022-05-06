@@ -18,10 +18,10 @@ enum log_subject {
 
 #define LOG(...) AWS_LOGF_INFO(PORT_DRIVER_SUBJECT, __VA_ARGS__)
 
-typedef struct {
+using DriverContext = struct {
     ErlDrvPort port;
     CDA_INTEGRATION_HANDLE *cda_integration_handle;
-} DriverContext;
+};
 
 static struct aws_logger our_logger {};
 
@@ -37,7 +37,7 @@ struct atoms {
 };
 static struct atoms ATOMS {};
 
-EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
+EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
     (void)buff;
     struct aws_logger_standard_options logger_options = {
         .level = AWS_LL_TRACE,
@@ -50,33 +50,33 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
     ei_init();
 
     // Setup static atoms
-    ATOMS.data = driver_mk_atom((char *)"data");
-    ATOMS.pass = driver_mk_atom((char *)"pass");
-    ATOMS.fail = driver_mk_atom((char *)"fail");
-    ATOMS.valid = driver_mk_atom((char *)"valid");
-    ATOMS.invalid = driver_mk_atom((char *)"invalid");
-    ATOMS.authorized = driver_mk_atom((char *)"authorized");
-    ATOMS.unauthorized = driver_mk_atom((char *)"unauthorized");
-    ATOMS.unknown = driver_mk_atom((char *)"unknown");
+    ATOMS.data = driver_mk_atom(const_cast<char *>("data"));
+    ATOMS.pass = driver_mk_atom(const_cast<char *>("pass"));
+    ATOMS.fail = driver_mk_atom(const_cast<char *>("fail"));
+    ATOMS.valid = driver_mk_atom(const_cast<char *>("valid"));
+    ATOMS.invalid = driver_mk_atom(const_cast<char *>("invalid"));
+    ATOMS.authorized = driver_mk_atom(const_cast<char *>("authorized"));
+    ATOMS.unauthorized = driver_mk_atom(const_cast<char *>("unauthorized"));
+    ATOMS.unknown = driver_mk_atom(const_cast<char *>("unknown"));
 
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
-    auto *context = (DriverContext *)driver_alloc(sizeof(DriverContext));
+    auto *context = reinterpret_cast<DriverContext *>(driver_alloc(sizeof(DriverContext)));
     context->port = port;
     context->cda_integration_handle = cda_integration_init();
     if (context->cda_integration_handle == nullptr) {
         LOG("Failed to initialize CDA handle");
 
         // return value -1 means failure
-        return (ErlDrvData)-1;
+        return reinterpret_cast<ErlDrvData>(-1); // NOLINT(performance-no-int-to-ptr)
     }
-    return (ErlDrvData)context;
+    return reinterpret_cast<ErlDrvData>(context);
 }
 
 EXPORTED void drv_stop(ErlDrvData handle) {
     LOG("Stopping AWS Greengrass auth driver");
-    auto *context = (DriverContext *)handle;
+    auto *context = reinterpret_cast<DriverContext *>(handle);
     cda_integration_close(context->cda_integration_handle);
-    driver_free((char *)handle);
+    driver_free(reinterpret_cast<void *>(handle));
     aws_logger_clean_up(&our_logger);
 }
 
@@ -103,7 +103,7 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
     // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false
     // atom]}}
 
-    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, (ErlDrvTermData)&requestId,
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, reinterpret_cast<ErlDrvTermData>(&requestId),
                              ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   (ErlDrvTermData)returnCode,
                              ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
                              ERL_DRV_TUPLE, 2,          ERL_DRV_TUPLE, 3};
@@ -115,7 +115,7 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
 static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     int type;
     int entry_size;
-    if (ei_get_type(buff, index, &type, &entry_size)) {
+    if (ei_get_type(buff, index, &type, &entry_size) != 0) {
         return nullptr;
     }
     if (type != ERL_BINARY_EXT && type != ERL_STRING_EXT && type != ERL_ATOM_EXT) {
@@ -123,9 +123,9 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
         return nullptr;
     }
 
-    auto b = std::unique_ptr<char[]>{nullptr};
+    auto buf = std::unique_ptr<char[]>{nullptr};
     try {
-        b.reset(new char[entry_size + 1]);
+        buf.reset(new char[static_cast<unsigned long>(entry_size + 1)]);
     } catch (...) {
         LOG("Out of memory allocating %d", entry_size + 1);
         return nullptr;
@@ -133,22 +133,22 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     switch (type) {
     case ERL_BINARY_EXT: {
         // Zero out the memory as decode_binary won't insert the null char
-        memset((void *)b.get(), 0, sizeof(char) * (entry_size + 1));
-        if (ei_decode_binary(buff, index, (void *)b.get(), (long *)&entry_size)) {
+        memset((void *)buf.get(), 0, sizeof(char) * (static_cast<unsigned long>(entry_size + 1)));
+        if (ei_decode_binary(buff, index, (void *)buf.get(), reinterpret_cast<long *>(&entry_size)) != 0) {
             LOG("Failed decoding binary");
             return nullptr;
         }
         break;
     }
     case ERL_STRING_EXT: {
-        if (ei_decode_string(buff, index, (char *)b.get())) {
+        if (ei_decode_string(buff, index, (char *)buf.get()) != 0) {
             LOG("Failed decoding string");
             return nullptr;
         }
         break;
     }
     case ERL_ATOM_EXT: {
-        if (ei_decode_atom(buff, index, b.get())) {
+        if (ei_decode_atom(buff, index, buf.get()) != 0) {
             LOG("Failed decoding atom");
             return nullptr;
         }
@@ -159,7 +159,7 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
         return nullptr;
     }
     }
-    return b;
+    return buf;
 }
 
 static void handle_client_id_and_pem(DriverContext *context, char *buff, int index,
@@ -246,7 +246,7 @@ struct packer {
 };
 
 void client_connect(void *buf) {
-    auto pack = (packer *)buf;
+    auto *pack = reinterpret_cast<packer *>(buf);
 
     LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
     bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
@@ -257,7 +257,7 @@ void client_connect(void *buf) {
 }
 
 void client_connect_complete(void *buf) {
-    auto pack = (packer *)buf;
+    auto *pack = reinterpret_cast<packer *>(buf);
 
     defer { delete pack; };
 
@@ -277,7 +277,7 @@ void handle_on_client_connect(DriverContext *context, char *buff, int index) {
     if (!pem) {
         return;
     }
-    auto packed = new packer{
+    auto *packed = new packer{
         .client_id = std::move(client_id),
         .pem = std::move(pem),
         .context = context,
@@ -323,7 +323,7 @@ static bool decode_operation_header(const char *buff, int *index, unsigned long 
 
 void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     // Input must look like: [{OperationUlong, ...Operation specific inputs}]
-    auto *context = (DriverContext *)handle;
+    auto *context = reinterpret_cast<DriverContext *>(handle);
     ErlDrvBinary *bin = ev->binv[1];
     char *buff = &bin->orig_bytes[0];
     int index = 0;
