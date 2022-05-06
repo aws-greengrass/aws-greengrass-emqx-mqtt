@@ -8,7 +8,7 @@
 -include("emqx.hrl").
 -include_lib("public_key/include/public_key.hrl").
 
--import(port_driver_integration,[verify_client_certificate/1]).
+-import(port_driver_integration, [verify_client_certificate/1]).
 
 -export([enable/0]).
 
@@ -51,7 +51,7 @@ custom_verify(OtpCert, Reason, UserState) ->
   case Reason of
     {bad_cert, unknown_ca} -> verify_client_certificate(OtpCert, UserState);
     {bad_cert, selfsigned_peer} -> verify_client_certificate(OtpCert, UserState);
-    {_, _} -> 
+    {_, _} ->
       logger:debug("Client certificate is invalid. Reason: ~p", [Reason]),
       {fail, "invalid certificate"}
   end.

@@ -9,12 +9,12 @@
 
 -emqx_plugin(?MODULE).
 
--import(port_driver_integration,[start/0, stop/0]).
+-import(port_driver_integration, [start/0, stop/0]).
 -import(tls_custom_certificate_verification, [enable/0]).
 
--export([ start/2
-        , stop/1
-        ]).
+-export([start/2
+  , stop/1
+]).
 
 start(_StartType, _StartArgs) ->
 %%  Uncomment to load server certs in from the filesystem
@@ -23,17 +23,17 @@ start(_StartType, _StartArgs) ->
   port_driver_integration:start(),
   case tls_custom_certificate_verification:enable() of
     ok -> ok;
-    nossl -> 
+    nossl ->
       ErrorString = io_lib:format("Could not find active Ssl listener"),
       throw({error, ErrorString});
     {error, Reason} ->
-      ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s", 
-				  [Reason]),
+      ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s",
+        [Reason]),
       throw({error, ErrorString})
-  end, 
+  end,
   aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
 
 stop(_State) ->
-    aws_greengrass_emqx_auth:unload(),
-    port_driver_integration:stop().
+  aws_greengrass_emqx_auth:unload(),
+  port_driver_integration:stop().

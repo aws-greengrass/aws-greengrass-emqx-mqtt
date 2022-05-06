@@ -145,10 +145,7 @@ bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const ch
 }
 
 bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> verify_client_cert_fun =
-	    [certPem](ClientDeviceAuthIntegration *cda_integ) {
-        return cda_integ->verify_client_certificate(certPem);
-    };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> verify_client_cert_fun =
+        [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
     return execute_with_handle(handle, verify_client_cert_fun);
 }
-
