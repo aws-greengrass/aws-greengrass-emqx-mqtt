@@ -32,7 +32,6 @@ checkServerCert(FileName) ->
     FileExists ->
       %Until we have proper cert rotation in place, just exit
       logger:error("Cert file ~p already exists!", [FileName]);
-%%      exit("Found existing cert file during startup!: ", [FileName]);
     true ->
       logger:warn("File does not exist yet!...", [FileName])
   end.
@@ -42,7 +41,8 @@ cleanPemCache() ->
   try
     ok = emqx_mgmt:clean_pem_cache()
   catch
-    error:{badmatch, ok} -> logger:error("Failed to clean PEM cache!"),
-    exit("Failed to clean PEM cache!")
+    error:{badmatch, ok} ->
+      logger:error("Failed to clean PEM cache!"),
+      exit("Failed to clean PEM cache!")
   end,
   logger:info("Finished cleaning pem cache!").
