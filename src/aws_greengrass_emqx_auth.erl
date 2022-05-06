@@ -56,7 +56,9 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
     {error, Reason} ->
       logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
       stop;
-    {_, _} -> stop
+    Other ->
+      logger:error("Unknown response ~p", [Other]),
+      stop
   end.
 
 on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
@@ -70,7 +72,9 @@ on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
     {error, Reason} ->
       logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
       stop;
-    {_, _} -> stop
+    Other ->
+      logger:error("Unknown response ~p", [Other]),
+      stop
   end.
 
 on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
@@ -84,7 +88,9 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
     {error, Reason} ->
       logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
       stop;
-    {_, _} -> stop
+    Other ->
+      logger:error("Unknown response ~p", [Other]),
+      stop
   end.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -102,7 +108,8 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     {error, Error} ->
       logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
       {stop, Result#{auth_result => not_authorized}};
-    {_, _} ->
+    Other ->
+      logger:error("Unknown response ~p", [Other]),
       {stop, Result#{auth_result => not_authorized}}
   end.
 
