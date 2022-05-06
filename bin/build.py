@@ -174,7 +174,9 @@ def main():
             raise ValueError("Didn't find ERTS version")
         print("ERTS version", erts_version)
 
-        add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf"}
+        add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf",
+               "emqx/etc/acl.conf": "patches/acl.conf",
+               "emqx/etc/emqx.conf": "patches/emqx.conf"}
 
         # On Windows, bundle in msvc runtime 120
         if os.name == 'nt':

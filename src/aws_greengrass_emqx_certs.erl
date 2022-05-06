@@ -5,7 +5,7 @@
 
 -module(aws_greengrass_emqx_certs).
 
--export([ load/0
+-export([load/0
 ]).
 
 -define(GG_CERT_REL_DIR, "etc/greengrass_certs/").
@@ -51,11 +51,11 @@ retrieveServerCert(FileName) ->
   end,
 
   RetrievedData = case file:read_file(BakFileName) of
-    {ok, Data} -> Data;
-    {error, Reason} ->
-      logger:error("Error reading from file ~p with message ~p and reason ~p", [BakFileName, error, Reason]),
-      exit("Failed to read file: ", [BakFileName])
-  end,
+                    {ok, Data} -> Data;
+                    {error, Reason} ->
+                      logger:error("Error reading from file ~p with message ~p and reason ~p", [BakFileName, error, Reason]),
+                      exit("Failed to read file: ", [BakFileName])
+                  end,
   logger:debug("Read in cert file ~p", [BakFileName]),
 
   IsBlank = string:is_empty(string:trim(RetrievedData)),
@@ -94,6 +94,6 @@ cleanPemCache() ->
     ok = emqx_mgmt:clean_pem_cache()
   catch
     error:{badmatch, ok} -> logger:error("Failed to clean PEM cache!"),
-    exit("Failed to clean PEM cache!")
+      exit("Failed to clean PEM cache!")
   end,
   logger:info("Finished cleaning pem cache!").

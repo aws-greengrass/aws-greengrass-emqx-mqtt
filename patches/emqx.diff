@@ -42,6 +42,14 @@
  @goto :eof
  
  :: Stop the Windows service
+@@ -217,6 +217,7 @@
+ :: window service?
+ :: @%erlsrv% stop %service_name%
+ @%escript% %nodetool% %node_type% %node_name% -setcookie %node_cookie% stop
++@%epmd% -kill
+ @goto :eof
+
+ :: Relup and reldown
 @@ -237,9 +244,9 @@
  @call :generate_app_config
  @set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
