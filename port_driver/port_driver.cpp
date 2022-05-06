@@ -95,7 +95,7 @@ static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, co
     }
 }
 
-static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, bool result,
+static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
                                      const char returnCode) {
     auto port = driver_mk_port(context->port);
 
@@ -103,14 +103,10 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
     // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false
     // atom]}}
 
-    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,
-                             ERL_DRV_INT64, (ErlDrvTermData)&requestId,
-                             ERL_DRV_ATOM,  ATOMS.data,
-                             ERL_DRV_INT,   (ErlDrvTermData)returnCode,
-                             ERL_DRV_ATOM,  result ? ATOMS.true_ : ATOMS.false_,
-                             ERL_DRV_LIST,  2,
-                             ERL_DRV_TUPLE, 2,
-                             ERL_DRV_TUPLE, 3};
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, (ErlDrvTermData)&requestId,
+                             ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   (ErlDrvTermData)returnCode,
+                             ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
+                             ERL_DRV_TUPLE, 2,          ERL_DRV_TUPLE, 3};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
         LOG("Failed outputting term");
     }
@@ -244,7 +240,7 @@ struct packer {
     std::unique_ptr<char[]> client_id;
     std::unique_ptr<char[]> pem;
     DriverContext *context;
-    bool result = false;
+    ErlDrvTermData result = ATOMS.fail;
     char returnCode = RETURN_CODE_UNEXPECTED;
     EI_LONGLONG requestId;
 };
@@ -254,7 +250,9 @@ void client_connect(void *buf) {
 
     LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
     bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
-    pack->result = result;
+    if (result) {
+        pack->result = ATOMS.pass;
+    }
     pack->returnCode = RETURN_CODE_SUCCESS;
 }
 
@@ -268,9 +266,9 @@ void client_connect_complete(void *buf) {
 
 void handle_on_client_connect(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    ErlDrvTermData result = ATOMS.unknown;
 
-    defer { write_bool_to_port(context, result, return_code); };
+    defer { write_atom_to_port(context, result, return_code); };
     auto client_id = decode_string(buff, &index);
     if (!client_id) {
         return;
@@ -289,7 +287,7 @@ void handle_on_client_connect(DriverContext *context, char *buff, int index) {
         return;
     }
     driver_async(context->port, nullptr, &client_connect, packed, &client_connect_complete);
-    result = true;
+    result = ATOMS.invalid;
     return_code = RETURN_CODE_ASYNC;
 }
 
