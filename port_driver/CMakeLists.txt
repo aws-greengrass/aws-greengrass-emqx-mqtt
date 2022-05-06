@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(port_driver)
+include(cmake_include/clang-format.cmake)
 
 option(BUILD_TESTS "Build the tests." ON)
 
@@ -27,14 +28,7 @@ execute_process(
 )
 message("Erlang libs directory found: ${ERL_LIBS}")
 
-
 add_subdirectory(cda_integration)
-
-if (APPLE)
-    # Avoid linking error on MacOS, though this likely means that the plugin won't actually work!
-    # TODO: Make it build properly on MacOS
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -undefined dynamic_lookup")
-endif (APPLE)
 
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -fPIC")
@@ -62,6 +56,10 @@ target_link_libraries(${PORT_DRIVER_TARGET_NAME} PRIVATE AWS::aws-crt-cpp)
 if (APPLE)
     # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
     set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES SUFFIX ".so")
+
+    # Avoid linking error on MacOS, though this likely means that the plugin won't actually work!
+    # TODO: Make it build properly on MacOS
+    target_link_options(${PORT_DRIVER_TARGET_NAME} PRIVATE -undefined dynamic_lookup)
 endif()
 
 if (WIN32)

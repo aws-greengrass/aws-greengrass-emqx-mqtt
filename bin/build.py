@@ -10,12 +10,14 @@ import wget
 
 from .package import do_patch
 
+
 def change_dir_permissions_recursive(path, mode):
     for root, dirs, files in os.walk(path, topdown=False):
         for dir in [os.path.join(root,d) for d in dirs]:
             os.chmod(dir, mode)
     for file in [os.path.join(root, f) for f in files]:
         os.chmod(file, mode)
+
 
 def main():
     # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
@@ -77,6 +79,21 @@ def main():
 
     subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
+    # Run format the code
+    if shutil.which("clang-format") is not None:
+        print("Reformatting code using clang-format")
+        subprocess.check_call("cmake --build . --target clangformat", shell=True)
+        # Fail the build on GitHub if there are format changes needed
+        if os.getenv("GITHUB_ACTIONS") == "true":
+            try:
+                subprocess.check_call("git diff --exit-code", shell=True,
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError:
+                print("Clang format check failed")
+                sys.exit(1)
+    else:
+        print("clang-format not found, won't format or check format of files")
+
     subprocess.check_call("cmake --build .", shell=True)
     if not quick_mode:
         print("Running unit tests")
