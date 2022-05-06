@@ -217,7 +217,6 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
     return_code = RETURN_CODE_SUCCESS;
 }
 
-
 static void handle_unknown_op(DriverContext *context) {
     write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
