@@ -27,8 +27,13 @@ static struct aws_logger our_logger {};
 
 struct atoms {
     ErlDrvTermData data;
-    ErlDrvTermData true_;
-    ErlDrvTermData false_;
+    ErlDrvTermData pass;
+    ErlDrvTermData fail;
+    ErlDrvTermData valid;
+    ErlDrvTermData invalid;
+    ErlDrvTermData authorized;
+    ErlDrvTermData unauthorized;
+    ErlDrvTermData unknown;
 };
 static struct atoms ATOMS {};
 
@@ -46,8 +51,13 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) {
 
     // Setup static atoms
     ATOMS.data = driver_mk_atom((char *)"data");
-    ATOMS.true_ = driver_mk_atom((char *)"true");
-    ATOMS.false_ = driver_mk_atom((char *)"false");
+    ATOMS.pass = driver_mk_atom((char *)"pass");
+    ATOMS.fail = driver_mk_atom((char *)"fail");
+    ATOMS.valid = driver_mk_atom((char *)"valid");
+    ATOMS.invalid = driver_mk_atom((char *)"invalid");
+    ATOMS.authorized = driver_mk_atom((char *)"authorized");
+    ATOMS.unauthorized = driver_mk_atom((char *)"unauthorized");
+    ATOMS.unknown = driver_mk_atom((char *)"unknown");
 
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = (DriverContext *)driver_alloc(sizeof(DriverContext));
@@ -70,22 +80,18 @@ EXPORTED void drv_stop(ErlDrvData handle) {
     aws_logger_clean_up(&our_logger);
 }
 
-static void write_bool_to_port(DriverContext *context, bool result, const char return_code) {
+static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, const char return_code) {
     auto port = driver_mk_port(context->port);
 
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, {data, [return code
-    // integer, true or false atom]}}
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, result atom]}}
 
-    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,
-                             ERL_DRV_ATOM,  ATOMS.data,
-                             ERL_DRV_INT,   (ErlDrvTermData)return_code,
-                             ERL_DRV_ATOM,  result ? ATOMS.true_ : ATOMS.false_,
-                             ERL_DRV_LIST,  2,
-                             ERL_DRV_TUPLE, 2,
-                             ERL_DRV_TUPLE, 2};
+    ErlDrvTermData spec[] = {
+        ERL_DRV_PORT,  port,   ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT,   (ErlDrvTermData)return_code,
+        ERL_DRV_ATOM,  result, ERL_DRV_LIST, 2,          ERL_DRV_TUPLE, 2,
+        ERL_DRV_TUPLE, 2};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG("Failed outputting term");
+        LOG("Failed outputting atom result");
     }
 }
 
@@ -143,9 +149,9 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
                                      bool (*func)(CDA_INTEGRATION_HANDLE *handle, const char *clientId,
                                                   const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    ErlDrvTermData result_atom = ATOMS.unknown;
 
-    defer { write_bool_to_port(context, result, return_code); };
+    defer { write_atom_to_port(context, result_atom, return_code); };
 
     auto client_id = decode_string(buff, &index);
     if (!client_id) {
@@ -156,16 +162,18 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
     if (!pem) {
         return;
     }
+
     LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
-    result = (*func)(context->cda_integration_handle, client_id.get(), pem.get());
+    bool result = (*func)(context->cda_integration_handle, client_id.get(), pem.get());
+    result_atom = result ? ATOMS.pass : ATOMS.fail;
     return_code = RETURN_CODE_SUCCESS;
 }
 
 static void handle_check_acl(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    bool result = false;
+    ErlDrvTermData result_atom = ATOMS.unknown;
 
-    defer { write_bool_to_port(context, result, return_code); };
+    defer { write_atom_to_port(context, result_atom, return_code); };
 
     auto client_id = decode_string(buff, &index);
     if (!client_id) {
@@ -190,13 +198,29 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
     LOG("Handling acl request with client id %s, pem %s, for topic %s, and "
         "action %s",
         client_id.get(), pem.get(), topic.get(), pub_sub.get())
-    result = on_check_acl(context->cda_integration_handle, client_id.get(), pem.get(), topic.get(), pub_sub.get());
+    bool result = on_check_acl(context->cda_integration_handle, client_id.get(), pem.get(), topic.get(), pub_sub.get());
+    result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
+    return_code = RETURN_CODE_SUCCESS;
+}
+
+static void handle_verify_client_certificate(DriverContext *context, char *buff, int index) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    ErlDrvTermData result_atom = ATOMS.unknown;
+
+    defer { write_atom_to_port(context, result_atom, return_code); };
+    auto cert_pem = decode_string(buff, &index);
+    if (!cert_pem) {
+        return;
+    }
+
+    LOG("Handling verify_client_certificate request with certPem %s", cert_pem.get())
+    bool result = verify_client_certificate(context->cda_integration_handle, cert_pem.get());
+    result_atom = result ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
 }
 
 static void handle_unknown_op(DriverContext *context) {
-    bool result = false;
-    write_bool_to_port(context, result, RETURN_CODE_UNKNOWN_OP);
+    write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
 
 static bool decode_operation_header(const char *buff, int *index, unsigned long *op) {
@@ -259,8 +283,12 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
         LOG("ON_CLIENT_CHECK_ACL")
         handle_check_acl(context, buff, index);
         break;
+    case VERIFY_CLIENT_CERTIFICATE:
+        LOG("VERIFY_CLIENT_CERTIFICATE")
+        handle_verify_client_certificate(context, buff, index);
+        break;
     default:
-        LOG("Unknown operation: %u", op);
+        LOG("Unknown operation: %lu", op);
         handle_unknown_op(context);
     }
 }
