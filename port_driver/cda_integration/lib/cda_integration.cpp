@@ -3,12 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <filesystem>
-#include <fstream>
-#include <string>
 #include <aws/crt/Api.h>
 #include <aws/crt/io/HostResolver.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 
@@ -18,15 +17,22 @@ using namespace Aws::Crt;
 using namespace Aws::Greengrass;
 using namespace std;
 
-const string EMQX_KEY_PATH = "/etc/greengrass_certs/greengrass_emqx.key";
-const string EMQX_PEM_PATH = "/etc/greengrass_certs/greengrass_emqx.pem";
-const string EMQX_CA_PATH = "/etc/greengrass_certs/greengrass_ca.pem";
+const filesystem::path EMQX_KEY_PATH = filesystem::path{"etc/greengrass_certs/greengrass_emqx.key"};
+const filesystem::path EMQX_PEM_PATH = filesystem::path{"etc/greengrass_certs/greengrass_emqx.pem"};
+const filesystem::path EMQX_CA_PATH = filesystem::path{"etc/greengrass_certs/greengrass_ca.pem"};
+
+enum log_subject {
+    CDA_INTEG_SUBJECT = AWS_LOG_SUBJECT_BEGIN_RANGE(101),
+};
+
+#define LOG(...) AWS_LOGF_INFO(CDA_INTEG_SUBJECT, __VA_ARGS__)
 
 class ClientDeviceAuthIntegration {
-private:
+  private:
     unique_ptr<GreengrassCoreIpcClient> ipcClient;
     unique_ptr<ApiHandle> apiHandle;
-public:
+
+  public:
     ClientDeviceAuthIntegration();
 
     bool close() const;
@@ -50,63 +56,60 @@ public:
  * Inheriting from ConnectionLifecycleHandler allows us to define callbacks that are
  * called upon when connection lifecycle events occur.
  */
-class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler{
-    public:
-        TestConnectionLifecycleHandler() {}
-        void OnConnectCallback() override { fprintf(stdout, "Connected to Greengrass Core\n"); }
-        void OnDisconnectCallback(RpcError status) override{
-            if (!status){
-                fprintf(stdout, "Disconnected from Greengrass Core with error: %s\n", status.StatusToString().c_str());
-                exit(-1);
-            }
+class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler {
+  public:
+    TestConnectionLifecycleHandler() = default;
+    void OnConnectCallback() override { LOG("Connected to Greengrass Core"); }
+    void OnDisconnectCallback(RpcError status) override {
+        if (!status) {
+            LOG("Disconnected from Greengrass Core with error: %s", status.StatusToString().c_str());
+            exit(-1);
         }
-        bool OnErrorCallback(RpcError status) override {
-            fprintf(
-                stdout,
-                "Processing messages from the Greengrass Core resulted in error: %s\n",
-                status.StatusToString().c_str());
-            return true;
-        }
+    }
+    bool OnErrorCallback(RpcError status) override {
+        LOG("Processing messages from the Greengrass Core resulted in error: %s", status.StatusToString().c_str());
+        return true;
+    }
 };
 
-int ClientDeviceAuthIntegration::retrieveCertsFromCda(){
+int ClientDeviceAuthIntegration::retrieveCertsFromCda() {
 
     class CertificateUpdatesStreamHandler : public SubscribeToCertificateUpdatesStreamHandler {
         void OnStreamEvent(CertificateUpdateEvent *response) override {
-            fprintf(stdout, "Retrieving all certs...\n");
+            LOG("Retrieving all certs...");
             auto certUpdate = response->GetCertificateUpdate();
             auto privateKey = certUpdate->GetPrivateKey();
             auto cert = certUpdate->GetCertificate();
             auto allCas = certUpdate->GetCaCertificates();
-            fprintf(stdout, "Retrieved all certs from response...\n");
+            LOG("Retrieved all certs from response...");
 
-            auto cwd = std::filesystem::current_path().string();
-            fprintf(stdout, "Current working directory is: %s \n", cwd.c_str());
-            ofstream out_key(cwd + EMQX_KEY_PATH);
+            auto cwd = std::filesystem::current_path();
+            LOG("Current working directory is %s", cwd.c_str());
+            ofstream out_key(cwd / EMQX_KEY_PATH);
             out_key << privateKey.value().c_str();
             out_key.close();
-            ofstream out_pem(cwd + EMQX_PEM_PATH);
+            ofstream out_pem(cwd / EMQX_PEM_PATH);
             out_pem << cert.value().c_str();
             out_pem.close();
-            ofstream out_ca(cwd + EMQX_CA_PATH);
+            ofstream out_ca(cwd / EMQX_CA_PATH);
             out_ca << allCas.value().front().c_str();
             out_ca.close();
-            fprintf(stdout, "Wrote all certs!\n");
+            LOG("Wrote all certs!");
         }
 
         bool OnStreamError(OperationError *error) override {
-            fprintf(stderr, "OnStream error %s\n", error->GetMessage().value().c_str());
+            LOG("OnStream error %s", error->GetMessage().value().c_str());
             return false; // Return true to close stream, false to keep stream open.
         }
 
         void OnStreamClosed() override {
-            fprintf(stdout, "Stream closed\n");
+            LOG("Stream closed");
             // Handle close.
         }
     };
 
     SubscribeToCertificateUpdatesRequest request;
-    CertificateOptions* options = new CertificateOptions();
+    auto options = std::make_unique<CertificateOptions>();
     options->SetCertificateType(CERTIFICATE_TYPE_SERVER);
     request.SetCertificateOptions(*options);
 
@@ -117,50 +120,47 @@ int ClientDeviceAuthIntegration::retrieveCertsFromCda(){
 
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(10)) == std::future_status::timeout) {
-        std::cerr << "Operation timed out while waiting for response from Greengrass Core." << std::endl;
+        LOG("Operation timed out while waiting for response from Greengrass Core.");
         exit(-1);
     }
     auto response = responseFuture.get();
-    fprintf(stdout, "Received response from CDA...\n");
+    LOG("Received response from CDA...");
     if (!response) {
-        fprintf(stderr, "Empty response\n");
+        LOG("Empty response");
         // Handle error.
         auto errorType = response.GetResultType();
-        fprintf(stdout, "Subscribe error %d\n", errorType);
+        LOG("Subscribe error %d", errorType);
         if (errorType == OPERATION_ERROR) {
             auto *error = response.GetOperationError();
-            fprintf(stderr, "Cert subscribe response error %s\n", error->GetMessage().value().c_str());
+            LOG("Cert subscribe response error %s", error->GetMessage().value().c_str());
         } else {
             // Handle RPC error.
         }
         return -1;
     }
-    fprintf(stdout, "Done subscribing\n");
+    LOG("Done subscribing");
     return 0;
 }
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
-    fprintf(stdout, "Attempting to initialize Greengrass IPC client...\n" );
-    apiHandle = unique_ptr<ApiHandle>(new ApiHandle{g_allocator});
-    if (apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError() != AWS_ERROR_SUCCESS){
-        fprintf(
-            stderr,
-            "ClientBootstrap failed with error %s\n",
+    LOG("Attempting to initialize Greengrass IPC client...");
+    apiHandle = std::make_unique<ApiHandle>(g_allocator);
+    if (apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError() != AWS_ERROR_SUCCESS) {
+        LOG("ClientBootstrap failed with error %s",
             ErrorDebugString(apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError()));
         exit(-1);
     }
-    ipcClient = unique_ptr<GreengrassCoreIpcClient>(new GreengrassCoreIpcClient(*apiHandle->GetOrCreateStaticDefaultClientBootstrap()));
+    ipcClient = std::make_unique<GreengrassCoreIpcClient>(*apiHandle->GetOrCreateStaticDefaultClientBootstrap());
 
     TestConnectionLifecycleHandler lifecycleHandler;
     auto connectionStatus = ipcClient->Connect(lifecycleHandler).get();
-    if (!connectionStatus)
-    {
-        fprintf(stderr, "Failed to establish connection with error %s\n", connectionStatus.StatusToString().c_str());
+    if (!connectionStatus) {
+        LOG("Failed to establish connection with error %s", connectionStatus.StatusToString().c_str());
         exit(-1);
     }
-    fprintf(stdout, "Greengrass IPC Client created and connected successfully!\n" );
+    LOG("Greengrass IPC Client created and connected successfully!\n");
     int subscribe_return = ClientDeviceAuthIntegration::retrieveCertsFromCda();
-    std::cout << "Retrieved certs from CDA with status : " << subscribe_return << std::endl;
+    LOG("Retrieved certs from CDA with status: %d", subscribe_return);
 }
 
 bool ClientDeviceAuthIntegration::close() const { return true; }
