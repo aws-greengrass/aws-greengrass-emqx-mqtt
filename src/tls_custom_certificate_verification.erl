@@ -70,8 +70,8 @@ verify_client_certificate(OtpCert, UserState) ->
     {error, Error} ->
       logger:error("Failed to verify client certificate. Error: ~p", [Error]),
       {fail, Error};
-    {_, _} ->
-      logger:debug("Client certificate is invalid: ~p", [CertPem]),
+    Unexpected ->
+      logger:debug("Unexpected certificate verify result: ~p", [Unexpected]),
       {fail, "invalid certificate"}
   end.
 
