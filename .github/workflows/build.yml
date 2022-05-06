@@ -21,9 +21,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-#      - uses: erlef/setup-beam@v1
-#        with:
-#          otp-version: ${{matrix.otp}}
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
       - uses: wagoid/commitlint-github-action@v4
         if: matrix.os == 'ubuntu-latest'
       - uses: actions/setup-python@v3

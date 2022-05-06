@@ -92,7 +92,8 @@ def main():
                 print("Clang format check failed")
                 sys.exit(1)
     else:
-        print("clang-format not found, won't format or check format of files")
+        print("clang-format not found, won't format or check format of files. Install using `brew install "
+              "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
 
     subprocess.check_call("cmake --build .", shell=True)
     if not quick_mode:
