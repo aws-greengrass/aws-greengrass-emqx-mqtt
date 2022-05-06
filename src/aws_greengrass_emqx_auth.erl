@@ -95,10 +95,10 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
-        {ok, valid} ->
+        {ok, pass} ->
             logger:info("Client(~s) is valid", [ClientId]),
             {ok, Result#{auth_result => success}};
-        {ok, invalid} ->
+        {ok, fail} ->
             logger:warn("Client(~s) is invalid", [ClientId]),
             {stop, Result#{auth_result => not_authorized}};
         {error, Error} ->
@@ -114,7 +114,7 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
 
     PeerCertEncoded = get(cert_pem),
     case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
-        {ok, true} ->
+        {ok, authorized} ->
             logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
             {stop, allow};
         {ok, unauthorized} ->
