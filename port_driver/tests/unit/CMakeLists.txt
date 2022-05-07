@@ -40,9 +40,12 @@ add_subdirectory(${CMAKE_BINARY_DIR}/third_party/googletest/src
 enable_testing()
 set(UNIT_TEST_TARGET_NAME port_driver_unit_tests)
 
-file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/tests/unit/src/*.cpp)
+find_package(aws-crt-cpp REQUIRED)
+find_package(GreengrassIpc-cpp REQUIRED)
+
+file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/tests/unit/src/*.cpp ${CMAKE_SOURCE_DIR}/tests/unit/src/*.hpp)
 add_executable(${UNIT_TEST_TARGET_NAME} ${UNIT_TEST_SOURCES})
-target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main)
+target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp)
 target_link_libraries(${UNIT_TEST_TARGET_NAME} ${PORT_DRIVER_TARGET_NAME})
 
 find_program(GCOV gcov)
