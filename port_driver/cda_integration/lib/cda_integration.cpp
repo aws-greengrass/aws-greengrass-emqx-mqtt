@@ -4,7 +4,6 @@
  */
 
 #include <aws/crt/Api.h>
-#include <aws/crt/io/HostResolver.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <fstream>
@@ -29,11 +28,16 @@ enum log_subject {
 
 class ClientDeviceAuthIntegration {
   private:
-    unique_ptr<GreengrassCoreIpcClient> ipcClient;
-    unique_ptr<ApiHandle> apiHandle;
+    ApiHandle *apiHandle;
+    GreengrassCoreIpcClient *ipcClient;
 
   public:
     ClientDeviceAuthIntegration();
+
+    ClientDeviceAuthIntegration(unique_ptr<GreengrassCoreIpcClient> &&client)
+        : ipcClient(client.release()), apiHandle(nullptr){};
+
+    ~ClientDeviceAuthIntegration();
 
     bool close() const;
 
@@ -63,7 +67,6 @@ class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler {
     void OnDisconnectCallback(RpcError status) override {
         if (!status) {
             LOG("Disconnected from Greengrass Core with error: %s", status.StatusToString().c_str());
-            exit(-1);
         }
     }
     bool OnErrorCallback(RpcError status) override {
@@ -121,7 +124,7 @@ int ClientDeviceAuthIntegration::retrieveCertsFromCda() {
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(10)) == std::future_status::timeout) {
         LOG("Operation timed out while waiting for response from Greengrass Core.");
-        exit(-1);
+        return -2;
     }
     auto response = responseFuture.get();
     LOG("Received response from CDA...");
@@ -144,21 +147,21 @@ int ClientDeviceAuthIntegration::retrieveCertsFromCda() {
 
 ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
     LOG("Attempting to initialize Greengrass IPC client...");
-    apiHandle = std::make_unique<ApiHandle>(g_allocator);
-    if (apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError() != AWS_ERROR_SUCCESS) {
-        LOG("ClientBootstrap failed with error %s",
-            ErrorDebugString(apiHandle->GetOrCreateStaticDefaultClientBootstrap()->LastError()));
-        exit(-1);
+    apiHandle = new ApiHandle();
+    Io::ClientBootstrap *clientBootstrap = apiHandle->GetOrCreateStaticDefaultClientBootstrap();
+    if (clientBootstrap->LastError() != AWS_ERROR_SUCCESS) {
+        LOG("ClientBootstrap failed with error %s", ErrorDebugString(clientBootstrap->LastError()));
+        throw std::runtime_error("Unable to get or create default client bootstrap");
     }
-    ipcClient = std::make_unique<GreengrassCoreIpcClient>(*apiHandle->GetOrCreateStaticDefaultClientBootstrap());
+    ipcClient = new GreengrassCoreIpcClient(*clientBootstrap);
 
     TestConnectionLifecycleHandler lifecycleHandler;
     auto connectionStatus = ipcClient->Connect(lifecycleHandler).get();
     if (!connectionStatus) {
         LOG("Failed to establish connection with error %s", connectionStatus.StatusToString().c_str());
-        exit(-1);
+        throw std::runtime_error("Failed to connect to AWS Greengrass");
     }
-    LOG("Greengrass IPC Client created and connected successfully!\n");
+    LOG("Greengrass IPC Client created and connected successfully!");
     int subscribe_return = ClientDeviceAuthIntegration::retrieveCertsFromCda();
     LOG("Retrieved certs from CDA with status: %d", subscribe_return);
 }
@@ -197,19 +200,34 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
     return true;
 }
 
-CDA_INTEGRATION_HANDLE *cda_integration_init() {
+ClientDeviceAuthIntegration::~ClientDeviceAuthIntegration() {
+    if (ipcClient != nullptr) {
+        delete ipcClient;
+    }
+    if (apiHandle != nullptr) {
+        delete apiHandle;
+    }
+}
+
+CDA_INTEGRATION_HANDLE *cda_integration_init(unique_ptr<GreengrassCoreIpcClient> &&client) {
     ClientDeviceAuthIntegration *cda_integ = nullptr;
 
     try {
-        cda_integ = new ClientDeviceAuthIntegration();
+        if (client) {
+            cda_integ = new ClientDeviceAuthIntegration{std::move(client)};
+        } else {
+            cda_integ = new ClientDeviceAuthIntegration();
+        }
     } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
+        LOG("Failed to initialize CDA integration %s", e.what());
     } catch (...) {
-        std::cerr << "Unknown exception" << std::endl;
+        LOG("Failed to initialize CDA integration due to an unknown error");
     }
 
     return reinterpret_cast<CDA_INTEGRATION_HANDLE *>(cda_integ);
 }
+
+CDA_INTEGRATION_HANDLE *cda_integration_init() { return cda_integration_init({}); }
 
 bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
                          std::function<bool(ClientDeviceAuthIntegration *cda_integ)> func) {
@@ -218,7 +236,7 @@ bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
         return false;
     }
 
-    ClientDeviceAuthIntegration *cda_integ = reinterpret_cast<ClientDeviceAuthIntegration *>(handle);
+    auto *cda_integ = reinterpret_cast<ClientDeviceAuthIntegration *>(handle);
     try {
         return func(cda_integ);
     } catch (std::exception &e) {

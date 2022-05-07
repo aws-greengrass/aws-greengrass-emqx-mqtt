@@ -5,11 +5,16 @@
 
 #pragma once
 
+#include <aws/crt/Api.h>
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
+#include <memory>
+
 /*
  * @brief Handle to client device auth integration
  */
 typedef void *CDA_INTEGRATION_HANDLE;
 
+CDA_INTEGRATION_HANDLE *cda_integration_init(std::unique_ptr<Aws::Greengrass::GreengrassCoreIpcClient> &&client);
 CDA_INTEGRATION_HANDLE *cda_integration_init();
 
 bool on_client_connect(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem);

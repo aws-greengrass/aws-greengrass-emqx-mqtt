@@ -26,9 +26,13 @@ def main():
     if len(sys.argv) == 2 and sys.argv[1] == "quick":
         print("Quick mode! Portions of the build will be skipped")
         quick_mode = True
+    test_mode = False
+    if len(sys.argv) == 2 and sys.argv[1] == "test":
+        print("Test mode! Portions of the build will be skipped")
+        test_mode = True
     current_abs_path = os.path.abspath(os.getcwd())
 
-    if not quick_mode:
+    if not quick_mode and not test_mode:
         print("Pulling all submodules recursively")
         subprocess.check_call("git submodule update --init --recursive", shell=True)
 
@@ -50,7 +54,7 @@ def main():
     os.chdir("_build")
 
     enable_unit_test_flag = ""
-    if not quick_mode:
+    if not quick_mode or test_mode:
         # enabled by default
         print("Enabling unit tests")
         if os.name != 'nt':
@@ -96,16 +100,19 @@ def main():
               "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
 
     subprocess.check_call("cmake --build .", shell=True)
-    if not quick_mode:
+    if not quick_mode or test_mode:
         print("Running unit tests")
         if os.name != 'nt':
             # run UTs with coverage
             subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
         else:
-            subprocess.check_call("ctest -C Debug --output-on-failure", shell=True)
+            subprocess.check_call(".\\bin\\Debug\\port_driver_unit_tests.exe", shell=True)
     os.chdir(current_abs_path)
     # Put the output driver library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
+
+    if test_mode:
+        return
 
     if not quick_mode:
         print("Cloning EMQ X")
@@ -191,4 +198,4 @@ def main():
 
     # If EMQ X is already unzipped into build, then update our built plugin native code so we don't need to unzip again
     if os.path.exists("build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv"):
-        shutil.copytree("_build/lib", "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv", dirs_exist_ok=True)
+        shutil.copytree("_build/driver_lib", "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv", dirs_exist_ok=True)
