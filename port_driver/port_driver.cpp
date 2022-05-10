@@ -104,7 +104,7 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
     // atom]}}
 
     ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, reinterpret_cast<ErlDrvTermData>(&requestId),
-                             ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   reinterpret_cast<ErlDrvTermData>(returnCode),
+                             ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   static_cast<ErlDrvTermData>(returnCode),
                              ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
                              ERL_DRV_TUPLE, 2,          ERL_DRV_TUPLE, 3};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
