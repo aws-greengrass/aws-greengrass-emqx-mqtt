@@ -43,5 +43,16 @@ void set_port_control_flags(ErlDrvPort port, int flags) {
     (void)port;
     (void)flags;
 }
+
+long driver_async([[maybe_unused]] ErlDrvPort port, [[maybe_unused]] unsigned int *key, void (*async_invoke)(void *),
+                  void *async_data, void (*async_free)(void *)) {
+    if (async_invoke != nullptr) {
+        async_invoke(async_data);
+    }
+    if (async_free != nullptr) {
+        async_free(async_data);
+    }
+    return 0;
+}
 }
 #endif

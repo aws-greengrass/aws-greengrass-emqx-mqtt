@@ -31,6 +31,7 @@ typedef SSIZE_T ssize_t;
 #define RETURN_CODE_SUCCESS 0
 #define RETURN_CODE_UNKNOWN_OP 1
 #define RETURN_CODE_UNEXPECTED 2
+#define RETURN_CODE_ASYNC 100
 
 #ifdef __cplusplus
 extern "C" {
