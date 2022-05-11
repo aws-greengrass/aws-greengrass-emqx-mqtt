@@ -114,8 +114,8 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
 
 static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     int type;
-    int entry_size;
-    if (ei_get_type(buff, index, &type, &entry_size) != 0) {
+    unsigned long entry_size;
+    if (ei_get_type(buff, index, &type, reinterpret_cast<int *>(&entry_size)) != 0) {
         return nullptr;
     }
     if (type != ERL_BINARY_EXT && type != ERL_STRING_EXT && type != ERL_ATOM_EXT) {
@@ -125,15 +125,15 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
 
     auto buf = std::unique_ptr<char[]>{nullptr};
     try {
-        buf.reset(new char[static_cast<unsigned long>(entry_size + 1)]);
+        buf.reset(new char[entry_size + 1]);
     } catch (...) {
-        LOG("Out of memory allocating %d", entry_size + 1);
+        LOG("Out of memory allocating %lu", entry_size + 1);
         return nullptr;
     }
     switch (type) {
     case ERL_BINARY_EXT: {
         // Zero out the memory as decode_binary won't insert the null char
-        memset((void *)buf.get(), 0, sizeof(char) * (static_cast<unsigned long>(entry_size + 1)));
+        memset((void *)buf.get(), 0, sizeof(char) * (entry_size + 1));
         if (ei_decode_binary(buff, index, (void *)buf.get(), reinterpret_cast<long *>(&entry_size)) != 0) {
             LOG("Failed decoding binary");
             return nullptr;
