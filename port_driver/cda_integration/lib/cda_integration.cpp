@@ -14,9 +14,6 @@
 int ClientDeviceAuthIntegration::subscribeToCertUpdates() { return certificateUpdater.subscribeToUpdates(); }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-void ClientDeviceAuthIntegration::close() const {}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
@@ -70,7 +67,4 @@ ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *c
 
 ClientDeviceAuthIntegration *cda_integration_init() { return cda_integration_init(nullptr); }
 
-void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) {
-    cda_integ->close();
-    delete cda_integ;
-}
+void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_integ; }

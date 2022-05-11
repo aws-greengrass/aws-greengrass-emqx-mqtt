@@ -21,8 +21,6 @@ class ClientDeviceAuthIntegration {
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
         : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()){};
 
-    void close() const;
-
     bool on_client_connect(const char *clientId, const char *pem);
 
     bool on_client_connected(const char *clientId, const char *pem);
