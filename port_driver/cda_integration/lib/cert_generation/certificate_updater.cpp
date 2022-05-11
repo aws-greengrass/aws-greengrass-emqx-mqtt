@@ -19,31 +19,32 @@ static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"etc/gre
 void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *response) {
     // TODO: Improve this code with error handling, logging
 
-    LOG("Retrieving all certs...");
+    LOG_I(CERT_UPDATER_SUBJECT, "Retrieving all certs...");
     auto certUpdate = response->GetCertificateUpdate();
     if (!certUpdate) {
-        LOG("Failed to get certificate update");
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to get certificate update");
         return;
     }
 
     auto privateKey = certUpdate->GetPrivateKey();
     if (!privateKey || privateKey->empty()) {
-        LOG("Failed to get private key");
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to get private key");
         return;
     }
 
     auto cert = certUpdate->GetCertificate();
     if (!cert || cert->empty()) {
-        LOG("Failed to get cert");
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to get cert");
         return;
     }
 
     auto allCas = certUpdate->GetCaCertificates();
     if (!allCas) {
-        LOG("Failed to get CA certs");
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to get CA certs");
         return;
     }
 
+    // TODO: Fix this code to write the cert and key files correctly
     auto cwd = std::filesystem::current_path();
     std::ofstream out_key(cwd / EMQX_KEY_PATH);
     out_key << privateKey.value().c_str();
@@ -54,16 +55,16 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
     std::ofstream out_ca(cwd / EMQX_CA_PATH);
     out_ca << allCas.value().front().c_str();
     out_ca.close();
-    LOG("Updated all certs!");
+    LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
 }
 
 bool CertificateUpdatesHandler::OnStreamError(OperationError *error) {
-    LOG("OnStream error %s", error->GetMessage().value().c_str());
+    LOG_E(CERT_UPDATER_SUBJECT, "OnStream error %s", error->GetMessage().value().c_str());
     return false; // Return true to close stream, false to keep stream open.
 }
 
 void CertificateUpdatesHandler::OnStreamClosed() {
-    LOG("Stream closed");
+    LOG_I(CERT_UPDATER_SUBJECT, "Stream closed");
     // Handle close.
 }
 
@@ -75,7 +76,7 @@ int CertificateUpdater::subscribeToUpdates() {
 
     auto operation = ipcClient.NewSubscribeToCertificateUpdates(updatesHandler);
     if (!operation) {
-        LOG("Failed creating SubscribeToCertificateUpdatesOperation.");
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed creating SubscribeToCertificateUpdatesOperation.");
         // TODO: Improve return codes
         return -1;
     }
@@ -85,22 +86,22 @@ int CertificateUpdater::subscribeToUpdates() {
 
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(SUBSCRIBE_TIMEOUT_SECONDS)) == std::future_status::timeout) {
-        LOG("Operation timed out while waiting for response from Greengrass Core.");
+        LOG_E(CERT_UPDATER_SUBJECT, "Operation timed out while waiting for response from Greengrass Core.");
         // TODO: Improve return codes
         return -2;
     }
 
     // TODO: Improve error handling
     auto response = responseFuture.get();
-    LOG("Received response from CDA...");
     if (!response) {
         // Handle error.
         auto responseType = response.GetResultType();
-        LOG("Subscribe failed with response type %d", responseType);
+        LOG_E(CERT_UPDATER_SUBJECT, "Subscribe failed with response type %d", responseType);
         if (responseType == OPERATION_ERROR) {
             auto *error = response.GetOperationError();
             if (error != nullptr) {
-                LOG("Cert updates subscribe failure response: %s", error->GetMessage().value().c_str());
+                LOG_E(CERT_UPDATER_SUBJECT, "Cert updates subscribe failure response: %s",
+                      error->GetMessage().value().c_str());
             }
         } else {
             // Handle RPC error.
@@ -108,6 +109,6 @@ int CertificateUpdater::subscribeToUpdates() {
         // TODO: Improve return codes
         return -1;
     }
-    LOG("Successfully subscribed to cert updates");
+    LOG_I(CERT_UPDATER_SUBJECT, "Successfully subscribed to cert updates");
     return 0;
 }

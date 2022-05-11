@@ -60,9 +60,9 @@ ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *c
     try {
         cda_integ = new ClientDeviceAuthIntegration(client);
     } catch (std::exception &e) {
-        LOG("Failed to initialize CDA integration %s", e.what());
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration %s", e.what());
     } catch (...) {
-        LOG("Failed to initialize CDA integration due to an unknown error");
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration due to an unknown error");
     }
 
     return cda_integ;
