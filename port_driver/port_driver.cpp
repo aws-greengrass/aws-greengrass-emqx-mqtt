@@ -103,6 +103,8 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
     // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false
     // atom]}}
 
+    // Request ID in this case is a pointer to stack memory, but that's fine because erl_drv_output_term copies
+    // the data immediately into the Erlang heap.
     ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, reinterpret_cast<ErlDrvTermData>(&requestId),
                              ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   static_cast<ErlDrvTermData>(returnCode),
                              ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
