@@ -28,7 +28,7 @@ class CDAIntegrationTester : public ::testing::Test {
     virtual void SetUp();
     virtual void TearDown();
 
-    CDA_INTEGRATION_HANDLE *handle;
+    ClientDeviceAuthIntegration *cda_integ;
 };
 
 const std::string CDAIntegrationTester::TEST_CLIENT_ID = "test_client_id";
@@ -37,46 +37,34 @@ const std::string CDAIntegrationTester::TEST_TOPIC = "/topic";
 const std::string CDAIntegrationTester::TEST_ACTION = "publish";
 
 void CDAIntegrationTester::SetUp() {
-    GreengrassCoreIpcClient *client = new MockGGIpc();
-    handle = cda_integration_init(client);
-    EXPECT_NE(nullptr, handle);
+    GreengrassCoreIpcClient *ipcClient = new MockGGIpc();
+    cda_integ = cda_integration_init(ipcClient);
+    EXPECT_NE(nullptr, cda_integ);
 }
 
-void CDAIntegrationTester::TearDown() {
-    if (handle == nullptr) {
-        EXPECT_FALSE(cda_integration_close(handle));
-    } else {
-        EXPECT_TRUE(cda_integration_close(handle));
-    }
-}
-
-TEST_F(CDAIntegrationTester, CDAIntegrationInitAndCloseTest) { EXPECT_NE(nullptr, handle); }
+void CDAIntegrationTester::TearDown() { cda_integration_close(cda_integ); }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectTest) {
-    EXPECT_TRUE(on_client_connect(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
+    EXPECT_TRUE(cda_integ->on_client_connect(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectedTest) {
-    EXPECT_TRUE(on_client_connected(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
+    EXPECT_TRUE(cda_integ->on_client_connected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientDisconnectTest) {
-    EXPECT_TRUE(on_client_disconnected(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
+    EXPECT_TRUE(cda_integ->on_client_disconnected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
-    EXPECT_TRUE(on_client_authenticate(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
+    EXPECT_TRUE(cda_integ->on_client_authenticate(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
-    EXPECT_TRUE(
-        on_check_acl(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(), TEST_ACTION.c_str()));
+    EXPECT_TRUE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(),
+                                        TEST_ACTION.c_str()));
 }
 
-TEST_F(CDAIntegrationTester, CDAIntegrationNullHandleTest) {
-    EXPECT_FALSE(on_check_acl(nullptr, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(),
-                              TEST_ACTION.c_str()));
-}
 } // namespace unit
 } // namespace tests
 } // namespace port_driver

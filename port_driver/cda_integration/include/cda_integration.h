@@ -7,28 +7,39 @@
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
+#include "private/certificate_updater.h"
+#include "private/ipc_wrapper.h"
+
 namespace GG = Aws::Greengrass;
 
-/*
- * @brief Handle to client device auth integration
- */
-typedef void *CDA_INTEGRATION_HANDLE;
+class ClientDeviceAuthIntegration {
+  private:
+    GreengrassIPCWrapper greengrassIpcWrapper;
+    CertificateUpdater certificateUpdater;
 
-CDA_INTEGRATION_HANDLE *cda_integration_init(GG::GreengrassCoreIpcClient *client);
+  public:
+    ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
+        : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()){};
 
-CDA_INTEGRATION_HANDLE *cda_integration_init();
+    void close() const;
 
-bool on_client_connect(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem);
+    bool on_client_connect(const char *clientId, const char *pem);
 
-bool on_client_connected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem);
+    bool on_client_connected(const char *clientId, const char *pem);
 
-bool on_client_disconnected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem);
+    bool on_client_disconnected(const char *clientId, const char *pem);
 
-bool on_client_authenticate(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem);
+    bool on_client_authenticate(const char *clientId, const char *pem);
 
-bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem, const char *topic,
-                  const char *action);
+    bool on_check_acl(const char *clientId, const char *pem, const char *topic, const char *action);
 
-bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem);
+    bool verify_client_certificate(const char *certPem);
 
-bool cda_integration_close(CDA_INTEGRATION_HANDLE *handle);
+    int subscribeToCertUpdates();
+};
+
+ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client);
+
+ClientDeviceAuthIntegration *cda_integration_init();
+
+void cda_integration_close(ClientDeviceAuthIntegration *cda_integ);

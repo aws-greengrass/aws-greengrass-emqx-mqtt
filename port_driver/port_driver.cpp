@@ -20,7 +20,7 @@ enum log_subject {
 
 using DriverContext = struct {
     ErlDrvPort port;
-    CDA_INTEGRATION_HANDLE *cda_integration_handle;
+    ClientDeviceAuthIntegration *cda_integration;
 };
 
 static struct aws_logger our_logger {};
@@ -62,9 +62,9 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = reinterpret_cast<DriverContext *>(driver_alloc(sizeof(DriverContext)));
     context->port = port;
-    context->cda_integration_handle = cda_integration_init();
-    if (context->cda_integration_handle == nullptr) {
-        LOG("Failed to initialize CDA handle");
+    context->cda_integration = cda_integration_init();
+    if (context->cda_integration == nullptr) {
+        LOG("Failed to initialize CDA integration");
 
         // return value -1 means failure
         return reinterpret_cast<ErlDrvData>(-1); // NOLINT(performance-no-int-to-ptr)
@@ -75,7 +75,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
 EXPORTED void drv_stop(ErlDrvData handle) {
     LOG("Stopping AWS Greengrass auth driver");
     auto *context = reinterpret_cast<DriverContext *>(handle);
-    cda_integration_close(context->cda_integration_handle);
+    cda_integration_close(context->cda_integration);
     driver_free(reinterpret_cast<void *>(handle));
     aws_logger_clean_up(&our_logger);
 }
@@ -165,8 +165,7 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
 }
 
 static void handle_client_id_and_pem(DriverContext *context, char *buff, int index,
-                                     bool (*func)(CDA_INTEGRATION_HANDLE *handle, const char *clientId,
-                                                  const char *pem)) {
+                                     bool (ClientDeviceAuthIntegration::*func)(const char *clientId, const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
     ErlDrvTermData result_atom = ATOMS.unknown;
 
@@ -183,7 +182,7 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
     }
 
     LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
-    bool result = (*func)(context->cda_integration_handle, client_id.get(), pem.get());
+    bool result = (context->cda_integration->*func)(client_id.get(), pem.get());
     result_atom = result ? ATOMS.pass : ATOMS.fail;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -217,7 +216,7 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
     LOG("Handling acl request with client id %s, pem %s, for topic %s, and "
         "action %s",
         client_id.get(), pem.get(), topic.get(), pub_sub.get())
-    bool result = on_check_acl(context->cda_integration_handle, client_id.get(), pem.get(), topic.get(), pub_sub.get());
+    bool result = context->cda_integration->on_check_acl(client_id.get(), pem.get(), topic.get(), pub_sub.get());
     result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -233,7 +232,7 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
     }
 
     LOG("Handling verify_client_certificate request with certPem %s", cert_pem.get())
-    bool result = verify_client_certificate(context->cda_integration_handle, cert_pem.get());
+    bool result = context->cda_integration->verify_client_certificate(cert_pem.get());
     result_atom = result ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -251,7 +250,7 @@ void client_connect(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
     LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
-    bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
+    bool result = pack->context->cda_integration->on_client_connect(pack->client_id.get(), pack->pem.get());
     if (result) {
         pack->result = ATOMS.pass;
     }
@@ -344,15 +343,15 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     }
     case ON_CLIENT_CONNECTED:
         LOG("ON_CLIENT_CONNECTED")
-        handle_client_id_and_pem(context, buff, index, &on_client_connected);
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_connected);
         break;
     case ON_CLIENT_DISCONNECT:
         LOG("ON_CLIENT_DISCONNECT")
-        handle_client_id_and_pem(context, buff, index, &on_client_disconnected);
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_disconnected);
         break;
     case ON_CLIENT_AUTHENTICATE:
         LOG("ON_CLIENT_AUTHENTICATE")
-        handle_client_id_and_pem(context, buff, index, &on_client_authenticate);
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_authenticate);
         break;
     case ON_CLIENT_CHECK_ACL:
         LOG("ON_CLIENT_CHECK_ACL")
