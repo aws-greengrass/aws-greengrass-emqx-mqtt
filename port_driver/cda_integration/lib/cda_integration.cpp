@@ -9,18 +9,18 @@
 #include <iostream>
 
 #include "cda_integration.h"
-#include "logger.h"
-#include "ipc/ipc_wrapper.hpp"
 #include "cert_generation/certificate_updater.hpp"
+#include "ipc/ipc_wrapper.hpp"
+#include "logger.h"
 
 class ClientDeviceAuthIntegration {
-private:
+  private:
     GreengrassIPCWrapper greengrassIpcWrapper;
     CertificateUpdater certificateUpdater;
 
-public:
+  public:
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
-            : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()) {};
+        : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()){};
 
     [[nodiscard]] bool close() const;
 
@@ -39,9 +39,7 @@ public:
     int subscribeToCertUpdates();
 };
 
-int ClientDeviceAuthIntegration::subscribeToCertUpdates() {
-    return certificateUpdater.subscribeToUpdates();
-}
+int ClientDeviceAuthIntegration::subscribeToCertUpdates() { return certificateUpdater.subscribeToUpdates(); }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::close() const { return true; }
@@ -96,7 +94,7 @@ CDA_INTEGRATION_HANDLE *cda_integration_init(GG::GreengrassCoreIpcClient *client
     }
 
     try {
-        if (cda_integ) {
+        if (cda_integ != nullptr) {
             int subscribe_return = cda_integ->subscribeToCertUpdates();
             LOG("Retrieved certs from CDA with status: %d", subscribe_return);
             // TODO: Improve return codes
@@ -133,54 +131,52 @@ bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
 }
 
 bool cda_integration_close(CDA_INTEGRATION_HANDLE *handle) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> close =
-            [](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->close(); };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> close =
+        [](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->close(); };
     return execute_with_handle(handle, close);
 }
 
 bool on_client_connect(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_connect =
-            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-                return cda_integ->on_client_connect(clientId, pem);
-            };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connect =
+        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->on_client_connect(clientId, pem); };
     return execute_with_handle(handle, on_connect);
 }
 
 bool on_client_connected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_connected =
-            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-                return cda_integ->on_client_connected(clientId, pem);
-            };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connected =
+        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+            return cda_integ->on_client_connected(clientId, pem);
+        };
     return execute_with_handle(handle, on_connected);
 }
 
 bool on_client_disconnected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_disconnected =
-            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-                return cda_integ->on_client_disconnected(clientId, pem);
-            };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_disconnected =
+        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+            return cda_integ->on_client_disconnected(clientId, pem);
+        };
     return execute_with_handle(handle, on_disconnected);
 }
 
 bool on_client_authenticate(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_authenticate =
-            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-                return cda_integ->on_client_authenticate(clientId, pem);
-            };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_authenticate =
+        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+            return cda_integ->on_client_authenticate(clientId, pem);
+        };
     return execute_with_handle(handle, on_authenticate);
 }
 
 bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem, const char *topic,
                   const char *action) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_check_acl_func =
-            [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
-                return cda_integ->on_check_acl(clientId, pem, topic, action);
-            };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_check_acl_func =
+        [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
+            return cda_integ->on_check_acl(clientId, pem, topic, action);
+        };
     return execute_with_handle(handle, on_check_acl_func);
 }
 
 bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem) {
-    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> verify_client_cert_fun =
-            [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
+    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> verify_client_cert_fun =
+        [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
     return execute_with_handle(handle, verify_client_cert_fun);
 }
