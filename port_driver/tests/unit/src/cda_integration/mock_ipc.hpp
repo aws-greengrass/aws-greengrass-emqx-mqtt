@@ -5,6 +5,7 @@
 #pragma once
 
 #include <gmock/gmock.h>
+#include <aws/crt/Api.h>
 #include "cda_integration.h"
 
 class MockGGIpc : public Aws::Greengrass::GreengrassCoreIpcClient {

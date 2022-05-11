@@ -37,8 +37,8 @@ const std::string CDAIntegrationTester::TEST_TOPIC = "/topic";
 const std::string CDAIntegrationTester::TEST_ACTION = "publish";
 
 void CDAIntegrationTester::SetUp() {
-    std::unique_ptr<GreengrassCoreIpcClient> client = std::make_unique<MockGGIpc>();
-    handle = cda_integration_init(std::move(client));
+    GreengrassCoreIpcClient *client = new MockGGIpc();
+    handle = cda_integration_init(client);
     EXPECT_NE(nullptr, handle);
 }
 
