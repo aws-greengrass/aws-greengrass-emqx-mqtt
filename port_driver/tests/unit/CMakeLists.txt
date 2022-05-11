@@ -9,6 +9,8 @@ endif ()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/archive)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_CXX_FLAGS "") # Remove extra warning flags which fail the googletest compilation
+set(CMAKE_CXX_CLANG_TIDY) # No clang tidy for tests
 
 # Configure Compiler flags
 if (WIN32)

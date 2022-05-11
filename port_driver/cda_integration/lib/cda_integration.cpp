@@ -15,7 +15,7 @@ class ClientDeviceAuthIntegration {
   public:
     ClientDeviceAuthIntegration();
 
-    bool close() const;
+    [[nodiscard]] bool close() const;
 
     bool on_client_connect(const char *clientId, const char *pem);
 
@@ -30,30 +30,36 @@ class ClientDeviceAuthIntegration {
     bool verify_client_certificate(const char *certPem);
 };
 
-ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {}
+ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() = default;
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::close() const { return true; }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
     std::cout << "on_client_connect called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_connected(const char *clientId, const char *pem) {
     std::cout << "on_client_connected called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, const char *pem) {
     std::cout << "on_client_disconnected called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_authenticate(const char *clientId, const char *pem) {
     std::cout << "on_client_authenticate called with clientId: " << clientId << " and pem: " << pem << std::endl;
     return true;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *pem, const char *topic,
                                                const char *action) {
     std::cout << "on_check_acl called with clientId: " << clientId << " and pem: " << pem << " and topic: " << topic
@@ -61,13 +67,14 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
     return true;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
     std::cout << "verify_client_certificate called with certPem: " << certPem << std::endl;
     return true;
 }
 
 CDA_INTEGRATION_HANDLE *cda_integration_init() {
-    ClientDeviceAuthIntegration *cda_integ = nullptr;
+    ClientDeviceAuthIntegration *cda_integ;
 
     try {
         cda_integ = new ClientDeviceAuthIntegration();
@@ -81,13 +88,13 @@ CDA_INTEGRATION_HANDLE *cda_integration_init() {
 }
 
 bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
-                         std::function<bool(ClientDeviceAuthIntegration *cda_integ)> func) {
-    if (!handle) {
+                         const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> &func) {
+    if (handle == nullptr) {
         std::cerr << "Handle cannot be null" << std::endl;
         return false;
     }
 
-    ClientDeviceAuthIntegration *cda_integ = reinterpret_cast<ClientDeviceAuthIntegration *>(handle);
+    auto *cda_integ = reinterpret_cast<ClientDeviceAuthIntegration *>(handle);
     try {
         return func(cda_integ);
     } catch (std::exception &e) {

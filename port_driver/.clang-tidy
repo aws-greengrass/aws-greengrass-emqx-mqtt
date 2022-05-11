@@ -1,0 +1,13 @@
+---
+Checks: >-
+  -*,readability-*,portability-*,misc-*,modernize-*,clang-analyzer-*,
+  cppcoreguidelines-*,performance-*,concurrency-*,
+  -cppcoreguidelines-owning-memory,-cppcoreguidelines-init-variables,-cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -modernize-use-trailing-return-type,-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays,
+  -cppcoreguidelines-pro-type-const-cast,-cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,-cppcoreguidelines-macro-usage,
+  -cppcoreguidelines-avoid-non-const-global-variables
+WarningsAsErrors: '*'
+CheckOptions:
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: 1

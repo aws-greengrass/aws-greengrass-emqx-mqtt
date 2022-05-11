@@ -77,7 +77,11 @@ def main():
         print("Setting generator for Windows")
         generator = "-A x64"
 
-    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+    clang_tidy = ""
+    if (shutil.which("clang-tidy")) is not None:
+        clang_tidy = "-DCLANG_TIDY=1"
+    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag}"
+                          f" {clang_tidy} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
     # Run format the code
     if shutil.which("clang-format") is not None:
