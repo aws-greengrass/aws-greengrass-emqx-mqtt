@@ -31,7 +31,7 @@ jobs:
           python-version: '3.x'
       - name: Dependencies
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt install -y clang-tidy
+        run: wget http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-14/clang-tools-14_14.0.0-1ubuntu1_amd64.deb && wget http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-14/clang-tidy-14_14.0.0-1ubuntu1_amd64.deb && sudo dpkg -i *.deb
       - name: Build
         run: |
           python3 -m pip install -r bin/requirements.txt
