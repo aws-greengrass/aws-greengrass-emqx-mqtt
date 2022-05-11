@@ -5,39 +5,22 @@
 
 #include <aws/crt/Api.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
-#include <filesystem>
-#include <fstream>
 #include <functional>
 #include <iostream>
 
 #include "cda_integration.h"
-
-using namespace Aws::Crt;
-using namespace Aws::Greengrass;
-using namespace std;
-
-const filesystem::path EMQX_KEY_PATH = filesystem::path{"etc/greengrass_certs/greengrass_emqx.key"};
-const filesystem::path EMQX_PEM_PATH = filesystem::path{"etc/greengrass_certs/greengrass_emqx.pem"};
-const filesystem::path EMQX_CA_PATH = filesystem::path{"etc/greengrass_certs/greengrass_ca.pem"};
-
-enum log_subject {
-    CDA_INTEG_SUBJECT = AWS_LOG_SUBJECT_BEGIN_RANGE(101),
-};
-
-#define LOG(...) AWS_LOGF_INFO(CDA_INTEG_SUBJECT, __VA_ARGS__)
+#include "logger.h"
+#include "ipc/ipc_wrapper.hpp"
+#include "cert_generation/certificate_updater.hpp"
 
 class ClientDeviceAuthIntegration {
-  private:
-    ApiHandle *apiHandle;
-    GreengrassCoreIpcClient *ipcClient;
+private:
+    GreengrassIPCWrapper greengrassIpcWrapper;
+    CertificateUpdater certificateUpdater;
 
-  public:
-    ClientDeviceAuthIntegration();
-
-    ClientDeviceAuthIntegration(unique_ptr<GreengrassCoreIpcClient> &&client)
-        : ipcClient(client.release()), apiHandle(nullptr){};
-
-    ~ClientDeviceAuthIntegration();
+public:
+    ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
+            : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()) {};
 
     bool close() const;
 
@@ -53,117 +36,11 @@ class ClientDeviceAuthIntegration {
 
     bool verify_client_certificate(const char *certPem);
 
-    int retrieveCertsFromCda();
+    int subscribeToCertUpdates();
 };
 
-/*
- * Inheriting from ConnectionLifecycleHandler allows us to define callbacks that are
- * called upon when connection lifecycle events occur.
- */
-class TestConnectionLifecycleHandler : public ConnectionLifecycleHandler {
-  public:
-    TestConnectionLifecycleHandler() = default;
-    void OnConnectCallback() override { LOG("Connected to Greengrass Core"); }
-    void OnDisconnectCallback(RpcError status) override {
-        if (!status) {
-            LOG("Disconnected from Greengrass Core with error: %s", status.StatusToString().c_str());
-        }
-    }
-    bool OnErrorCallback(RpcError status) override {
-        LOG("Processing messages from the Greengrass Core resulted in error: %s", status.StatusToString().c_str());
-        return true;
-    }
-};
-
-int ClientDeviceAuthIntegration::retrieveCertsFromCda() {
-
-    class CertificateUpdatesStreamHandler : public SubscribeToCertificateUpdatesStreamHandler {
-        void OnStreamEvent(CertificateUpdateEvent *response) override {
-            LOG("Retrieving all certs...");
-            auto certUpdate = response->GetCertificateUpdate();
-            auto privateKey = certUpdate->GetPrivateKey();
-            auto cert = certUpdate->GetCertificate();
-            auto allCas = certUpdate->GetCaCertificates();
-            LOG("Retrieved all certs from response...");
-
-            auto cwd = std::filesystem::current_path();
-            LOG("Current working directory is %s", cwd.c_str());
-            ofstream out_key(cwd / EMQX_KEY_PATH);
-            out_key << privateKey.value().c_str();
-            out_key.close();
-            ofstream out_pem(cwd / EMQX_PEM_PATH);
-            out_pem << cert.value().c_str();
-            out_pem.close();
-            ofstream out_ca(cwd / EMQX_CA_PATH);
-            out_ca << allCas.value().front().c_str();
-            out_ca.close();
-            LOG("Wrote all certs!");
-        }
-
-        bool OnStreamError(OperationError *error) override {
-            LOG("OnStream error %s", error->GetMessage().value().c_str());
-            return false; // Return true to close stream, false to keep stream open.
-        }
-
-        void OnStreamClosed() override {
-            LOG("Stream closed");
-            // Handle close.
-        }
-    };
-
-    SubscribeToCertificateUpdatesRequest request;
-    auto options = std::make_unique<CertificateOptions>();
-    options->SetCertificateType(CERTIFICATE_TYPE_SERVER);
-    request.SetCertificateOptions(*options);
-
-    shared_ptr<CertificateUpdatesStreamHandler> streamHandler(new CertificateUpdatesStreamHandler());
-    auto operation = ipcClient->NewSubscribeToCertificateUpdates(streamHandler);
-    auto activate = operation->Activate(request, nullptr);
-    activate.wait();
-
-    auto responseFuture = operation->GetResult();
-    if (responseFuture.wait_for(std::chrono::seconds(10)) == std::future_status::timeout) {
-        LOG("Operation timed out while waiting for response from Greengrass Core.");
-        return -2;
-    }
-    auto response = responseFuture.get();
-    LOG("Received response from CDA...");
-    if (!response) {
-        LOG("Empty response");
-        // Handle error.
-        auto errorType = response.GetResultType();
-        LOG("Subscribe error %d", errorType);
-        if (errorType == OPERATION_ERROR) {
-            auto *error = response.GetOperationError();
-            LOG("Cert subscribe response error %s", error->GetMessage().value().c_str());
-        } else {
-            // Handle RPC error.
-        }
-        return -1;
-    }
-    LOG("Done subscribing");
-    return 0;
-}
-
-ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() {
-    LOG("Attempting to initialize Greengrass IPC client...");
-    apiHandle = new ApiHandle();
-    Io::ClientBootstrap *clientBootstrap = apiHandle->GetOrCreateStaticDefaultClientBootstrap();
-    if (clientBootstrap->LastError() != AWS_ERROR_SUCCESS) {
-        LOG("ClientBootstrap failed with error %s", ErrorDebugString(clientBootstrap->LastError()));
-        throw std::runtime_error("Unable to get or create default client bootstrap");
-    }
-    ipcClient = new GreengrassCoreIpcClient(*clientBootstrap);
-
-    TestConnectionLifecycleHandler lifecycleHandler;
-    auto connectionStatus = ipcClient->Connect(lifecycleHandler).get();
-    if (!connectionStatus) {
-        LOG("Failed to establish connection with error %s", connectionStatus.StatusToString().c_str());
-        throw std::runtime_error("Failed to connect to AWS Greengrass");
-    }
-    LOG("Greengrass IPC Client created and connected successfully!");
-    int subscribe_return = ClientDeviceAuthIntegration::retrieveCertsFromCda();
-    LOG("Retrieved certs from CDA with status: %d", subscribe_return);
+int ClientDeviceAuthIntegration::subscribeToCertUpdates() {
+    return certificateUpdater.subscribeToUpdates();
 }
 
 bool ClientDeviceAuthIntegration::close() const { return true; }
@@ -200,34 +77,34 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
     return true;
 }
 
-ClientDeviceAuthIntegration::~ClientDeviceAuthIntegration() {
-    if (ipcClient != nullptr) {
-        delete ipcClient;
-    }
-    if (apiHandle != nullptr) {
-        delete apiHandle;
-    }
-}
-
-CDA_INTEGRATION_HANDLE *cda_integration_init(unique_ptr<GreengrassCoreIpcClient> &&client) {
+CDA_INTEGRATION_HANDLE *cda_integration_init(GG::GreengrassCoreIpcClient *client) {
     ClientDeviceAuthIntegration *cda_integ = nullptr;
 
     try {
-        if (client) {
-            cda_integ = new ClientDeviceAuthIntegration{std::move(client)};
-        } else {
-            cda_integ = new ClientDeviceAuthIntegration();
-        }
+        cda_integ = new ClientDeviceAuthIntegration(client);
     } catch (std::exception &e) {
         LOG("Failed to initialize CDA integration %s", e.what());
     } catch (...) {
         LOG("Failed to initialize CDA integration due to an unknown error");
     }
 
+    try {
+        if (cda_integ) {
+            int subscribe_return = cda_integ->subscribeToCertUpdates();
+            LOG("Retrieved certs from CDA with status: %d", subscribe_return);
+            // TODO: Improve return codes
+            // TODO: Bubble up the failure in fetching certs
+        }
+    } catch (std::exception &e) {
+        LOG("Failed to retrieve certs. Error: %s", e.what());
+    } catch (...) {
+        LOG("Failed to retrieve certs due to an unknown error");
+    }
+
     return reinterpret_cast<CDA_INTEGRATION_HANDLE *>(cda_integ);
 }
 
-CDA_INTEGRATION_HANDLE *cda_integration_init() { return cda_integration_init({}); }
+CDA_INTEGRATION_HANDLE *cda_integration_init() { return cda_integration_init(nullptr); }
 
 bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
                          std::function<bool(ClientDeviceAuthIntegration *cda_integ)> func) {
@@ -249,52 +126,54 @@ bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
 }
 
 bool cda_integration_close(CDA_INTEGRATION_HANDLE *handle) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> close =
-        [](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->close(); };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> close =
+            [](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->close(); };
     return execute_with_handle(handle, close);
 }
 
 bool on_client_connect(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connect =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->on_client_connect(clientId, pem); };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_connect =
+            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_client_connect(clientId, pem);
+            };
     return execute_with_handle(handle, on_connect);
 }
 
 bool on_client_connected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connected =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_connected(clientId, pem);
-        };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_connected =
+            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_client_connected(clientId, pem);
+            };
     return execute_with_handle(handle, on_connected);
 }
 
 bool on_client_disconnected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_disconnected =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_disconnected(clientId, pem);
-        };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_disconnected =
+            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_client_disconnected(clientId, pem);
+            };
     return execute_with_handle(handle, on_disconnected);
 }
 
 bool on_client_authenticate(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_authenticate =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_authenticate(clientId, pem);
-        };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_authenticate =
+            [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_client_authenticate(clientId, pem);
+            };
     return execute_with_handle(handle, on_authenticate);
 }
 
 bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem, const char *topic,
                   const char *action) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_check_acl_func =
-        [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_check_acl(clientId, pem, topic, action);
-        };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> on_check_acl_func =
+            [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
+                return cda_integ->on_check_acl(clientId, pem, topic, action);
+            };
     return execute_with_handle(handle, on_check_acl_func);
 }
 
 bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> verify_client_cert_fun =
-        [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
+    const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> verify_client_cert_fun =
+            [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
     return execute_with_handle(handle, verify_client_cert_fun);
 }

@@ -30,8 +30,8 @@ start(_StartType, _StartArgs) ->
         [Reason]),
       throw({error, ErrorString})
   end,
-  aws_greengrass_emqx_auth:load(application:get_all_env()),
   aws_greengrass_emqx_certs:load(),
+  aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
 
 stop(_State) ->
