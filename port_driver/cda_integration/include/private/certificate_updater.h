@@ -13,11 +13,19 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
     void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
     bool OnStreamError(OperationError *error) override;
     void OnStreamClosed() override;
-    static int writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
-                                 std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
+    int writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
+                          std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
 
   public:
     virtual ~CertificateUpdatesHandler() = default;
+
+    CertificateUpdatesHandler(std::unique_ptr<std::filesystem::path> basePath,
+                              std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription)
+        : basePath(std::move(basePath)), subscription(std::move(subscription)) {}
+
+  private:
+    const std::unique_ptr<std::filesystem::path> basePath;
+    const std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription;
 };
 
 class CertificateUpdater {
@@ -26,9 +34,9 @@ class CertificateUpdater {
     std::shared_ptr<CertificateUpdatesHandler> updatesHandler;
 
   public:
-    CertificateUpdater(GG::GreengrassCoreIpcClient &client)
-        : ipcClient(client), updatesHandler(new CertificateUpdatesHandler()){};
+    CertificateUpdater(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
 
     // TODO: Improve return codes
-    int subscribeToUpdates();
+    int subscribeToUpdates(std::unique_ptr<std::filesystem::path> basePath,
+                           std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 };

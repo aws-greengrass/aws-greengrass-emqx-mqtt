@@ -16,29 +16,26 @@
 static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
 static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
-static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 
 int CertificateUpdatesHandler::writeCertsToFiles(
     Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
     std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue) {
-
-    // TODO: create and write to a new subdirectory
     // TODO improve io error handling
-    const char *dataDir = std::getenv(EMQX_DATA_ENV_VAR);
-    if (dataDir == nullptr) {
-        LOG_E(CERT_UPDATER_SUBJECT, "Environment variable %s not set", EMQX_DATA_ENV_VAR);
+
+    if (!basePath) {
         return -1;
     }
-
-    std::ofstream out_key(dataDir / EMQX_KEY_PATH);
+    const auto path = *basePath;
+    std::filesystem::create_directories(path);
+    std::ofstream out_key(path / EMQX_KEY_PATH);
     out_key << privateKeyValue.c_str();
     out_key.close();
 
-    std::ofstream out_pem(dataDir / EMQX_PEM_PATH);
+    std::ofstream out_pem(path / EMQX_PEM_PATH);
     out_pem << certValue.c_str();
     out_pem.close();
 
-    std::ofstream out_ca(dataDir / EMQX_CA_PATH);
+    std::ofstream out_ca(path / EMQX_CA_PATH);
     // TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
     for (const auto &str : allCAsValue) {
         out_ca << str << std::endl;
@@ -82,6 +79,10 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
     } else {
         LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
     }
+
+    if (subscription) {
+        subscription->operator()(response);
+    }
 }
 
 bool CertificateUpdatesHandler::OnStreamError(OperationError *error) {
@@ -94,12 +95,15 @@ void CertificateUpdatesHandler::OnStreamClosed() {
     // Handle close.
 }
 
-int CertificateUpdater::subscribeToUpdates() {
+int CertificateUpdater::subscribeToUpdates(
+    std::unique_ptr<std::filesystem::path> basePath,
+    std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
     GG::SubscribeToCertificateUpdatesRequest request;
     GG::CertificateOptions options;
     options.SetCertificateType(GG::CERTIFICATE_TYPE_SERVER);
     request.SetCertificateOptions(options);
 
+    updatesHandler = std::make_shared<CertificateUpdatesHandler>(std::move(basePath), std::move(subscription));
     auto operation = ipcClient.NewSubscribeToCertificateUpdates(updatesHandler);
     if (!operation) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed creating SubscribeToCertificateUpdatesOperation.");
