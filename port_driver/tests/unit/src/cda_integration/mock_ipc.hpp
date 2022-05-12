@@ -11,7 +11,7 @@
 class MockGGIpc : public Aws::Greengrass::GreengrassCoreIpcClient {
 public:
     MockGGIpc()
-            : GreengrassCoreIpcClient(*Aws::Crt::ApiHandle().GetOrCreateStaticDefaultClientBootstrap(),
+            : GreengrassCoreIpcClient(*Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap(),
                                       Aws::Crt::g_allocator) {
     };
 

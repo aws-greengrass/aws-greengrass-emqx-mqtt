@@ -3,11 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <algorithm>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 
 #include "logger.h"
 #include "private/certificate_updater.h"
@@ -18,6 +16,7 @@
 static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
 static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
+static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 
 int CertificateUpdatesHandler::writeCertsToFiles(
     Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
@@ -25,7 +24,11 @@ int CertificateUpdatesHandler::writeCertsToFiles(
 
     // TODO: create and write to a new subdirectory
     // TODO improve io error handling
-    std::string dataDir = getEnvVar(EMQX_DATA_ENV_VAR);
+    const char *dataDir = std::getenv(EMQX_DATA_ENV_VAR);
+    if (dataDir == nullptr) {
+        LOG_E(CERT_UPDATER_SUBJECT, "Environment variable %s not set", EMQX_DATA_ENV_VAR);
+        return -1;
+    }
 
     std::ofstream out_key(dataDir / EMQX_KEY_PATH);
     out_key << privateKeyValue.c_str();
@@ -37,7 +40,9 @@ int CertificateUpdatesHandler::writeCertsToFiles(
 
     std::ofstream out_ca(dataDir / EMQX_CA_PATH);
     // TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
-    std::copy(allCAsValue.begin(), allCAsValue.end(), std::ostream_iterator<Aws::Crt::String>(out_ca, ""));
+    for (const auto &str : allCAsValue) {
+        out_ca << str << std::endl;
+    }
     out_ca.close();
 
     return 0;
@@ -70,10 +75,13 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to get CA certs");
         return;
     }
-    // TODO: validate writeStatus
-    int writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
 
-    LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
+    int writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
+    if (writeStatus != 0) {
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", writeStatus);
+    } else {
+        LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
+    }
 }
 
 bool CertificateUpdatesHandler::OnStreamError(OperationError *error) {

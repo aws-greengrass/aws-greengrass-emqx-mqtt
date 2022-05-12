@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <aws/crt/Api.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <functional>
 #include <iostream>
@@ -12,13 +11,14 @@
 
 void ClientDeviceAuthIntegration::connect() { greengrassIpcWrapper.connect(); }
 
-void ClientDeviceAuthIntegration::subscribeToCertUpdates() {
+int ClientDeviceAuthIntegration::subscribeToCertUpdates() {
     int certSubscribeStatus = certificateUpdater.subscribeToUpdates();
     if (certSubscribeStatus != 0) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
-        throw std::runtime_error("Failed to subscribe to cert updates with status " + certSubscribeStatus);
+        return certSubscribeStatus;
     }
     LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");
+    return 0;
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

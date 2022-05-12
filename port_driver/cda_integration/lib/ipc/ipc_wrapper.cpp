@@ -22,17 +22,12 @@ bool ConnectionEventsHandler::OnErrorCallback(RpcError status) {
 }
 
 GreengrassIPCWrapper::GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client)
-    : crtApiHandle(new CRT::ApiHandle()), clientBootstrap(getClientBootstrap()) {
-    ipcClient = client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap);
-    if (ipcClient == nullptr) {
-        throw std::runtime_error("Failed to create IPC Client");
-    }
-};
+    : clientBootstrap(getClientBootstrap()),
+      ipcClient(client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap)){
 
-GreengrassIPCWrapper::~GreengrassIPCWrapper() {
-    delete ipcClient;
-    delete crtApiHandle;
-}
+      };
+
+GreengrassIPCWrapper::~GreengrassIPCWrapper() { delete ipcClient; }
 
 CRT::Io::ClientBootstrap &GreengrassIPCWrapper::getClientBootstrap() {
     CRT::Io::ClientBootstrap *clientBootstrap = CRT::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();

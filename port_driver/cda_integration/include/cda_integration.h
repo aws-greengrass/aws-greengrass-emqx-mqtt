@@ -36,7 +36,7 @@ class ClientDeviceAuthIntegration {
 
     void connect();
 
-    void subscribeToCertUpdates();
+    int subscribeToCertUpdates();
 };
 
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client);
