@@ -38,7 +38,7 @@
  @echo on
 -@start "%rel_name%" %werl% -boot "%boot_script%" %args%
 +@title "%rel_name%"
-+@%werl% -boot "%boot_script%" %args% || exit /b %ERRORLEVEL%
++@%werl% -boot "%boot_script%" %args% || exit /b
  @goto :eof
  
  :: Stop the Windows service
@@ -58,7 +58,7 @@
  @echo on
 -@start "bin\%rel_name% console" %werl% -boot "%boot_script%" %args%
 +@title "%rel_root_dir%\bin\%rel_name% console"
-+@%werl% -boot "%boot_script%" %args% || exit /b %ERRORLEVEL%
++@%erl_exe% -noshell -boot "%boot_script%" %args% || exit /b
  @echo emqx is started!
  @goto :eof
  
