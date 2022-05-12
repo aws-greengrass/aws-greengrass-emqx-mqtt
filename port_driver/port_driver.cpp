@@ -66,7 +66,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
         // return value -1 means failure
         return reinterpret_cast<ErlDrvData>(-1); // NOLINT(performance-no-int-to-ptr)
     }
-    //TODO: move this to cda_integration_init() once tests are changed
+    // TODO: move this to cda_integration_init() once tests are changed
     context->cda_integration->connect();
     context->cda_integration->subscribeToCertUpdates();
     return reinterpret_cast<ErlDrvData>(context);

@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "private/ipc_wrapper.h"
+#include "logger.h"
 #include <aws/crt/Api.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
-#include "logger.h"
-#include "private/ipc_wrapper.h"
 
 void ConnectionEventsHandler::OnConnectCallback() { LOG_I(IPC_WRAPPER_SUBJECT, "Connected to Greengrass Core"); }
 
@@ -31,7 +31,8 @@ GreengrassIPCWrapper::GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client)
 
 GreengrassIPCWrapper::~GreengrassIPCWrapper() {
     delete ipcClient;
-    delete crtApiHandle;}
+    delete crtApiHandle;
+}
 
 CRT::Io::ClientBootstrap &GreengrassIPCWrapper::getClientBootstrap() {
     CRT::Io::ClientBootstrap *clientBootstrap = CRT::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();

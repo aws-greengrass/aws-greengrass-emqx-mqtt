@@ -10,7 +10,7 @@
 
 #include "cda_integration.h"
 
-void ClientDeviceAuthIntegration::connect(){greengrassIpcWrapper.connect();}
+void ClientDeviceAuthIntegration::connect() { greengrassIpcWrapper.connect(); }
 
 void ClientDeviceAuthIntegration::subscribeToCertUpdates() {
     int certSubscribeStatus = certificateUpdater.subscribeToUpdates();

@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <algorithm>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <fstream>
-#include <algorithm>
 #include <iterator>
 
 #include "logger.h"
@@ -14,13 +14,14 @@
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
-//TODO: naming
+// TODO: naming
 static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
 static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
 
-int CertificateUpdatesHandler::writeCertsToFiles(Aws::Crt::String& privateKeyValue, Aws::Crt::String& certValue,
-    std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>>& allCAsValue){
+int CertificateUpdatesHandler::writeCertsToFiles(
+    Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
+    std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue) {
 
     // TODO: create and write to a new subdirectory
     // TODO improve io error handling
@@ -35,7 +36,7 @@ int CertificateUpdatesHandler::writeCertsToFiles(Aws::Crt::String& privateKeyVal
     out_pem.close();
 
     std::ofstream out_ca(dataDir / EMQX_CA_PATH);
-    //TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
+    // TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
     std::copy(allCAsValue.begin(), allCAsValue.end(), std::ostream_iterator<Aws::Crt::String>(out_ca, ""));
     out_ca.close();
 
@@ -69,7 +70,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to get CA certs");
         return;
     }
-    //TODO: validate writeStatus
+    // TODO: validate writeStatus
     int writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
 
     LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
