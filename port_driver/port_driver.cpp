@@ -34,14 +34,16 @@ static struct atoms ATOMS {};
 
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
     (void)buff;
+    std::string logDir = getEnvVar(EMQX_LOG_ENV_VAR) + "\\crt.log";
     struct aws_logger_standard_options logger_options = {
         .level = AWS_LL_TRACE,
-        .filename = "crt.log",
+        .filename = logDir.c_str(),
     };
     aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
 
     LOG_I(PORT_DRIVER_SUBJECT, "Starting AWS Greengrass auth driver");
+    LOG_I(PORT_DRIVER_SUBJECT, logDir.c_str());
     ei_init();
 
     // Setup static atoms
@@ -64,6 +66,9 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
         // return value -1 means failure
         return reinterpret_cast<ErlDrvData>(-1); // NOLINT(performance-no-int-to-ptr)
     }
+    //TODO: move this to cda_integration_init() once tests are changed
+    context->cda_integration->connect();
+    context->cda_integration->subscribeToCertUpdates();
     return reinterpret_cast<ErlDrvData>(context);
 }
 

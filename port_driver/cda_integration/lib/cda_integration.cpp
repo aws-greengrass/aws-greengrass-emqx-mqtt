@@ -9,9 +9,17 @@
 #include <iostream>
 
 #include "cda_integration.h"
-#include "logger.h"
 
-int ClientDeviceAuthIntegration::subscribeToCertUpdates() { return certificateUpdater.subscribeToUpdates(); }
+void ClientDeviceAuthIntegration::connect(){greengrassIpcWrapper.connect();}
+
+void ClientDeviceAuthIntegration::subscribeToCertUpdates() {
+    int certSubscribeStatus = certificateUpdater.subscribeToUpdates();
+    if (certSubscribeStatus != 0) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
+        throw std::runtime_error("Failed to subscribe to cert updates with status " + certSubscribeStatus);
+    }
+    LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");
+}
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
@@ -53,7 +61,6 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
 
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client) {
     ClientDeviceAuthIntegration *cda_integ = nullptr;
-
     try {
         cda_integ = new ClientDeviceAuthIntegration(client);
     } catch (std::exception &e) {
@@ -61,7 +68,6 @@ ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *c
     } catch (...) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration due to an unknown error");
     }
-
     return cda_integ;
 }
 

@@ -6,15 +6,41 @@
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <fstream>
+#include <algorithm>
+#include <iterator>
 
 #include "logger.h"
 #include "private/certificate_updater.h"
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
-static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"etc/greengrass_certs/greengrass_emqx.key"};
-static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"etc/greengrass_certs/greengrass_emqx.pem"};
-static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"etc/greengrass_certs/greengrass_ca.pem"};
+//TODO: naming
+static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
+static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
+static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
+
+int CertificateUpdatesHandler::writeCertsToFiles(Aws::Crt::String& privateKeyValue, Aws::Crt::String& certValue,
+    std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>>& allCAsValue){
+
+    // TODO: create and write to a new subdirectory
+    // TODO improve io error handling
+    std::string dataDir = getEnvVar(EMQX_DATA_ENV_VAR);
+
+    std::ofstream out_key(dataDir / EMQX_KEY_PATH);
+    out_key << privateKeyValue.c_str();
+    out_key.close();
+
+    std::ofstream out_pem(dataDir / EMQX_PEM_PATH);
+    out_pem << certValue.c_str();
+    out_pem.close();
+
+    std::ofstream out_ca(dataDir / EMQX_CA_PATH);
+    //TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
+    std::copy(allCAsValue.begin(), allCAsValue.end(), std::ostream_iterator<Aws::Crt::String>(out_ca, ""));
+    out_ca.close();
+
+    return 0;
+}
 
 void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *response) {
     // TODO: Improve this code with error handling, logging
@@ -38,23 +64,14 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         return;
     }
 
-    auto allCas = certUpdate->GetCaCertificates();
-    if (!allCas) {
+    auto allCAs = certUpdate->GetCaCertificates();
+    if (!allCAs) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to get CA certs");
         return;
     }
+    //TODO: validate writeStatus
+    int writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
 
-    // TODO: Fix this code to write the cert and key files correctly
-    auto cwd = std::filesystem::current_path();
-    std::ofstream out_key(cwd / EMQX_KEY_PATH);
-    out_key << privateKey.value().c_str();
-    out_key.close();
-    std::ofstream out_pem(cwd / EMQX_PEM_PATH);
-    out_pem << cert.value().c_str();
-    out_pem.close();
-    std::ofstream out_ca(cwd / EMQX_CA_PATH);
-    out_ca << allCas.value().front().c_str();
-    out_ca.close();
     LOG_I(CERT_UPDATER_SUBJECT, "Updated all certs!");
 }
 

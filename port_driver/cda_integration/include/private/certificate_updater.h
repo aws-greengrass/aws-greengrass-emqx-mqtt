@@ -13,6 +13,8 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
     void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
     bool OnStreamError(OperationError *error) override;
     void OnStreamClosed() override;
+    int writeCertsToFiles(Aws::Crt::String& privateKeyValue, Aws::Crt::String& certValue,
+            std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>>&);
 };
 
 class CertificateUpdater {
