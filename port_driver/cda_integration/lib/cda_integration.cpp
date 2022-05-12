@@ -3,37 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <aws/crt/Api.h>
-#include <aws/crt/io/HostResolver.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <functional>
 #include <iostream>
 
 #include "cda_integration.h"
 
-class ClientDeviceAuthIntegration {
-  public:
-    ClientDeviceAuthIntegration();
+void ClientDeviceAuthIntegration::connect() { greengrassIpcWrapper.connect(); }
 
-    [[nodiscard]] bool close() const;
-
-    bool on_client_connect(const char *clientId, const char *pem);
-
-    bool on_client_connected(const char *clientId, const char *pem);
-
-    bool on_client_disconnected(const char *clientId, const char *pem);
-
-    bool on_client_authenticate(const char *clientId, const char *pem);
-
-    bool on_check_acl(const char *clientId, const char *pem, const char *topic, const char *action);
-
-    bool verify_client_certificate(const char *certPem);
-};
-
-ClientDeviceAuthIntegration::ClientDeviceAuthIntegration() = default;
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::close() const { return true; }
+int ClientDeviceAuthIntegration::subscribeToCertUpdates() {
+    int certSubscribeStatus = certificateUpdater.subscribeToUpdates();
+    if (certSubscribeStatus != 0) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
+        return certSubscribeStatus;
+    }
+    LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");
+    return 0;
+}
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
@@ -73,86 +59,18 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
     return true;
 }
 
-CDA_INTEGRATION_HANDLE *cda_integration_init() {
-    ClientDeviceAuthIntegration *cda_integ;
-
+ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client) {
+    ClientDeviceAuthIntegration *cda_integ = nullptr;
     try {
-        cda_integ = new ClientDeviceAuthIntegration();
+        cda_integ = new ClientDeviceAuthIntegration(client);
     } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration %s", e.what());
     } catch (...) {
-        std::cerr << "Unknown exception" << std::endl;
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration due to an unknown error");
     }
-
-    return reinterpret_cast<CDA_INTEGRATION_HANDLE *>(cda_integ);
+    return cda_integ;
 }
 
-bool execute_with_handle(CDA_INTEGRATION_HANDLE *handle,
-                         const std::function<bool(ClientDeviceAuthIntegration *cda_integ)> &func) {
-    if (handle == nullptr) {
-        std::cerr << "Handle cannot be null" << std::endl;
-        return false;
-    }
+ClientDeviceAuthIntegration *cda_integration_init() { return cda_integration_init(nullptr); }
 
-    auto *cda_integ = reinterpret_cast<ClientDeviceAuthIntegration *>(handle);
-    try {
-        return func(cda_integ);
-    } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        return false;
-    } catch (...) {
-        std::cerr << "Unknown exception" << std::endl;
-        return false;
-    }
-}
-
-bool cda_integration_close(CDA_INTEGRATION_HANDLE *handle) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> close =
-        [](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->close(); };
-    return execute_with_handle(handle, close);
-}
-
-bool on_client_connect(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connect =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->on_client_connect(clientId, pem); };
-    return execute_with_handle(handle, on_connect);
-}
-
-bool on_client_connected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_connected =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_connected(clientId, pem);
-        };
-    return execute_with_handle(handle, on_connected);
-}
-
-bool on_client_disconnected(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_disconnected =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_disconnected(clientId, pem);
-        };
-    return execute_with_handle(handle, on_disconnected);
-}
-
-bool on_client_authenticate(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_authenticate =
-        [clientId, pem](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_client_authenticate(clientId, pem);
-        };
-    return execute_with_handle(handle, on_authenticate);
-}
-
-bool on_check_acl(CDA_INTEGRATION_HANDLE *handle, const char *clientId, const char *pem, const char *topic,
-                  const char *action) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> on_check_acl_func =
-        [clientId, pem, topic, action](ClientDeviceAuthIntegration *cda_integ) {
-            return cda_integ->on_check_acl(clientId, pem, topic, action);
-        };
-    return execute_with_handle(handle, on_check_acl_func);
-}
-
-bool verify_client_certificate(CDA_INTEGRATION_HANDLE *handle, const char *certPem) {
-    const std::function<bool(ClientDeviceAuthIntegration * cda_integ)> verify_client_cert_fun =
-        [certPem](ClientDeviceAuthIntegration *cda_integ) { return cda_integ->verify_client_certificate(certPem); };
-    return execute_with_handle(handle, verify_client_cert_fun);
-}
+void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_integ; }

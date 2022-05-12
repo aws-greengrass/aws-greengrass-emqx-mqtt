@@ -5,19 +5,30 @@
 
 #include <gtest/gtest.h>
 
+#include <aws/greengrass/GreengrassCoreIpcClient.h>
+
 #include "cda_integration.h"
+#include "mock_ipc.hpp"
+
+using namespace Aws::Crt;
+using namespace Aws::Greengrass;
 
 namespace port_driver {
 namespace tests {
 namespace unit {
 class CDAIntegrationTester : public ::testing::Test {
   protected:
-    CDAIntegrationTester() {}
+    CDAIntegrationTester() = default;
 
     static const std::string TEST_CLIENT_ID;
     static const std::string TEST_CLIENT_PEM;
     static const std::string TEST_TOPIC;
     static const std::string TEST_ACTION;
+
+    virtual void SetUp();
+    virtual void TearDown();
+
+    ClientDeviceAuthIntegration *cda_integ;
 };
 
 const std::string CDAIntegrationTester::TEST_CLIENT_ID = "test_client_id";
@@ -25,47 +36,35 @@ const std::string CDAIntegrationTester::TEST_CLIENT_PEM = "test_client_pem";
 const std::string CDAIntegrationTester::TEST_TOPIC = "/topic";
 const std::string CDAIntegrationTester::TEST_ACTION = "publish";
 
-TEST_F(CDAIntegrationTester, CDAIntegrationInitAndCloseTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_NE(nullptr, handle);
-    EXPECT_TRUE(cda_integration_close(handle));
+void CDAIntegrationTester::SetUp() {
+    GreengrassCoreIpcClient *ipcClient = new MockGGIpc();
+    cda_integ = cda_integration_init(ipcClient);
+    EXPECT_NE(nullptr, cda_integ);
 }
 
+void CDAIntegrationTester::TearDown() { cda_integration_close(cda_integ); }
+
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_TRUE(on_client_connect(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-    EXPECT_TRUE(cda_integration_close(handle));
+    EXPECT_TRUE(cda_integ->on_client_connect(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectedTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_TRUE(on_client_connected(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-    EXPECT_TRUE(cda_integration_close(handle));
+    EXPECT_TRUE(cda_integ->on_client_connected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientDisconnectTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_TRUE(on_client_disconnected(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-    EXPECT_TRUE(cda_integration_close(handle));
+    EXPECT_TRUE(cda_integ->on_client_disconnected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_TRUE(on_client_authenticate(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-    EXPECT_TRUE(cda_integration_close(handle));
+    EXPECT_TRUE(cda_integ->on_client_authenticate(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
-    CDA_INTEGRATION_HANDLE *handle = cda_integration_init();
-    EXPECT_TRUE(
-        on_check_acl(handle, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(), TEST_ACTION.c_str()));
-    EXPECT_TRUE(cda_integration_close(handle));
+    EXPECT_TRUE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(),
+                                        TEST_ACTION.c_str()));
 }
 
-TEST_F(CDAIntegrationTester, CDAIntegrationNullHandleTest) {
-    EXPECT_FALSE(on_check_acl(nullptr, TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(),
-                              TEST_ACTION.c_str()));
-}
 } // namespace unit
 } // namespace tests
 } // namespace port_driver

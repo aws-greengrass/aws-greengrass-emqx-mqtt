@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-file(GLOB LIB_SRC "*.cpp")
+file(GLOB_RECURSE LIB_SRC "*.cpp")
 
 if (CLANG_TIDY)
     set(CMAKE_CXX_CLANG_TIDY clang-tidy)

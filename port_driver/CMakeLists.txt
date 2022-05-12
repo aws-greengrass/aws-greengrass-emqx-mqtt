@@ -28,6 +28,7 @@ execute_process(
 )
 message("Erlang libs directory found: ${ERL_LIBS}")
 
+include_directories("include")
 add_subdirectory(cda_integration)
 
 if (CLANG_TIDY)

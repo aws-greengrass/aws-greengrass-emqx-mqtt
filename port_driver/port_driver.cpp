@@ -3,24 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <cstdio>
-
-#include "defer.h"
 #include "port_driver.h"
+#include "defer.h"
 #include <aws/crt/Api.h>
 #include <cda_integration.h>
 #include <cstring>
+#include <filesystem>
+#include <logger.h>
 #include <memory>
-
-enum log_subject {
-    PORT_DRIVER_SUBJECT = AWS_LOG_SUBJECT_BEGIN_RANGE(100),
-};
-
-#define LOG(...) AWS_LOGF_INFO(PORT_DRIVER_SUBJECT, __VA_ARGS__)
 
 using DriverContext = struct {
     ErlDrvPort port;
-    CDA_INTEGRATION_HANDLE *cda_integration_handle;
+    ClientDeviceAuthIntegration *cda_integration;
 };
 
 static struct aws_logger our_logger {};
@@ -36,17 +30,25 @@ struct atoms {
     ErlDrvTermData unknown;
 };
 static struct atoms ATOMS {};
+static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
     (void)buff;
+    const char *logDir = std::getenv(EMQX_LOG_ENV_VAR);
+    if (logDir == nullptr) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
+        return ERL_DRV_ERROR_BADARG;
+    }
+    const std::filesystem::path logPath = std::filesystem::path(logDir) / "crt.log";
+    const auto *logPathStr = new std::string{logPath.string()};
     struct aws_logger_standard_options logger_options = {
         .level = AWS_LL_TRACE,
-        .filename = "crt.log",
+        .filename = logPathStr->c_str(),
     };
     aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
 
-    LOG("Starting AWS Greengrass auth driver");
+    LOG_I(PORT_DRIVER_SUBJECT, "Starting AWS Greengrass auth driver");
     ei_init();
 
     // Setup static atoms
@@ -62,20 +64,31 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = reinterpret_cast<DriverContext *>(driver_alloc(sizeof(DriverContext)));
     context->port = port;
-    context->cda_integration_handle = cda_integration_init();
-    if (context->cda_integration_handle == nullptr) {
-        LOG("Failed to initialize CDA handle");
+    context->cda_integration = cda_integration_init();
+    if (context->cda_integration == nullptr) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed to initialize CDA integration");
 
-        // return value -1 means failure
-        return reinterpret_cast<ErlDrvData>(-1); // NOLINT(performance-no-int-to-ptr)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
+        return ERL_DRV_ERROR_GENERAL;
+    }
+    // TODO: move this to cda_integration_init() once tests are changed
+    try {
+        context->cda_integration->connect();
+    } catch (std::exception &e) {
+        LOG_E(PORT_DRIVER_SUBJECT, "failed to connect to AWS Greengrass due to %s", e.what());
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
+        return ERL_DRV_ERROR_GENERAL;
+    }
+    if (context->cda_integration->subscribeToCertUpdates() != 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed when subscribing to certificate updates");
     }
     return reinterpret_cast<ErlDrvData>(context);
 }
 
 EXPORTED void drv_stop(ErlDrvData handle) {
-    LOG("Stopping AWS Greengrass auth driver");
+    LOG_I(PORT_DRIVER_SUBJECT, "Stopping AWS Greengrass auth driver");
     auto *context = reinterpret_cast<DriverContext *>(handle);
-    cda_integration_close(context->cda_integration_handle);
+    cda_integration_close(context->cda_integration);
     driver_free(reinterpret_cast<void *>(handle));
     aws_logger_clean_up(&our_logger);
 }
@@ -91,7 +104,7 @@ static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, co
         ERL_DRV_ATOM,  result, ERL_DRV_LIST, 2,          ERL_DRV_TUPLE, 2,
         ERL_DRV_TUPLE, 2};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG("Failed outputting atom result");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting atom result");
     }
 }
 
@@ -110,7 +123,7 @@ static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG request
                              ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
                              ERL_DRV_TUPLE, 2,          ERL_DRV_TUPLE, 3};
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG("Failed outputting term");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting term");
     }
 }
 
@@ -121,7 +134,8 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
         return nullptr;
     }
     if (type != ERL_BINARY_EXT && type != ERL_STRING_EXT && type != ERL_ATOM_EXT) {
-        LOG("Wrong type %c, expected %c, %c, or %c", (char)type, ERL_BINARY_EXT, ERL_STRING_EXT, ERL_ATOM_EXT);
+        LOG_E(PORT_DRIVER_SUBJECT, "Wrong type %c, expected %c, %c, or %c", (char)type, ERL_BINARY_EXT, ERL_STRING_EXT,
+              ERL_ATOM_EXT);
         return nullptr;
     }
 
@@ -129,7 +143,7 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     try {
         buf.reset(new char[entry_size + 1]);
     } catch (...) {
-        LOG("Out of memory allocating %lu", entry_size + 1);
+        LOG_E(PORT_DRIVER_SUBJECT, "Out of memory allocating %lu", entry_size + 1);
         return nullptr;
     }
     switch (type) {
@@ -137,27 +151,27 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
         // Zero out the memory as decode_binary won't insert the null char
         memset((void *)buf.get(), 0, sizeof(char) * (entry_size + 1));
         if (ei_decode_binary(buff, index, (void *)buf.get(), reinterpret_cast<long *>(&entry_size)) != 0) {
-            LOG("Failed decoding binary");
+            LOG_E(PORT_DRIVER_SUBJECT, "Failed decoding binary");
             return nullptr;
         }
         break;
     }
     case ERL_STRING_EXT: {
         if (ei_decode_string(buff, index, (char *)buf.get()) != 0) {
-            LOG("Failed decoding string");
+            LOG_E(PORT_DRIVER_SUBJECT, "Failed decoding string");
             return nullptr;
         }
         break;
     }
     case ERL_ATOM_EXT: {
         if (ei_decode_atom(buff, index, buf.get()) != 0) {
-            LOG("Failed decoding atom");
+            LOG_E(PORT_DRIVER_SUBJECT, "Failed decoding atom");
             return nullptr;
         }
         break;
     }
     default: {
-        LOG("Missing branch decoding string");
+        LOG_W(PORT_DRIVER_SUBJECT, "Missing branch decoding string");
         return nullptr;
     }
     }
@@ -165,8 +179,7 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
 }
 
 static void handle_client_id_and_pem(DriverContext *context, char *buff, int index,
-                                     bool (*func)(CDA_INTEGRATION_HANDLE *handle, const char *clientId,
-                                                  const char *pem)) {
+                                     bool (ClientDeviceAuthIntegration::*func)(const char *clientId, const char *pem)) {
     char return_code = RETURN_CODE_UNEXPECTED;
     ErlDrvTermData result_atom = ATOMS.unknown;
 
@@ -182,8 +195,8 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
         return;
     }
 
-    LOG("Handling request with client id %s, pem %s", client_id.get(), pem.get())
-    bool result = (*func)(context->cda_integration_handle, client_id.get(), pem.get());
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s, pem %s", client_id.get(), pem.get())
+    bool result = (context->cda_integration->*func)(client_id.get(), pem.get());
     result_atom = result ? ATOMS.pass : ATOMS.fail;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -214,10 +227,11 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
         return;
     }
 
-    LOG("Handling acl request with client id %s, pem %s, for topic %s, and "
-        "action %s",
-        client_id.get(), pem.get(), topic.get(), pub_sub.get())
-    bool result = on_check_acl(context->cda_integration_handle, client_id.get(), pem.get(), topic.get(), pub_sub.get());
+    LOG_D(PORT_DRIVER_SUBJECT,
+          "Handling acl request with client id %s, pem %s, for topic %s, and "
+          "action %s",
+          client_id.get(), pem.get(), topic.get(), pub_sub.get())
+    bool result = context->cda_integration->on_check_acl(client_id.get(), pem.get(), topic.get(), pub_sub.get());
     result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -232,8 +246,8 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
         return;
     }
 
-    LOG("Handling verify_client_certificate request with certPem %s", cert_pem.get())
-    bool result = verify_client_certificate(context->cda_integration_handle, cert_pem.get());
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling verify_client_certificate request with certPem %s", cert_pem.get())
+    bool result = context->cda_integration->verify_client_certificate(cert_pem.get());
     result_atom = result ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
 }
@@ -250,8 +264,8 @@ struct packer {
 void client_connect(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
-    LOG("Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
-    bool result = on_client_connect(pack->context->cda_integration_handle, pack->client_id.get(), pack->pem.get());
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
+    bool result = pack->context->cda_integration->on_client_connect(pack->client_id.get(), pack->pem.get());
     if (result) {
         pack->result = ATOMS.pass;
     }
@@ -331,39 +345,39 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     int index = 0;
     unsigned long op;
     if (!decode_operation_header(buff, &index, &op)) {
-        LOG("Failed to parse operation input");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed to parse operation input");
         handle_unknown_op(context);
         return;
     }
 
     switch (op) {
     case ON_CLIENT_CONNECT: {
-        LOG("ON_CLIENT_CONNECT")
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CONNECT")
         handle_on_client_connect(context, buff, index);
         break;
     }
     case ON_CLIENT_CONNECTED:
-        LOG("ON_CLIENT_CONNECTED")
-        handle_client_id_and_pem(context, buff, index, &on_client_connected);
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CONNECTED")
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_connected);
         break;
     case ON_CLIENT_DISCONNECT:
-        LOG("ON_CLIENT_DISCONNECT")
-        handle_client_id_and_pem(context, buff, index, &on_client_disconnected);
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_DISCONNECT")
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_disconnected);
         break;
     case ON_CLIENT_AUTHENTICATE:
-        LOG("ON_CLIENT_AUTHENTICATE")
-        handle_client_id_and_pem(context, buff, index, &on_client_authenticate);
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_AUTHENTICATE")
+        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_authenticate);
         break;
     case ON_CLIENT_CHECK_ACL:
-        LOG("ON_CLIENT_CHECK_ACL")
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CHECK_ACL")
         handle_check_acl(context, buff, index);
         break;
     case VERIFY_CLIENT_CERTIFICATE:
-        LOG("VERIFY_CLIENT_CERTIFICATE")
+        LOG_I(PORT_DRIVER_SUBJECT, "VERIFY_CLIENT_CERTIFICATE")
         handle_verify_client_certificate(context, buff, index);
         break;
     default:
-        LOG("Unknown operation: %lu", op);
+        LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", op);
         handle_unknown_op(context);
     }
 }
