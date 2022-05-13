@@ -32,6 +32,11 @@ def main():
         test_mode = True
     current_abs_path = os.path.abspath(os.getcwd())
 
+    release_type = "RelWithDebInfo"
+    config = ""
+    if os.name == "nt":
+        config = f"--config {release_type}"
+
     if not quick_mode and not test_mode:
         print("Pulling all submodules recursively")
         subprocess.check_call("git submodule update --init --recursive", shell=True)
@@ -43,9 +48,9 @@ def main():
         pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
         os.chdir("_build_sdk")
         # Build SDK
-        subprocess.check_call("cmake -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=\"Debug\" -DBUILD_TESTING=OFF" +
-                              " ../aws-iot-device-sdk-cpp-v2", shell=True)
-        subprocess.check_call("cmake --build . --target install", shell=True)
+        subprocess.check_call(f"cmake -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=\"{release_type}\""
+                              " -DBUILD_TESTING=OFF ../aws-iot-device-sdk-cpp-v2", shell=True)
+        subprocess.check_call(f"cmake --build . --target install {config}", shell=True)
 
     # Build plugin
     print("Building native plugin")
@@ -84,7 +89,7 @@ def main():
     clang_tidy = ""
     if (shutil.which("clang-tidy")) is not None:
         clang_tidy = "-DCLANG_TIDY=1"
-    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag}"
+    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_BUILD_TYPE=\"{release_type}\""
                           f" {clang_tidy} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
                           shell=True)
     # Run format the code
@@ -103,14 +108,14 @@ def main():
         print("clang-format not found, won't format or check format of files. Install using `brew install "
               "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
 
-    subprocess.check_call("cmake --build .", shell=True)
+    subprocess.check_call(f"cmake --build . {config}", shell=True)
     if not quick_mode or test_mode:
         print("Running unit tests")
         if os.name != 'nt':
             # run UTs with coverage
             subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
         else:
-            subprocess.check_call(".\\bin\\Debug\\port_driver_unit_tests.exe", shell=True)
+            subprocess.check_call(f".\\bin\\{release_type}\\port_driver_unit_tests.exe", shell=True)
     os.chdir(current_abs_path)
     # Put the output driver library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
@@ -192,6 +197,9 @@ def main():
         # On Windows, bundle in msvc runtime 120
         if os.name == 'nt':
             add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
         do_patch("build/emqx.zip", erts_version=erts_version, add=add)
 
     os.chdir(current_abs_path)
