@@ -28,9 +28,12 @@ struct atoms {
     ErlDrvTermData authorized;
     ErlDrvTermData unauthorized;
     ErlDrvTermData unknown;
+    ErlDrvTermData event;
+    ErlDrvTermData certificate_update;
 };
 static struct atoms ATOMS {};
 static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
+static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
     (void)buff;
@@ -60,6 +63,8 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
     ATOMS.authorized = driver_mk_atom(const_cast<char *>("authorized"));
     ATOMS.unauthorized = driver_mk_atom(const_cast<char *>("unauthorized"));
     ATOMS.unknown = driver_mk_atom(const_cast<char *>("unknown"));
+    ATOMS.certificate_update = driver_mk_atom(const_cast<char *>("certificate_update"));
+    ATOMS.event = driver_mk_atom(const_cast<char *>("event"));
 
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = reinterpret_cast<DriverContext *>(driver_alloc(sizeof(DriverContext)));
@@ -79,9 +84,6 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
         return ERL_DRV_ERROR_GENERAL;
     }
-    if (context->cda_integration->subscribeToCertUpdates() != 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed when subscribing to certificate updates");
-    }
     return reinterpret_cast<ErlDrvData>(context);
 }
 
@@ -91,6 +93,18 @@ EXPORTED void drv_stop(ErlDrvData handle) {
     cda_integration_close(context->cda_integration);
     driver_free(reinterpret_cast<void *>(handle));
     aws_logger_clean_up(&our_logger);
+}
+
+static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom) {
+    auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, event, event atom}
+
+    ErlDrvTermData spec[] = {ERL_DRV_PORT, port, ERL_DRV_ATOM, ATOMS.event, ERL_DRV_ATOM, eventAtom, ERL_DRV_TUPLE, 3};
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting atom event");
+    }
 }
 
 static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, const char return_code) {
@@ -252,6 +266,27 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
     return_code = RETURN_CODE_SUCCESS;
 }
 
+void handle_certificate_update_subscription(DriverContext *context) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    ErlDrvTermData result_atom = ATOMS.unknown;
+
+    defer { write_atom_to_port(context, result_atom, return_code); };
+    const char *baseDir = std::getenv(EMQX_DATA_ENV_VAR);
+    if (baseDir == nullptr) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Environment variable %s was not set", EMQX_DATA_ENV_VAR);
+        return;
+    }
+    auto baseDirPath = std::make_unique<std::filesystem::path>(baseDir);
+
+    auto callback = std::make_unique<std::function<void(Aws::Greengrass::CertificateUpdateEvent *)>>(
+        [context]([[maybe_unused]] Aws::Greengrass::CertificateUpdateEvent *event) {
+            send_event_to_port(context, ATOMS.certificate_update);
+        });
+    int result = context->cda_integration->subscribeToCertUpdates(std::move(baseDirPath), std::move(callback));
+    result_atom = result == 0 ? ATOMS.valid : ATOMS.invalid;
+    return_code = RETURN_CODE_SUCCESS;
+}
+
 struct packer {
     std::unique_ptr<char[]> client_id;
     std::unique_ptr<char[]> pem;
@@ -375,6 +410,10 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     case VERIFY_CLIENT_CERTIFICATE:
         LOG_I(PORT_DRIVER_SUBJECT, "VERIFY_CLIENT_CERTIFICATE")
         handle_verify_client_certificate(context, buff, index);
+        break;
+    case SUBSCRIBE_TO_CERTIFICATE_UPDATES:
+        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CERTIFICATE_UPDATES")
+        handle_certificate_update_subscription(context);
         break;
     default:
         LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", op);

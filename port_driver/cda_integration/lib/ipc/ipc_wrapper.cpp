@@ -22,11 +22,14 @@ bool ConnectionEventsHandler::OnErrorCallback(RpcError status) {
 }
 
 GreengrassIPCWrapper::GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client)
-    : clientBootstrap(getClientBootstrap()),
-      ipcClient(client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap)){
+    : crtApiHandle(new CRT::ApiHandle()), clientBootstrap(getClientBootstrap()) {
+    ipcClient = client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap);
+    if (ipcClient == nullptr) {
+        throw std::runtime_error("Failed to create IPC Client");
+    }
+};
 
-      };
-
+// TODO: clean up apihandle without breaking tests
 GreengrassIPCWrapper::~GreengrassIPCWrapper() { delete ipcClient; }
 
 CRT::Io::ClientBootstrap &GreengrassIPCWrapper::getClientBootstrap() {
