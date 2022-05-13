@@ -6,6 +6,7 @@
 #pragma once
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
+#include <filesystem>
 
 #include "logger.h"
 #include "private/certificate_updater.h"
@@ -36,7 +37,8 @@ class ClientDeviceAuthIntegration {
 
     void connect();
 
-    int subscribeToCertUpdates();
+    int subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
+                               std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 };
 
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client);

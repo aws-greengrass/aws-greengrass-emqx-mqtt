@@ -12,6 +12,8 @@
   , on_client_disconnected/2
   , on_client_check_acl/4
   , verify_client_certificate/1
+  , register_fun/2
+  , request_certificates/0
 ]).
 
 -include("emqx.hrl").
@@ -23,6 +25,7 @@
 -define(ON_CLIENT_AUTHENTICATE, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
+-define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -60,11 +63,21 @@ init(PortDriver) ->
   Port = open_port({spawn, PortDriver}, [binary]),
   loop(Port).
 
-loop(Port) ->
-  loop(Port, maps:new(), counters:new(1, [atomics])).
+empty() -> ok.
 
-loop(Port, Inflight, Counter) ->
+loop(Port) ->
+  loop(Port, maps:new(), counters:new(1, [atomics]), maps:new()).
+
+loop(Port, Inflight, Counter, FunMap) ->
   receive
+    % register callback
+    {register_fun, Atom, Fun} ->
+      loop(Port, Inflight, Counter, maps:put(Atom, Fun, FunMap));
+    % handle event type from C++ by finding a registered callback (if any)
+    {Port, event, EventType} ->
+      Fun = maps:get(EventType, FunMap, fun empty/0),
+      Fun(),
+      loop(Port, Inflight, Counter, FunMap);
     {call, Caller, Msg, async} ->
       RequestId = counters:get(Counter, 1),
       counters:add(Counter, 1, 1),
@@ -75,24 +88,24 @@ loop(Port, Inflight, Counter) ->
           case ReturnCode of
             ?RETURN_CODE_ASYNC ->
               NewInflight = maps:put(RequestId, Caller, Inflight),
-              loop(Port, NewInflight, Counter);
+              loop(Port, NewInflight, Counter, FunMap);
             _OtherReturnCode ->
               Caller ! {process, Data},
-              loop(Port, Inflight, Counter)
+              loop(Port, Inflight, Counter, FunMap)
           end
       end;
     {Port, Id, {data, Data}} ->
       Caller = maps:get(Id, Inflight),
       NewInflight = maps:remove(Id, Inflight),
       Caller ! {process, Data},
-      loop(Port, NewInflight, Counter);
+      loop(Port, NewInflight, Counter, FunMap);
     {call, Caller, Msg} ->
       Port ! {self(), {command, term_to_binary([Msg])}},
       receive
         {Port, {data, Data}} ->
           Caller ! {process, Data}
       end,
-      loop(Port, Inflight, Counter);
+      loop(Port, Inflight, Counter, FunMap);
     stop ->
       Port ! {self(), close},
       receive
@@ -121,6 +134,12 @@ on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
 
 verify_client_certificate(CertPem) ->
   call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}).
+
+request_certificates() ->
+  call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
+
+register_fun(Atom, Fun) ->
+  process ! {register_fun, Atom, Fun}.
 
 receive_back() ->
   receive

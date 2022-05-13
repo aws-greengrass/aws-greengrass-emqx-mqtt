@@ -25,6 +25,7 @@ class ConnectionEventsHandler : public ConnectionLifecycleHandler {
 
 class GreengrassIPCWrapper {
   private:
+    CRT::ApiHandle *crtApiHandle;
     CRT::Io::ClientBootstrap &clientBootstrap;
     GG::GreengrassCoreIpcClient *ipcClient;
     ConnectionEventsHandler connectionEventsHandler;

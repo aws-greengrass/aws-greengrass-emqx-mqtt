@@ -4,6 +4,7 @@
  */
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 
@@ -11,8 +12,10 @@
 
 void ClientDeviceAuthIntegration::connect() { greengrassIpcWrapper.connect(); }
 
-int ClientDeviceAuthIntegration::subscribeToCertUpdates() {
-    int certSubscribeStatus = certificateUpdater.subscribeToUpdates();
+int ClientDeviceAuthIntegration::subscribeToCertUpdates(
+    std::unique_ptr<std::filesystem::path> basePath,
+    std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
+    int certSubscribeStatus = certificateUpdater.subscribeToUpdates(std::move(basePath), std::move(subscription));
     if (certSubscribeStatus != 0) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
         return certSubscribeStatus;
