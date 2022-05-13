@@ -44,13 +44,22 @@ add_custom_verify_to_ssl_options(Options) ->
       replace(Options, ssl_options, NewSslOpts)
   end.
 
--spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {atom(), atom()},
+-spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
+    {revoked, atom()}} | {extension, #'Extension'{}} | valid | valid_peer | {atom(), atom()},
     InitialUserState :: term()) -> {valid, UserState :: term()} | {fail, Reason :: term()}).
 custom_verify(OtpCert, Reason, UserState) ->
   logger:debug("Verifying client certificate for reason: ~p", [Reason]),
   case Reason of
+    {extension, _} ->
+      {unknown, UserState};
     {bad_cert, unknown_ca} -> verify_client_certificate(OtpCert, UserState);
     {bad_cert, selfsigned_peer} -> verify_client_certificate(OtpCert, UserState);
+    valid ->
+      logger:debug("Returning valid for valid"),
+      {valid, UserState};
+    valid_peer ->
+      logger:debug("Returning valid for valid_peer"),
+      {valid, UserState};
     {_, _} ->
       logger:debug("Client certificate is invalid. Reason: ~p", [Reason]),
       {fail, "invalid certificate"}
