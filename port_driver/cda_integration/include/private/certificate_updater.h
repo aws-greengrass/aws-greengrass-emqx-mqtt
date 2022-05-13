@@ -13,8 +13,6 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
     void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
     bool OnStreamError(OperationError *error) override;
     void OnStreamClosed() override;
-    int writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
-                          std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
 
   public:
     virtual ~CertificateUpdatesHandler() = default;
@@ -24,6 +22,9 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
         : basePath(std::move(basePath)), subscription(std::move(subscription)) {}
 
   private:
+    int writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
+                          std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
+
     const std::unique_ptr<std::filesystem::path> basePath;
     const std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription;
 };
