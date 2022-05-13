@@ -32,6 +32,7 @@ class CertificateUpdater {
   private:
     GG::GreengrassCoreIpcClient &ipcClient;
     std::shared_ptr<CertificateUpdatesHandler> updatesHandler;
+    std::shared_ptr<GG::SubscribeToCertificateUpdatesOperation> operation;
 
   public:
     CertificateUpdater(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};

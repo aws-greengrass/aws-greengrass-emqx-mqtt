@@ -104,7 +104,7 @@ int CertificateUpdater::subscribeToUpdates(
     request.SetCertificateOptions(options);
 
     updatesHandler = std::make_shared<CertificateUpdatesHandler>(std::move(basePath), std::move(subscription));
-    auto operation = ipcClient.NewSubscribeToCertificateUpdates(updatesHandler);
+    operation = ipcClient.NewSubscribeToCertificateUpdates(updatesHandler);
     if (!operation) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed creating SubscribeToCertificateUpdatesOperation.");
         // TODO: Improve return codes
