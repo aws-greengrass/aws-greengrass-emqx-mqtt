@@ -97,7 +97,7 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
                       error->GetMessage().value().c_str());
             }
         } else {
-            // Handle RPC error.
+            LOG_E(CDA_INTEG_SUBJECT, "RPC error during VerifyClientDeviceIdentity");
         }
         return false;
     }
