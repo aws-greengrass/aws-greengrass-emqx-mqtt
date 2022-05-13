@@ -37,4 +37,6 @@ class GreengrassIPCWrapper {
     ~GreengrassIPCWrapper();
 
     GG::GreengrassCoreIpcClient &getIPCClient();
+
+    void setAsRunning();
 };
