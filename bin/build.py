@@ -197,9 +197,9 @@ def main():
         # On Windows, bundle in msvc runtime 120
         if os.name == 'nt':
             add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
-            add[f"emqx/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
-            add[f"emqx/aws_greengrass_emqx_auth-1.0.0/vcruntime140.dll"] = "patches/vcruntime140.dll"
-            add[f"emqx/aws_greengrass_emqx_auth-1.0.0/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
+            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
         do_patch("build/emqx.zip", erts_version=erts_version, add=add)
 
     os.chdir(current_abs_path)
