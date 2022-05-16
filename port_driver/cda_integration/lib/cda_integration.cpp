@@ -10,7 +10,10 @@
 
 #include "cda_integration.h"
 
-void ClientDeviceAuthIntegration::connect() { greengrassIpcWrapper.connect(); }
+void ClientDeviceAuthIntegration::connect() {
+    greengrassIpcWrapper.connect();
+    greengrassIpcWrapper.setAsRunning();
+}
 
 int ClientDeviceAuthIntegration::subscribeToCertUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
