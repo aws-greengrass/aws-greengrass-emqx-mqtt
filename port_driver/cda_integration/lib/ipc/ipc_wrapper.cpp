@@ -54,3 +54,13 @@ void GreengrassIPCWrapper::connect() {
 }
 
 GG::GreengrassCoreIpcClient &GreengrassIPCWrapper::getIPCClient() { return *ipcClient; }
+
+void GreengrassIPCWrapper::setAsRunning() {
+    auto operation = ipcClient->NewUpdateState();
+    GG::UpdateStateRequest request;
+    request.SetState(Aws::Greengrass::REPORTED_LIFECYCLE_STATE_RUNNING);
+    auto fut = operation->Activate(request, nullptr);
+    fut.wait();
+    operation->GetResult().wait_for(std::chrono::seconds(10));
+    operation->Close();
+}
