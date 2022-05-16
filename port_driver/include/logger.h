@@ -14,7 +14,7 @@ enum log_subject {
     IPC_WRAPPER_SUBJECT = AWS_LOG_SUBJECT_BEGIN_RANGE(103),
 };
 
-#define LOG_I(subject, ...) AWS_LOGF_DEBUG(subject, __VA_ARGS__)
+#define LOG_I(subject, ...) AWS_LOGF_INFO(subject, __VA_ARGS__)
 #define LOG_D(subject, ...) AWS_LOGF_DEBUG(subject, __VA_ARGS__)
 #define LOG_W(subject, ...) AWS_LOGF_WARN(subject, __VA_ARGS__)
 #define LOG_E(subject, ...) AWS_LOGF_ERROR(subject, __VA_ARGS__)

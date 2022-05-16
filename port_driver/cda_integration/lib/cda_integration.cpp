@@ -63,7 +63,7 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
-    LOG_I(CDA_INTEG_SUBJECT, "verify_client_certificate called with pem: %s", certPem);
+    LOG_D(CDA_INTEG_SUBJECT, "verify_client_certificate called with pem: %s", certPem);
     Aws::Crt::String certPemStr(certPem);
 
     GG::ClientDeviceCredential clientDeviceCredential;
@@ -78,8 +78,13 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
         return false;
     }
 
-    auto activate = operation->Activate(request);
-    activate.wait();
+    auto activate = operation->Activate(request).get();
+
+    if (!activate) {
+        LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentity failed to activate with error %s",
+              activate.StatusToString().c_str());
+        return false;
+    }
 
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
@@ -89,9 +94,9 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
     }
 
     auto response = responseFuture.get();
-    if (!response) {
+    auto responseType = response.GetResultType();
+    if (responseType != OPERATION_RESPONSE) {
         // Handle error.
-        auto responseType = response.GetResultType();
         LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentity failed with response type %d.", responseType);
         if (responseType == OPERATION_ERROR) {
             auto *error = response.GetOperationError();
