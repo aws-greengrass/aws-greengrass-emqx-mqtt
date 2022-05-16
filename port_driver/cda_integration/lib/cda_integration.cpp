@@ -48,9 +48,65 @@ bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, c
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_client_authenticate(const char *clientId, const char *pem) {
-    std::cout << "on_client_authenticate called with clientId: " << clientId << " and pem: " << pem << std::endl;
-    return true;
+const char *ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId, const char *pem) {
+    LOG_D(CDA_INTEG_SUBJECT, "on_client_authenticate called with clientId: %s and pem: %s", clientId, pem);
+    Aws::Crt::String clientIdStr(clientId);
+    Aws::Crt::String pemStr(pem);
+
+    GG::MQTTCredential mqttCredential;
+    mqttCredential.SetClientId(clientIdStr);
+    mqttCredential.SetCertificatePem(pemStr);
+
+    GG::CredentialDocument credentialDocument;
+    credentialDocument.SetMqttCredential(mqttCredential);
+
+    GG::GetClientDeviceAuthTokenRequest request;
+    request.SetCredential(credentialDocument);
+
+    auto operation = greengrassIpcWrapper.getIPCClient().NewGetClientDeviceAuthToken();
+    if (!operation) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed creating NewGetClientDeviceAuthToken.");
+        return nullptr;
+    }
+
+    auto activate = operation->Activate(request).get();
+    if (!activate) {
+        LOG_E(CDA_INTEG_SUBJECT, "NewGetClientDeviceAuthToken failed to activate with error %s",
+              activate.StatusToString().c_str());
+        return nullptr;
+    }
+
+    auto responseFuture = operation->GetResult();
+    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+        LOG_E(CDA_INTEG_SUBJECT,
+              "NewGetClientDeviceAuthToken timed out while waiting for response from Greengrass Core.");
+        return nullptr;
+    }
+
+    auto response = responseFuture.get();
+    auto responseType = response.GetResultType();
+    if (responseType != OPERATION_RESPONSE) {
+        // Handle error.
+        LOG_E(CDA_INTEG_SUBJECT, "NewGetClientDeviceAuthToken failed with response type %d.", responseType);
+        if (responseType == OPERATION_ERROR) {
+            auto *error = response.GetOperationError();
+            if (error != nullptr) {
+                LOG_E(CDA_INTEG_SUBJECT, "NewGetClientDeviceAuthToken failure response: %s.",
+                      error->GetMessage().value().c_str());
+            }
+        } else {
+            LOG_E(CDA_INTEG_SUBJECT, "RPC error during NewGetClientDeviceAuthToken");
+        }
+        return nullptr;
+    }
+
+    auto token = response.GetOperationResponse()->GetClientDeviceAuthToken();
+    if (!token.has_value()) {
+        LOG_E(CDA_INTEG_SUBJECT, "Token received from CDA does not have a value.");
+        return nullptr;
+    }
+
+    return token.value().c_str();
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
