@@ -10,6 +10,8 @@
 
 #include "cda_integration.h"
 
+#define TIMEOUT_SECONDS 2
+
 void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.connect();
     greengrassIpcWrapper.setAsRunning();
@@ -61,8 +63,59 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
-    std::cout << "verify_client_certificate called with certPem: " << certPem << std::endl;
-    return true;
+    LOG_D(CDA_INTEG_SUBJECT, "verify_client_certificate called with pem: %s", certPem);
+    Aws::Crt::String certPemStr(certPem);
+
+    GG::ClientDeviceCredential clientDeviceCredential;
+    clientDeviceCredential.SetClientDeviceCertificate(certPemStr);
+
+    GG::VerifyClientDeviceIdentityRequest request;
+    request.SetCredential(clientDeviceCredential);
+
+    auto operation = greengrassIpcWrapper.getIPCClient().NewVerifyClientDeviceIdentity();
+    if (!operation) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed creating NewVerifyClientDeviceIdentity.");
+        return false;
+    }
+
+    auto activate = operation->Activate(request).get();
+
+    if (!activate) {
+        LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentity failed to activate with error %s",
+              activate.StatusToString().c_str());
+        return false;
+    }
+
+    auto responseFuture = operation->GetResult();
+    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+        LOG_E(CDA_INTEG_SUBJECT,
+              "VerifyClientDeviceIdentity operation timed out while waiting for response from Greengrass Core.");
+        return false;
+    }
+
+    auto response = responseFuture.get();
+    auto responseType = response.GetResultType();
+    if (responseType != OPERATION_RESPONSE) {
+        // Handle error.
+        LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentity failed with response type %d.", responseType);
+        if (responseType == OPERATION_ERROR) {
+            auto *error = response.GetOperationError();
+            if (error != nullptr) {
+                LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentity failure response: %s.",
+                      error->GetMessage().value().c_str());
+            }
+        } else {
+            LOG_E(CDA_INTEG_SUBJECT, "RPC error during VerifyClientDeviceIdentity");
+        }
+        return false;
+    }
+
+    auto isValid = response.GetOperationResponse()->GetIsValidClientDevice();
+    if (!isValid.has_value()) {
+        LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentityResponse does not have a value.");
+        return false;
+    }
+    return isValid.value();
 }
 
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client) {
