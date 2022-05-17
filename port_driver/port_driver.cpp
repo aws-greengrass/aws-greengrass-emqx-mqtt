@@ -123,16 +123,26 @@ static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, co
     }
 }
 
-static void write_string_to_port(DriverContext *context, const char *result, const char return_code) {
+static void write_string_to_port(DriverContext *context, std::string result, const char return_code) {
     auto port = driver_mk_port(context->port);
 
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
     // The follow code encodes this Erlang term: {Port, {data, [return code integer, result string]}}
-
-    ErlDrvTermData spec[] = {
-        ERL_DRV_PORT, port, ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT, (ErlDrvTermData)return_code,
-        ERL_DRV_STRING, (ErlDrvTermData)result, strlen(result), ERL_DRV_LIST, 2, 
-        ERL_DRV_TUPLE, 2, ERL_DRV_TUPLE, 2};
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,
+                             port,
+                             ERL_DRV_ATOM,
+                             ATOMS.data,
+                             ERL_DRV_INT,
+                             (ErlDrvTermData)return_code,
+                             ERL_DRV_STRING,
+                             (ErlDrvTermData)result.c_str(),
+                             result.length(),
+                             ERL_DRV_LIST,
+                             2,
+                             ERL_DRV_TUPLE,
+                             2,
+                             ERL_DRV_TUPLE,
+                             2};
 
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
         LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting string result");
@@ -234,7 +244,7 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
 
 static void handle_get_auth_token(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    const char *result_string = nullptr;
+    std::string result_string = "";
     defer { write_string_to_port(context, result_string, return_code); };
 
     auto client_id = decode_string(buff, &index);
@@ -249,12 +259,11 @@ static void handle_get_auth_token(DriverContext *context, char *buff, int index)
 
     LOG_D(PORT_DRIVER_SUBJECT, "Handling get_auth_token request with client id %s and pem %s", client_id.get(),
           pem.get());
-    const char *result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get());
-    if (result) {
-        result_string = result;
+    std::string *result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get()).get();
+    if (!result->empty()) {
+        result_string = *result;
     }
     return_code = RETURN_CODE_SUCCESS;
-    delete result;
 }
 
 static void handle_check_acl(DriverContext *context, char *buff, int index) {

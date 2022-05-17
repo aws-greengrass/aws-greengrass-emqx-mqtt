@@ -57,7 +57,9 @@ TEST_F(CDAIntegrationTester, CDAIntegrationOnClientDisconnectTest) {
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
-    EXPECT_EQ(NULL, cda_integ->get_client_device_auth_token(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
+    auto response = cda_integ->get_client_device_auth_token(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str());
+    std::string expected = "";
+    EXPECT_EQ(expected, response.get()->c_str());
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
