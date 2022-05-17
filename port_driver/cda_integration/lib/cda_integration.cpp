@@ -47,12 +47,9 @@ bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, c
     return true;
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,
                                                                                        const char *pem) {
     LOG_D(CDA_INTEG_SUBJECT, "on_client_authenticate called with clientId: %s and pem: %s", clientId, pem);
-    std::unique_ptr<std::string> emptyResponse = std::make_unique<std::string>("");
-
     Aws::Crt::String clientIdStr(clientId);
     Aws::Crt::String pemStr(pem);
 
@@ -69,21 +66,21 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
     auto operation = greengrassIpcWrapper.getIPCClient().NewGetClientDeviceAuthToken();
     if (!operation) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed creating NewGetClientDeviceAuthToken.");
-        return emptyResponse;
+        return {};
     }
 
     auto activate = operation->Activate(request).get();
     if (!activate) {
         LOG_E(CDA_INTEG_SUBJECT, "NewGetClientDeviceAuthToken failed to activate with error %s",
               activate.StatusToString().c_str());
-        return emptyResponse;
+        return {};
     }
 
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT,
               "NewGetClientDeviceAuthToken timed out while waiting for response from Greengrass Core.");
-        return emptyResponse;
+        return {};
     }
 
     auto response = responseFuture.get();
@@ -100,17 +97,15 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
         } else {
             LOG_E(CDA_INTEG_SUBJECT, "RPC error during NewGetClientDeviceAuthToken");
         }
-        return emptyResponse;
+        return {};
     }
 
     auto token = response.GetOperationResponse()->GetClientDeviceAuthToken();
     if (!token.has_value()) {
         LOG_E(CDA_INTEG_SUBJECT, "Token received from CDA does not have a value.");
-        return emptyResponse;
+        return {};
     }
-    auto tokenStr = token.value().c_str();
-    std::string tokenCpy(tokenStr);
-    return std::make_unique<std::string>(tokenCpy);
+    return std::make_unique<std::string>(token.value());
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

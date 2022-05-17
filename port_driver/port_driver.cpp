@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <logger.h>
 #include <memory>
-#include <string.h>
+#include <string>
 
 using DriverContext = struct {
     ErlDrvPort port;
@@ -123,7 +123,7 @@ static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, co
     }
 }
 
-static void write_string_to_port(DriverContext *context, std::string result, const char return_code) {
+static void write_string_to_port(DriverContext *context, const std::string &result, const char return_code) {
     auto port = driver_mk_port(context->port);
 
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
@@ -135,7 +135,7 @@ static void write_string_to_port(DriverContext *context, std::string result, con
                              ERL_DRV_INT,
                              (ErlDrvTermData)return_code,
                              ERL_DRV_STRING,
-                             (ErlDrvTermData)result.c_str(),
+                             reinterpret_cast<ErlDrvTermData>(result.c_str()),
                              result.length(),
                              ERL_DRV_LIST,
                              2,
@@ -244,8 +244,8 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
 
 static void handle_get_auth_token(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    std::string result_string = "";
-    defer { write_string_to_port(context, result_string, return_code); };
+    std::unique_ptr<std::string> result = std::make_unique<std::string>("");
+    defer { write_string_to_port(context, *result, return_code); };
 
     auto client_id = decode_string(buff, &index);
     if (!client_id) {
@@ -259,11 +259,12 @@ static void handle_get_auth_token(DriverContext *context, char *buff, int index)
 
     LOG_D(PORT_DRIVER_SUBJECT, "Handling get_auth_token request with client id %s and pem %s", client_id.get(),
           pem.get());
-    std::string *result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get()).get();
-    if (!result->empty()) {
-        result_string = *result;
+    result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get());
+    if (result) {
+        return_code = RETURN_CODE_SUCCESS;
+    } else {
+        result = std::make_unique<std::string>("");
     }
-    return_code = RETURN_CODE_SUCCESS;
 }
 
 static void handle_check_acl(DriverContext *context, char *buff, int index) {
