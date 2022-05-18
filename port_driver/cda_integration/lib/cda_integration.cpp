@@ -49,7 +49,7 @@ bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, c
 
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,
                                                                                        const char *pem) {
-    LOG_D(CDA_INTEG_SUBJECT, "on_client_authenticate called with clientId: %s and pem: %s", clientId, pem);
+    LOG_D(CDA_INTEG_SUBJECT, "on_client_authenticate called with clientId: %s", clientId);
     Aws::Crt::String clientIdStr(clientId);
     Aws::Crt::String pemStr(pem);
 
@@ -118,7 +118,7 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
-    LOG_D(CDA_INTEG_SUBJECT, "verify_client_certificate called with pem: %s", certPem);
+    LOG_D(CDA_INTEG_SUBJECT, "verify_client_certificate called");
     Aws::Crt::String certPemStr(certPem);
 
     GG::ClientDeviceCredential clientDeviceCredential;
