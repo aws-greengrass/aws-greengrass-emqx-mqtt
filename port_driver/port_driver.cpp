@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <logger.h>
 #include <memory>
+#include <string>
 
 using DriverContext = struct {
     ErlDrvPort port;
@@ -122,6 +123,32 @@ static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, co
     }
 }
 
+static void write_string_to_port(DriverContext *context, const std::string &result, const char return_code) {
+    auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, result string]}}
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,
+                             port,
+                             ERL_DRV_ATOM,
+                             ATOMS.data,
+                             ERL_DRV_INT,
+                             (ErlDrvTermData)return_code,
+                             ERL_DRV_STRING,
+                             reinterpret_cast<ErlDrvTermData>(result.c_str()),
+                             result.length(),
+                             ERL_DRV_LIST,
+                             2,
+                             ERL_DRV_TUPLE,
+                             2,
+                             ERL_DRV_TUPLE,
+                             2};
+
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting string result");
+    }
+}
+
 static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
                                      const char returnCode) {
     auto port = driver_mk_port(context->port);
@@ -213,6 +240,31 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
     bool result = (context->cda_integration->*func)(client_id.get(), pem.get());
     result_atom = result ? ATOMS.pass : ATOMS.fail;
     return_code = RETURN_CODE_SUCCESS;
+}
+
+static void handle_get_auth_token(DriverContext *context, char *buff, int index) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    std::unique_ptr<std::string> result = std::make_unique<std::string>("");
+    defer { write_string_to_port(context, *result, return_code); };
+
+    auto client_id = decode_string(buff, &index);
+    if (!client_id) {
+        return;
+    }
+
+    auto pem = decode_string(buff, &index);
+    if (!pem) {
+        return;
+    }
+
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling get_auth_token request with client id %s and pem %s", client_id.get(),
+          pem.get());
+    result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get());
+    if (result) {
+        return_code = RETURN_CODE_SUCCESS;
+    } else {
+        result = std::make_unique<std::string>("");
+    }
 }
 
 static void handle_check_acl(DriverContext *context, char *buff, int index) {
@@ -401,7 +453,7 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
         break;
     case ON_CLIENT_AUTHENTICATE:
         LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_AUTHENTICATE")
-        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_authenticate);
+        handle_get_auth_token(context, buff, index);
         break;
     case ON_CLIENT_CHECK_ACL:
         LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CHECK_ACL")

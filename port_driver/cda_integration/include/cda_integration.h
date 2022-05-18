@@ -29,7 +29,7 @@ class ClientDeviceAuthIntegration {
 
     bool on_client_disconnected(const char *clientId, const char *pem);
 
-    bool on_client_authenticate(const char *clientId, const char *pem);
+    std::unique_ptr<std::string> get_client_device_auth_token(const char *clientId, const char *pem);
 
     bool on_check_acl(const char *clientId, const char *pem, const char *topic, const char *action);
 
