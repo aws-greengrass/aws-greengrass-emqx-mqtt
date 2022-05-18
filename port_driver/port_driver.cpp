@@ -236,7 +236,7 @@ static void handle_client_id_and_pem(DriverContext *context, char *buff, int ind
         return;
     }
 
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s, pem %s", client_id.get(), pem.get())
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s", client_id.get())
     bool result = (context->cda_integration->*func)(client_id.get(), pem.get());
     result_atom = result ? ATOMS.pass : ATOMS.fail;
     return_code = RETURN_CODE_SUCCESS;
@@ -257,8 +257,7 @@ static void handle_get_auth_token(DriverContext *context, char *buff, int index)
         return;
     }
 
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling get_auth_token request with client id %s and pem %s", client_id.get(),
-          pem.get());
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling get_auth_token request with client id %s", client_id.get());
     result = context->cda_integration->get_client_device_auth_token(client_id.get(), pem.get());
     if (result) {
         return_code = RETURN_CODE_SUCCESS;
@@ -294,9 +293,9 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
     }
 
     LOG_D(PORT_DRIVER_SUBJECT,
-          "Handling acl request with client id %s, pem %s, for topic %s, and "
+          "Handling acl request with client id %s, for topic %s, and "
           "action %s",
-          client_id.get(), pem.get(), topic.get(), pub_sub.get())
+          client_id.get(), topic.get(), pub_sub.get())
     bool result = context->cda_integration->on_check_acl(client_id.get(), pem.get(), topic.get(), pub_sub.get());
     result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
     return_code = RETURN_CODE_SUCCESS;
@@ -312,7 +311,7 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
         return;
     }
 
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling verify_client_certificate request with certPem %s", cert_pem.get())
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling verify_client_certificate request")
     bool result = context->cda_integration->verify_client_certificate(cert_pem.get());
     result_atom = result ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
@@ -351,7 +350,7 @@ struct packer {
 void client_connect(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s, pem %s", pack->client_id.get(), pack->pem.get());
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s", pack->client_id.get());
     bool result = pack->context->cda_integration->on_client_connect(pack->client_id.get(), pack->pem.get());
     if (result) {
         pack->result = ATOMS.pass;

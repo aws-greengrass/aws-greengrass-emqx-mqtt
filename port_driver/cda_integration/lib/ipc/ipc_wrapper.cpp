@@ -8,7 +8,7 @@
 #include <aws/crt/Api.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
-#define TIMEOUT_SECONDS 10
+#define CONNECT_TIMEOUT_SECONDS 10
 
 void ConnectionEventsHandler::OnConnectCallback() { LOG_I(IPC_WRAPPER_SUBJECT, "Connected to Greengrass Core"); }
 
@@ -63,6 +63,6 @@ void GreengrassIPCWrapper::setAsRunning() {
     request.SetState(Aws::Greengrass::REPORTED_LIFECYCLE_STATE_RUNNING);
     auto fut = operation->Activate(request, nullptr);
     fut.wait();
-    operation->GetResult().wait_for(std::chrono::seconds(TIMEOUT_SECONDS));
+    operation->GetResult().wait_for(std::chrono::seconds(CONNECT_TIMEOUT_SECONDS));
     operation->Close();
 }
