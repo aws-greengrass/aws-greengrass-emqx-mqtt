@@ -108,12 +108,64 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
     return std::make_unique<std::string>(token.value());
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *authToken, const char *topic,
-                                               const char *action) {
-    std::cout << "on_check_acl called with clientId: " << clientId << " and authToken: " << authToken
-              << " and topic: " << topic << " and action: " << action << std::endl;
-    return true;
+bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *token, const char *resource,
+                                               const char *operation) {
+
+    LOG_D(CDA_INTEG_SUBJECT, "on_check_acl called with clientId: %s, token: %s, resource: %s, operation: %s", clientId,
+          token, resource, operation);
+
+    Aws::Crt::String tokenStr(token);
+    Aws::Crt::String resourceStr(resource);
+    Aws::Crt::String operationStr(operation);
+
+    GG::AuthorizeClientDeviceActionRequest request;
+    request.SetClientDeviceAuthToken(tokenStr);
+    request.SetOperation(operationStr);
+    request.SetResource(resourceStr);
+
+    auto authorizationOperation = greengrassIpcWrapper.getIPCClient().NewAuthorizeClientDeviceAction();
+    if (!authorizationOperation) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed creating AuthorizeClientDeviceAction.");
+        return false;
+    }
+
+    auto activate = authorizationOperation->Activate(request).get();
+    if (!activate) {
+        LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failed to activate with error %s",
+              activate.StatusToString().c_str());
+        return false;
+    }
+
+    auto responseFuture = authorizationOperation->GetResult();
+    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+        LOG_E(CDA_INTEG_SUBJECT,
+              "AuthorizeClientDeviceAction timed out while waiting for response from Greengrass Core.");
+        return false;
+    }
+
+    auto response = responseFuture.get();
+    auto responseType = response.GetResultType();
+    if (responseType != OPERATION_RESPONSE) {
+        // Handle error.
+        LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failed with response type %d.", responseType);
+        if (responseType == OPERATION_ERROR) {
+            auto *error = response.GetOperationError();
+            if (error != nullptr) {
+                LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failure response: %s.",
+                      error->GetMessage().value().c_str());
+            }
+        } else {
+            LOG_E(CDA_INTEG_SUBJECT, "RPC error during AuthorizeClientDeviceAction");
+        }
+        return false;
+    }
+
+    auto isAllowed = response.GetOperationResponse()->GetIsAuthorized();
+    if (!isAllowed.has_value()) {
+        LOG_E(CDA_INTEG_SUBJECT, "Authorization received from CDA does not have a value.");
+        return false;
+    }
+    return isAllowed.value();
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

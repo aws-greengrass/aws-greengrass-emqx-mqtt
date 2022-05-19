@@ -31,7 +31,7 @@ class ClientDeviceAuthIntegration {
 
     std::unique_ptr<std::string> get_client_device_auth_token(const char *clientId, const char *pem);
 
-    bool on_check_acl(const char *clientId, const char *authToken, const char *topic, const char *action);
+    bool on_check_acl(const char *clientId, const char *authToken, const char *resource, const char *operation);
 
     bool verify_client_certificate(const char *certPem);
 
