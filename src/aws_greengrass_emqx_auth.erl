@@ -14,8 +14,6 @@
 , on_client_check_acl/4
 ]).
 
--import(auth_token_store, [lookup_token/1, save_token/2]).
-
 -export([load/1
   , unload/0
 ]).
