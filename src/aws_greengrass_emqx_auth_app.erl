@@ -11,7 +11,6 @@
 
 -import(port_driver_integration, [start/0, stop/0]).
 -import(tls_custom_certificate_verification, [enable/0]).
--import(auth_token_store, [init/0, close/0]).
 
 -export([start/2
   , stop/1
@@ -33,10 +32,8 @@ start(_StartType, _StartArgs) ->
   end,
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
-  auth_token_store:init(),
   {ok, Sup}.
 
 stop(_State) ->
-  auth_token_store:close(),
   aws_greengrass_emqx_auth:unload(),
   port_driver_integration:stop().

@@ -100,10 +100,12 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     [ClientId, ClientInfo, Result, _Env]),
 
   PeerCertEncoded = get(cert_pem),
-  case check_auth_token_for_client(ClientId, PeerCertEncoded) of
+  case get_auth_token_for_client(ClientId, PeerCertEncoded) of
     {ok, AuthToken} ->
       logger:info("Client(~s) is valid", [ClientId]),
-      auth_token_store:save_token(PeerCertEncoded, AuthToken),
+      %% puts authToken in the process dictionary
+      %% to be retrieved during authorization check
+      put(cda_auth_token, AuthToken),
       {ok, Result#{auth_result => success}};
     {error, Error} ->
       logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
@@ -113,10 +115,11 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
       {stop, Result#{auth_result => not_authorized}}
   end.
 
-check_auth_token_for_client(ClientId, CertPem) ->
-  case auth_token_store:lookup_token(CertPem) of
-    [] -> port_driver_integration:get_auth_token(ClientId, CertPem);
-    [{AuthToken}] -> {ok, AuthToken}
+%% Retrives authToken from CDA if not stored in process dictionary
+get_auth_token_for_client(ClientId, CertPem) ->
+  case get(cda_auth_token) of
+    undefined -> port_driver_integration:get_auth_token(ClientId, CertPem);
+    AuthToken -> {ok, AuthToken}
   end.
 
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
