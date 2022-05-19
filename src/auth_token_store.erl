@@ -7,7 +7,7 @@
 
 -export([init/0, save_token/2, delete_token/1, lookup_token/1, close/0]).
 
--define(AUTH_TOKEN_TABLE, client_device_auth_token).
+-define(AUTH_TOKEN_TABLE, client_device_auth_token_store).
 
 init() ->
   logger:debug("Initializing auth token store"),
@@ -27,6 +27,7 @@ lookup_token(CertPem) ->
 close() ->
   ets:delete(?AUTH_TOKEN_TABLE).
 
+%% Creates hex-string for sha256 hash 
 hash_cert(CertPem) ->
   io_lib:format("~64.16.0b", 
     [binary:decode_unsigned(crypto:hash(sha256, CertPem))]).
