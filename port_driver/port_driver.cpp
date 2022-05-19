@@ -277,8 +277,8 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
         return;
     }
 
-    auto pem = decode_string(buff, &index);
-    if (!pem) {
+    auto auth_token = decode_string(buff, &index);
+    if (!auth_token) {
         return;
     }
 
@@ -296,7 +296,7 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
           "Handling acl request with client id %s, for topic %s, and "
           "action %s",
           client_id.get(), topic.get(), pub_sub.get())
-    bool result = context->cda_integration->on_check_acl(client_id.get(), pem.get(), topic.get(), pub_sub.get());
+    bool result = context->cda_integration->on_check_acl(client_id.get(), auth_token.get(), topic.get(), pub_sub.get());
     result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
     return_code = RETURN_CODE_SUCCESS;
 }

@@ -126,8 +126,8 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
   logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
     [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
 
-  PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
+  AuthToken = get(cda_auth_token),
+  case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Topic, PubSub) of
     {ok, authorized} ->
       logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
       {stop, allow};

@@ -129,8 +129,8 @@ on_client_disconnected(ClientId, CertPem) ->
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}).
 
-on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
-  call_port({?ON_CLIENT_CHECK_ACL, ClientId, CertPem, Topic, PubSub}).
+on_client_check_acl(ClientId, AuthToken, Topic, PubSub) ->
+  call_port({?ON_CLIENT_CHECK_ACL, ClientId, AuthToken, Topic, PubSub}).
 
 verify_client_certificate(CertPem) ->
   call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}).

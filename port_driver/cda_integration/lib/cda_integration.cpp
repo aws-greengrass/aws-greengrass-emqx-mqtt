@@ -109,10 +109,10 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *pem, const char *topic,
+bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *authToken, const char *topic,
                                                const char *action) {
-    std::cout << "on_check_acl called with clientId: " << clientId << " and pem: " << pem << " and topic: " << topic
-              << " and action: " << action << std::endl;
+    std::cout << "on_check_acl called with clientId: " << clientId << " and authToken: " << authToken
+              << " and topic: " << topic << " and action: " << action << std::endl;
     return true;
 }
 
