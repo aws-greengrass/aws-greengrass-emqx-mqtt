@@ -16,7 +16,7 @@ set(CMAKE_CXX_CLANG_TIDY) # No clang tidy for tests
 if (WIN32)
     set(CUSTOM_COMPILER_FLAGS "/W4")
 else ()
-    set(CUSTOM_COMPILER_FLAGS "-fno-exceptions -Wall -Werror")
+    set(CUSTOM_COMPILER_FLAGS "-Wall -Werror")
 endif ()
 
 # Download and unpack googletest at configure time
@@ -43,10 +43,9 @@ set(UNIT_TEST_TARGET_NAME port_driver_unit_tests)
 find_package(aws-crt-cpp REQUIRED)
 find_package(GreengrassIpc-cpp REQUIRED)
 
-file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/tests/unit/src/*.cpp ${CMAKE_SOURCE_DIR}/tests/unit/src/*.hpp)
+file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/*.cpp ${CMAKE_SOURCE_DIR}/*.hpp)
 add_executable(${UNIT_TEST_TARGET_NAME} ${UNIT_TEST_SOURCES})
-target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp)
-target_link_libraries(${UNIT_TEST_TARGET_NAME} ${PORT_DRIVER_TARGET_NAME})
+target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp port_driver cda_integration)
 
 find_program(GCOV gcov)
 find_program(LCOV lcov)
@@ -78,8 +77,9 @@ if (GCOV AND LCOV AND GENHTML)
             COMMAND ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${UNIT_TEST_TARGET_NAME}
 
             # Capturing lcov counters and generating report
-            COMMAND ${LCOV} --rc lcov_branch_coverage=1 --directory ${CMAKE_BINARY_DIR} --capture --output-file ${LCOV_INFO}
-            COMMAND ${LCOV} --rc lcov_branch_coverage=1 --remove ${LCOV_INFO} 'tests/*' 'build/*' '/usr/*' '*logging/*' --output-file ${LCOV_CLEAN}
+            COMMAND ${LCOV} --rc lcov_branch_coverage=1 --base-directory ${CMAKE_SOURCE_DIR} --directory ${CMAKE_BINARY_DIR} --capture --output-file ${LCOV_INFO} --no-external
+            COMMAND ${LCOV} --rc lcov_branch_coverage=1 --remove ${LCOV_INFO}  --output-file ${LCOV_CLEAN}
+                '*port_driver/tests/*' '*test_utils.h' 'build/*' '/usr/*' '*logging/*' '*/third_party/*'
             COMMAND ${GENHTML} -o ${UNIT_TEST_OUTPUT_NAME} ${LCOV_CLEAN}
             COMMAND ${CMAKE_COMMAND} -E remove ${LCOV_INFO} ${LCOV_CLEAN}
             COMMENT "Open ${CMAKE_BINARY_DIR}/${UNIT_TEST_OUTPUT_NAME}/index.html in your browser to view the coverage report."
