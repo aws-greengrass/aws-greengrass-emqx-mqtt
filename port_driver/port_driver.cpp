@@ -450,8 +450,8 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
         LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_DISCONNECT")
         handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_disconnected);
         break;
-    case ON_CLIENT_AUTHENTICATE:
-        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_AUTHENTICATE")
+    case GET_CLIENT_DEVICE_AUTH_TOKEN:
+        LOG_I(PORT_DRIVER_SUBJECT, "GET_CLIENT_DEVICE_AUTH_TOKEN")
         handle_get_auth_token(context, buff, index);
         break;
     case ON_CLIENT_CHECK_ACL:

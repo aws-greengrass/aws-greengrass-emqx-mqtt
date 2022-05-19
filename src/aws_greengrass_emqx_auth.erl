@@ -7,12 +7,14 @@
 
 -include("emqx.hrl").
 
--import(port_driver_integration, [on_client_authenticate/2
+-import(port_driver_integration, [get_auth_token/2
 , on_client_connect/2
 , on_client_connected/2
 , on_client_disconnected/2
 , on_client_check_acl/4
 ]).
+
+-import(auth_token_store, [lookup_token/1, save_token/2]).
 
 -export([load/1
   , unload/0
@@ -98,19 +100,23 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     [ClientId, ClientInfo, Result, _Env]),
 
   PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
-    {ok, pass} ->
+  case check_auth_token_for_client(ClientId, PeerCertEncoded) of
+    {ok, AuthToken} ->
       logger:info("Client(~s) is valid", [ClientId]),
+      auth_token_store:save_token(PeerCertEncoded, AuthToken),
       {ok, Result#{auth_result => success}};
-    {ok, fail} ->
-      logger:warn("Client(~s) is invalid", [ClientId]),
-      {stop, Result#{auth_result => not_authorized}};
     {error, Error} ->
       logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
       {stop, Result#{auth_result => not_authorized}};
     Other ->
       logger:error("Unknown response ~p", [Other]),
       {stop, Result#{auth_result => not_authorized}}
+  end.
+
+check_auth_token_for_client(ClientId, CertPem) ->
+  case auth_token_store:lookup_token(CertPem) of
+    [] -> port_driver_integration:get_auth_token(ClientId, CertPem);
+    [{AuthToken}] -> {ok, AuthToken}
   end.
 
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->

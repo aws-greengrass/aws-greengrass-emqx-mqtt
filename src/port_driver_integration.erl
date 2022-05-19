@@ -6,7 +6,7 @@
 -module(port_driver_integration).
 
 -export([start/0, stop/0, init/1]).
--export([on_client_authenticate/2
+-export([get_auth_token/2
   , on_client_connect/2
   , on_client_connected/2
   , on_client_disconnected/2
@@ -22,7 +22,7 @@
 -define(ON_CLIENT_CONNECT, 0).
 -define(ON_CLIENT_CONNECTED, 1).
 -define(ON_CLIENT_DISCONNECT, 2).
--define(ON_CLIENT_AUTHENTICATE, 3).
+-define(GET_CLIENT_DEVICE_AUTH_TOKEN, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
 -define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
@@ -126,8 +126,8 @@ on_client_connected(ClientId, CertPem) ->
 on_client_disconnected(ClientId, CertPem) ->
   call_port({?ON_CLIENT_DISCONNECT, ClientId, CertPem}).
 
-on_client_authenticate(ClientId, CertPem) ->
-  call_port({?ON_CLIENT_AUTHENTICATE, ClientId, CertPem}).
+get_auth_token(ClientId, CertPem) ->
+  call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}).
 
 on_client_check_acl(ClientId, CertPem, Topic, PubSub) ->
   call_port({?ON_CLIENT_CHECK_ACL, ClientId, CertPem, Topic, PubSub}).
