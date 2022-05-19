@@ -125,13 +125,13 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
 
     auto authorizationOperation = greengrassIpcWrapper.getIPCClient().NewAuthorizeClientDeviceAction();
     if (!authorizationOperation) {
-        LOG_E(CDA_INTEG_SUBJECT, "Failed creating NewAuthorizeClientDeviceAction.");
+        LOG_E(CDA_INTEG_SUBJECT, "Failed creating AuthorizeClientDeviceAction.");
         return false;
     }
 
     auto activate = authorizationOperation->Activate(request).get();
     if (!activate) {
-        LOG_E(CDA_INTEG_SUBJECT, "NewAuthorizeClientDeviceAction failed to activate with error %s",
+        LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failed to activate with error %s",
               activate.StatusToString().c_str());
         return false;
     }
@@ -139,7 +139,7 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
     auto responseFuture = authorizationOperation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT,
-              "NewAuthorizeClientDeviceAction timed out while waiting for response from Greengrass Core.");
+              "AuthorizeClientDeviceAction timed out while waiting for response from Greengrass Core.");
         return false;
     }
 
@@ -147,15 +147,15 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
     auto responseType = response.GetResultType();
     if (responseType != OPERATION_RESPONSE) {
         // Handle error.
-        LOG_E(CDA_INTEG_SUBJECT, "NewAuthorizeClientDeviceAction failed with response type %d.", responseType);
+        LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failed with response type %d.", responseType);
         if (responseType == OPERATION_ERROR) {
             auto *error = response.GetOperationError();
             if (error != nullptr) {
-                LOG_E(CDA_INTEG_SUBJECT, "NewAuthorizeClientDeviceAction failure response: %s.",
+                LOG_E(CDA_INTEG_SUBJECT, "AuthorizeClientDeviceAction failure response: %s.",
                       error->GetMessage().value().c_str());
             }
         } else {
-            LOG_E(CDA_INTEG_SUBJECT, "RPC error during NewAuthorizeClientDeviceAction");
+            LOG_E(CDA_INTEG_SUBJECT, "RPC error during AuthorizeClientDeviceAction");
         }
         return false;
     }
@@ -222,7 +222,6 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
         LOG_E(CDA_INTEG_SUBJECT, "VerifyClientDeviceIdentityResponse does not have a value.");
         return false;
     }
-    LOG_I(CDA_INTEG_SUBJECT, "CDA RESPONSE: %s", isValid.value() ? "true" : "false");
     return isValid.value();
 }
 
