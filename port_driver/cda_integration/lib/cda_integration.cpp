@@ -49,7 +49,7 @@ bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, c
 
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,
                                                                                        const char *pem) {
-    LOG_D(CDA_INTEG_SUBJECT, "on_client_authenticate called with clientId: %s", clientId);
+    LOG_D(CDA_INTEG_SUBJECT, "get_client_device_auth_token called with clientId: %s", clientId);
     Aws::Crt::String clientIdStr(clientId);
     Aws::Crt::String pemStr(pem);
 
