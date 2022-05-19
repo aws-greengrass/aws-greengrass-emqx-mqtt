@@ -24,6 +24,7 @@ class CDAIntegrationTester : public ::testing::Test {
     static const std::string TEST_CLIENT_PEM;
     static const std::string TEST_TOPIC;
     static const std::string TEST_ACTION;
+    static const std::string TEST_AUTH_TOKEN;
 
     virtual void SetUp();
     virtual void TearDown();
@@ -35,6 +36,7 @@ const std::string CDAIntegrationTester::TEST_CLIENT_ID = "test_client_id";
 const std::string CDAIntegrationTester::TEST_CLIENT_PEM = "test_client_pem";
 const std::string CDAIntegrationTester::TEST_TOPIC = "/topic";
 const std::string CDAIntegrationTester::TEST_ACTION = "publish";
+const std::string CDAIntegrationTester::TEST_AUTH_TOKEN = "test_auth_token";
 
 void CDAIntegrationTester::SetUp() {
     GreengrassCoreIpcClient *ipcClient = new MockGGIpc();
@@ -62,7 +64,7 @@ TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
-    EXPECT_TRUE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str(), TEST_TOPIC.c_str(),
+    EXPECT_TRUE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
                                         TEST_ACTION.c_str()));
 }
 

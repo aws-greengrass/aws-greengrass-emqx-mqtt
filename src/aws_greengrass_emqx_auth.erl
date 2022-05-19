@@ -7,12 +7,14 @@
 
 -include("emqx.hrl").
 
--import(port_driver_integration, [on_client_authenticate/2
+-import(port_driver_integration, [get_auth_token/2
 , on_client_connect/2
 , on_client_connected/2
 , on_client_disconnected/2
 , on_client_check_acl/4
 ]).
+
+-import(auth_token_store, [lookup_token/1, save_token/2]).
 
 -export([load/1
   , unload/0
@@ -98,13 +100,13 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     [ClientId, ClientInfo, Result, _Env]),
 
   PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_authenticate(ClientId, PeerCertEncoded) of
-    {ok, pass} ->
+  case get_auth_token_for_client(ClientId, PeerCertEncoded) of
+    {ok, AuthToken} ->
       logger:info("Client(~s) is valid", [ClientId]),
+      %% puts authToken in the process dictionary
+      %% to be retrieved during authorization check
+      put(cda_auth_token, AuthToken),
       {ok, Result#{auth_result => success}};
-    {ok, fail} ->
-      logger:warn("Client(~s) is invalid", [ClientId]),
-      {stop, Result#{auth_result => not_authorized}};
     {error, Error} ->
       logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
       {stop, Result#{auth_result => not_authorized}};
@@ -113,12 +115,19 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
       {stop, Result#{auth_result => not_authorized}}
   end.
 
+%% Retrives authToken from CDA if not stored in process dictionary
+get_auth_token_for_client(ClientId, CertPem) ->
+  case get(cda_auth_token) of
+    undefined -> port_driver_integration:get_auth_token(ClientId, CertPem);
+    AuthToken -> {ok, AuthToken}
+  end.
+
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
   logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
     [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
 
-  PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_check_acl(ClientId, PeerCertEncoded, Topic, PubSub) of
+  AuthToken = get(cda_auth_token),
+  case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Topic, PubSub) of
     {ok, authorized} ->
       logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
       {stop, allow};
