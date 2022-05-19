@@ -5,8 +5,6 @@
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
-#include <iostream>
-
 #include "logger.h"
 #include "private/certificate_updater.h"
 
@@ -36,11 +34,9 @@ int CertificateUpdater::subscribeToUpdates(
     auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(SUBSCRIBE_TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CERT_UPDATER_SUBJECT, "Operation timed out while waiting for response from Greengrass Core.");
-        // TODO: Improve return codes
         return -2;
     }
 
-    // TODO: Improve error handling
     auto response = responseFuture.get();
     if (!response) {
         // Handle error.
@@ -54,8 +50,8 @@ int CertificateUpdater::subscribeToUpdates(
             }
         } else {
             // Handle RPC error.
+            // TODO: Improve error handling
         }
-        // TODO: Improve return codes
         return -3;
     }
     LOG_I(CERT_UPDATER_SUBJECT, "Successfully subscribed to cert updates");

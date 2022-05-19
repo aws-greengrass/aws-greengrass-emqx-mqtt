@@ -9,7 +9,7 @@
 
 #include "cda_integration.h"
 #include "private/certificate_updater.h"
-#include "private/test_utils.h"
+#include "private/test_utils.hpp"
 
 using namespace Aws::Crt;
 using namespace Aws::Greengrass;
@@ -20,11 +20,6 @@ namespace unit {
 class CertificateUpdatesHandlerTester : public ::testing::Test {
   public:
     CertificateUpdatesHandlerTester() = default;
-
-    static const std::string TEST_CLIENT_ID;
-    static const std::string TEST_CLIENT_PEM;
-    static const std::string TEST_TOPIC;
-    static const std::string TEST_ACTION;
 
     virtual void SetUp();
     virtual void TearDown();

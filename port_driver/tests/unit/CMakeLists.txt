@@ -79,7 +79,7 @@ if (GCOV AND LCOV AND GENHTML)
             # Capturing lcov counters and generating report
             COMMAND ${LCOV} --rc lcov_branch_coverage=1 --base-directory ${CMAKE_SOURCE_DIR} --directory ${CMAKE_BINARY_DIR} --capture --output-file ${LCOV_INFO} --no-external
             COMMAND ${LCOV} --rc lcov_branch_coverage=1 --remove ${LCOV_INFO}  --output-file ${LCOV_CLEAN}
-                '*port_driver/tests/*' '*test_utils.h' 'build/*' '/usr/*' '*logging/*' '*/third_party/*'
+                '*port_driver/tests/*' '*test_utils.hpp' 'build/*' '/usr/*' '*logging/*' '*/third_party/*'
             COMMAND ${GENHTML} -o ${UNIT_TEST_OUTPUT_NAME} ${LCOV_CLEAN}
             COMMAND ${CMAKE_COMMAND} -E remove ${LCOV_INFO} ${LCOV_CLEAN}
             COMMENT "Open ${CMAKE_BINARY_DIR}/${UNIT_TEST_OUTPUT_NAME}/index.html in your browser to view the coverage report."

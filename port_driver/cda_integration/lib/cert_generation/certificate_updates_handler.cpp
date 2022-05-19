@@ -32,7 +32,7 @@ int CertificateUpdatesHandler::writeCertsToFiles(
             LOG_D(CERT_UPDATER_SUBJECT, "Created directory %s to write certs to", path.c_str());
         }
     } catch (std::exception &e) {
-        LOG_E(CERT_UPDATER_SUBJECT, "Could not create directory %s to write certs to", path.c_str());
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to create write directory %s for certs: %s", path.c_str(), e.what());
         return -2;
     }
 
@@ -62,7 +62,6 @@ int CertificateUpdatesHandler::writeCertsToFiles(
 }
 
 void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *response) {
-    // TODO: Improve this code with error handling, logging
 
     LOG_I(CERT_UPDATER_SUBJECT, "Retrieving all certs...");
     if (!response) {
@@ -106,7 +105,9 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
 }
 
 bool CertificateUpdatesHandler::OnStreamError(OperationError *error) {
-    LOG_E(CERT_UPDATER_SUBJECT, "OnStream error %s", error->GetMessage().value().c_str());
+    if (error != nullptr) {
+        LOG_E(CERT_UPDATER_SUBJECT, "OnStream error %s", error->GetMessage().value().c_str());
+    }
     return false; // Return true to close stream, false to keep stream open.
 }
 
