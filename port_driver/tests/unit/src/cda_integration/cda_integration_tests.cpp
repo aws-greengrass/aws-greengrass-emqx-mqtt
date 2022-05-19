@@ -64,8 +64,8 @@ TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
 }
 
 TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
-    EXPECT_TRUE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
-                                        TEST_ACTION.c_str()));
+    EXPECT_FALSE(cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
+                                         TEST_ACTION.c_str()));
 }
 
 } // namespace unit
