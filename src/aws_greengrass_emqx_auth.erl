@@ -96,21 +96,31 @@ on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInf
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
     [ClientId, ClientInfo, Result, _Env]),
-
   PeerCertEncoded = get(cert_pem),
-  case get_auth_token_for_client(ClientId, PeerCertEncoded) of
+  case authenticate_client_device(ClientId, PeerCertEncoded) of
+    ok -> 
+      AuthToken = get(cda_auth_token),
+      authorize_client_connect(ClientId, AuthToken, Result);
+    stop ->
+      {stop, Result#{auth_result => not_authorized}};
+    _ -> 
+      {stop, Result#{auth_result => not_authorized}}
+  end.
+
+authenticate_client_device(ClientId, CertPem) -> 
+  case get_auth_token_for_client(ClientId, CertPem) of
     {ok, AuthToken} ->
       logger:info("Client(~s) is valid", [ClientId]),
       %% puts authToken in the process dictionary
       %% to be retrieved during authorization check
       put(cda_auth_token, AuthToken),
-      {ok, Result#{auth_result => success}};
+      ok;
     {error, Error} ->
       logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
-      {stop, Result#{auth_result => not_authorized}};
+      stop;
     Other ->
-      logger:error("Unknown response ~p", [Other]),
-      {stop, Result#{auth_result => not_authorized}}
+      logger:error("Unknown response for get authToken: ~p", [Other]),
+      stop
   end.
 
 %% Retrives authToken from CDA if not stored in process dictionary
@@ -120,22 +130,37 @@ get_auth_token_for_client(ClientId, CertPem) ->
     AuthToken -> {ok, AuthToken}
   end.
 
+authorize_client_connect(ClientId, AuthToken, Result) ->
+  ConnectResource = "mqtt:clientId:" ++ binary_to_list(ClientId),
+  ConnectAction = "mqtt:connect",
+  case check_authorization(ClientId, AuthToken, ConnectResource, ConnectAction) of
+    authorized -> {ok, Result#{auth_result => success}};
+    unauthorized -> {stop, Result#{auth_result => not_authorized}};
+    _ -> {stop, Result#{auth_result => not_authorized}}
+  end.
+
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
   logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
     [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-
   AuthToken = get(cda_auth_token),
-  case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Topic, PubSub) of
+  case check_authorization(ClientId, AuthToken, Topic, PubSub) of
+    authorized -> {stop, allow};
+    unauthorized -> {stop, deny};
+    _ -> {stop, deny}
+  end.
+
+check_authorization(ClientId, AuthToken, Resource, Action) ->
+  case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action) of
     {ok, authorized} ->
-      logger:info("Client(~s) authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
-      {stop, allow};
+      logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+      authorized;
     {ok, unauthorized} ->
-      logger:warn("Client(~s) not authorized to perform ~p on topic ~p", [ClientId, PubSub, Topic]),
-      {stop, deny};
+      logger:warn("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+      unauthorized;
     {error, Error} ->
-      logger:error("Client(~s) not authorized to perform ~p on topic ~p. Error:~p",
-        [ClientId, PubSub, Topic, Error]),
-      {stop, deny}
+      logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
+        [ClientId, Action, Resource, Error]),
+      unauthorized
   end.
 
 encode_peer_cert(PeerCert) ->
