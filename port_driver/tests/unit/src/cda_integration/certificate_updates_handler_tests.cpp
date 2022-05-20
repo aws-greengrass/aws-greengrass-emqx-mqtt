@@ -9,7 +9,7 @@
 
 #include "cda_integration.h"
 #include "private/certificate_updater.h"
-#include "private/test_utils.hpp"
+#include "test_utils.hpp"
 
 using namespace Aws::Crt;
 using namespace Aws::Greengrass;
@@ -138,14 +138,14 @@ TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestNullBasePath) {
     String crtPrivateKeyString(testPrivateKey);
     String crtCertString(testCert);
 
-    int retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
-    EXPECT_EQ(retVal, -1);
+    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
+    EXPECT_EQ(retVal, CertWriteStatus::WRITE_ERROR_BASE_PATH);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
     EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
-TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestInvalidBasePath) {
+TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestInvalidDir) {
     std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>("");
     handler = new CertificateUpdatesHandler(std::move(testPath), nullptr);
 
@@ -154,8 +154,8 @@ TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestInvalidBasePath) {
     auto cas = Vector<String>();
     cas.emplace_back(testCACert);
 
-    int retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
-    EXPECT_EQ(retVal, -2);
+    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
+    EXPECT_EQ(retVal, CertWriteStatus::WRITE_ERROR_DIR_PATH);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
     EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
