@@ -155,7 +155,7 @@ check_authorization(ClientId, AuthToken, Resource, Action) ->
       logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
       authorized;
     {ok, unauthorized} ->
-      logger:warn("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+      logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
       unauthorized;
     {error, Error} ->
       logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
