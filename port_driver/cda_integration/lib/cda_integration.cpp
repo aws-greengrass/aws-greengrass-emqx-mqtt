@@ -98,7 +98,7 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
     auto response = responseFuture.get();
     auto responseType = response.GetResultType();
     if (responseType != OPERATION_RESPONSE) {
-        handle_response_error(VERIFY_CLIENT_DEVICE_IDENTITY, responseType, response.GetOperationError());
+        handle_response_error(GET_CLIENT_DEVICE_AUTH_TOKEN, responseType, response.GetOperationError());
         return {};
     }
 
@@ -221,8 +221,8 @@ ClientDeviceAuthIntegration *cda_integration_init() { return cda_integration_ini
 
 void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_integ; }
 
-void ClientDeviceAuthIntegration::handle_response_error(std::string action,
-                                                        Aws::Eventstreamrpc::ResultType responseType,
+void ClientDeviceAuthIntegration::handle_response_error(const std::string &action,
+                                                        const Aws::Eventstreamrpc::ResultType &responseType,
                                                         Aws::Eventstreamrpc::OperationError *error) {
     LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action, responseType);
     if (responseType == OPERATION_ERROR) {
