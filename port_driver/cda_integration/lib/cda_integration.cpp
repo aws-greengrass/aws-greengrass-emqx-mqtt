@@ -17,16 +17,17 @@ void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.setAsRunning();
 }
 
-int ClientDeviceAuthIntegration::subscribeToCertUpdates(
+CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
     std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
-    int certSubscribeStatus = certificateUpdater.subscribeToUpdates(std::move(basePath), std::move(subscription));
-    if (certSubscribeStatus != 0) {
-        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
+    CertSubscribeUpdateStatus certSubscribeStatus =
+        certificateUpdater.subscribeToUpdates(std::move(basePath), std::move(subscription));
+    if (certSubscribeStatus != CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS) {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", (int)certSubscribeStatus);
         return certSubscribeStatus;
     }
     LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");
-    return 0;
+    return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

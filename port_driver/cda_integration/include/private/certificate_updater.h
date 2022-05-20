@@ -6,11 +6,25 @@
 #pragma once
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
+#include <filesystem>
 
 namespace GG = Aws::Greengrass;
 
+enum class CertWriteStatus : int {
+    WRITE_SUCCESS = 0,
+    WRITE_ERROR_BASE_PATH = -1,
+    WRITE_ERROR_DIR_PATH = -2,
+    WRITE_ERROR_OUT_STREAM = -3
+};
+
+enum class CertSubscribeUpdateStatus : int {
+    SUBSCRIBE_SUCCESS = 0,
+    SUBSCRIBE_ERROR_CREATE_OPERATION = -1,
+    SUBSCRIBE_ERROR_TIMEOUT_RESPONSE = -2,
+    SUBSCRIBE_ERROR_FAILURE_RESPONSE = -3
+};
+
 class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStreamHandler {
-    void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
     bool OnStreamError(OperationError *error) override;
     void OnStreamClosed() override;
 
@@ -21,10 +35,13 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
                               std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription)
         : basePath(std::move(basePath)), subscription(std::move(subscription)) {}
 
-  private:
-    int writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
-                          std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
+    // TODO: move these out of public
+    void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
+    CertWriteStatus
+    writeCertsToFiles(const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue,
+                      const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue);
 
+  private:
     const std::unique_ptr<std::filesystem::path> basePath;
     const std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription;
 };
@@ -39,6 +56,7 @@ class CertificateUpdater {
     CertificateUpdater(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
 
     // TODO: Improve return codes
-    int subscribeToUpdates(std::unique_ptr<std::filesystem::path> basePath,
-                           std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
+    CertSubscribeUpdateStatus
+    subscribeToUpdates(std::unique_ptr<std::filesystem::path> basePath,
+                       std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 };

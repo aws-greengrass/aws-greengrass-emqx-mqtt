@@ -335,8 +335,9 @@ void handle_certificate_update_subscription(DriverContext *context) {
         [context]([[maybe_unused]] Aws::Greengrass::CertificateUpdateEvent *event) {
             send_event_to_port(context, ATOMS.certificate_update);
         });
-    int result = context->cda_integration->subscribeToCertUpdates(std::move(baseDirPath), std::move(callback));
-    result_atom = result == 0 ? ATOMS.valid : ATOMS.invalid;
+    CertSubscribeUpdateStatus result =
+        context->cda_integration->subscribeToCertUpdates(std::move(baseDirPath), std::move(callback));
+    result_atom = result == CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
 }
 
