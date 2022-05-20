@@ -10,13 +10,13 @@
 
 namespace GG = Aws::Greengrass;
 
-enum class CertWriteStatus { WRITE_SUCCESS = 0, WRITE_ERROR_BASE_PATH, WRITE_ERROR_DIR_PATH, WRITE_ERROR_OUT_STREAM };
+enum class CertWriteStatus : signed int { WRITE_SUCCESS = 0, WRITE_ERROR_BASE_PATH = -1, WRITE_ERROR_DIR_PATH = -2, WRITE_ERROR_OUT_STREAM = -3 };
 
-enum class CertSubscribeUpdateStatus {
+enum class CertSubscribeUpdateStatus : signed int {
     SUBSCRIBE_SUCCESS = 0,
-    SUBSCRIBE_ERROR_CREATE_OPERATION,
-    SUBSCRIBE_ERROR_TIMEOUT_RESPONSE,
-    SUBSCRIBE_ERROR_FAILURE_RESPONSE
+    SUBSCRIBE_ERROR_CREATE_OPERATION = -1,
+    SUBSCRIBE_ERROR_TIMEOUT_RESPONSE = -2,
+    SUBSCRIBE_ERROR_FAILURE_RESPONSE = -3
 };
 
 class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStreamHandler {
@@ -32,8 +32,8 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
 
     // TODO: move these out of public
     void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
-    CertWriteStatus writeCertsToFiles(Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
-                                      std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &);
+    CertWriteStatus writeCertsToFiles(const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue,
+                                      const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue);
 
   private:
     const std::unique_ptr<std::filesystem::path> basePath;

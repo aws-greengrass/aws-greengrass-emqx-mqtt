@@ -23,7 +23,7 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     CertSubscribeUpdateStatus certSubscribeStatus =
         certificateUpdater.subscribeToUpdates(std::move(basePath), std::move(subscription));
     if (certSubscribeStatus != CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS) {
-        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", certSubscribeStatus);
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", (int) certSubscribeStatus);
         return certSubscribeStatus;
     }
     LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");

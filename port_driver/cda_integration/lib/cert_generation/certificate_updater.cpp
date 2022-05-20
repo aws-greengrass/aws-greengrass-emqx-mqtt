@@ -3,12 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "private/certificate_updater.h"
+#include "logger.h"
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <fstream>
-
-#include "logger.h"
-#include "private/certificate_updater.h"
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
@@ -18,8 +17,8 @@ static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.p
 static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
 
 CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
-    Aws::Crt::String &privateKeyValue, Aws::Crt::String &certValue,
-    std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue) {
+    const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue,
+    const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue){
 
     if (!basePath) {
         return CertWriteStatus::WRITE_ERROR_BASE_PATH;
@@ -86,7 +85,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         return;
     }
 
-    auto allCAs = certUpdate->GetCaCertificates();
+    const auto allCAs = certUpdate->GetCaCertificates();
     if (!allCAs || allCAs->empty()) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to get CA certs");
         return;
@@ -94,7 +93,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
 
     CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
     if (writeStatus != CertWriteStatus::WRITE_SUCCESS) {
-        LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", writeStatus);
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int) writeStatus);
         return;
     }
 
