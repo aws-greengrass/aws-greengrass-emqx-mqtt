@@ -18,7 +18,7 @@ static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.
 
 CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
     const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue,
-    const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue){
+    const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue) {
 
     if (!basePath) {
         return CertWriteStatus::WRITE_ERROR_BASE_PATH;
@@ -93,7 +93,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
 
     CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
     if (writeStatus != CertWriteStatus::WRITE_SUCCESS) {
-        LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int) writeStatus);
+        LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int)writeStatus);
         return;
     }
 
