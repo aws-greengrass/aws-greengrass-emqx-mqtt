@@ -292,12 +292,16 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
         return;
     }
 
+    // Append "mqtt:" to the beginning of the action
+    auto transformedOperation = std::make_unique<std::string>("mqtt:");
+    transformedOperation->append(operation.get());
+
     LOG_D(PORT_DRIVER_SUBJECT,
           "Handling acl request with client id %s, client token %s, for topic %s, and "
           "action %s",
-          client_id.get(), auth_token.get(), resource.get(), operation.get())
-    bool result =
-        context->cda_integration->on_check_acl(client_id.get(), auth_token.get(), resource.get(), operation.get());
+          client_id.get(), auth_token.get(), resource.get(), transformedOperation->c_str())
+    bool result = context->cda_integration->on_check_acl(client_id.get(), auth_token.get(), resource.get(),
+                                                         transformedOperation->c_str());
 
     result_atom = result ? ATOMS.authorized : ATOMS.unauthorized;
     return_code = RETURN_CODE_SUCCESS;

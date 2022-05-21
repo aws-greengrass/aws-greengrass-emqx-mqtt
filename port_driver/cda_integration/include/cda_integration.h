@@ -41,8 +41,8 @@ class ClientDeviceAuthIntegration {
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
                            std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 
-    void handle_response_error(const std::string &action, const Aws::Eventstreamrpc::ResultType &responseType,
-                               Aws::Eventstreamrpc::OperationError *error);
+    static void handle_response_error(const std::string &action, const Aws::Eventstreamrpc::ResultType &responseType,
+                                      Aws::Eventstreamrpc::OperationError *error);
 };
 
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client);

@@ -62,7 +62,7 @@ CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
 void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *response) {
 
     LOG_I(CERT_UPDATER_SUBJECT, "Retrieving all certs...");
-    if (!response) {
+    if (response == nullptr) {
         LOG_E(CERT_UPDATER_SUBJECT, "Received CertificateUpdateEvent response was null");
         return;
     }
