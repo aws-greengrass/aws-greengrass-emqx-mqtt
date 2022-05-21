@@ -224,7 +224,7 @@ void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_
 void ClientDeviceAuthIntegration::handle_response_error(const std::string &action,
                                                         const Aws::Eventstreamrpc::ResultType &responseType,
                                                         Aws::Eventstreamrpc::OperationError *error) {
-    LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action, responseType);
+    LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action.c_str(), responseType);
     if (responseType == OPERATION_ERROR) {
         if (error != nullptr) {
             LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_MESSAGE_FMT, VERIFY_CLIENT_DEVICE_IDENTITY,

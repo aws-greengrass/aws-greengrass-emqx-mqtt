@@ -151,20 +151,24 @@ def main():
         print("Building EMQ X")
         if os.name == 'nt':
             print("Setting additional env var for Windows")
-            vs_paths = {"C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat",
-                        "C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
-                        "C:\\Program Files\\Microsoft Visual "
-                        "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat",
-                        "C:\\Program Files\\Microsoft Visual "
-                        "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat"}
+            vs_paths = {("C:\\Program Files (x86)\\Microsoft Visual "
+                        "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                        ("C:\\Program Files (x86)\\Microsoft Visual "
+                         "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                        ("C:\\Program Files\\Microsoft Visual "
+                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                        ("C:\\Program Files\\Microsoft Visual "
+                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                        ("C:\\Program Files (x86)\\Microsoft Visual "
+                        "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")}
             for vs_path in vs_paths:
+                vs_arch = vs_path[1]
+                vs_path = vs_path[0]
                 if os.path.exists(vs_path):
                     break
             else:
                 raise FileNotFoundError("Unable to find where VS is installed!")
-            additional_env_var_script = f'call "{vs_path}" x86_amd64'
+            additional_env_var_script = f'call "{vs_path}" {vs_arch}'
             subprocess.check_call(f"{additional_env_var_script} && make -j", shell=True,
                                   env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
         else:
