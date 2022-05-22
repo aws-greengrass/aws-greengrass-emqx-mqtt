@@ -143,7 +143,13 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
   logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
     [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
   AuthToken = get(cda_auth_token),
-  case check_authorization(ClientId, AuthToken, Topic, PubSub) of
+  case PubSub of
+    publish -> Action = "mqtt:publish",
+      TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
+    subscribe -> Action = "mqtt:subscribe",
+      TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
+  end,
+  case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
     authorized -> {stop, allow};
     unauthorized -> {stop, deny};
     _ -> {stop, deny}
