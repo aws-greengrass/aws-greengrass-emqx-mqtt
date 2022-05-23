@@ -58,7 +58,8 @@ def do_patch(zip_path, erts_version="11.0", add=None):
         add = {}
     add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
     update_zip(zipname=zip_path, updates={
-        "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.diff"),
+        "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
+        "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
         "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff"),
         "emqx/data/loaded_plugins": lambda o: append(o, "{aws_greengrass_emqx_auth, true}.\n")
     }, add=add)
