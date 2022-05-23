@@ -85,9 +85,9 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
             return ERL_DRV_ERROR_BADARG;
         }
-        const std::filesystem::path logPath = std::filesystem::path(logDir) / "crt.log";
         // try to create the log directories as needed, ignoring errors
-        std::filesystem::create_directories(logPath);
+        std::filesystem::create_directories(logDir);
+        const std::filesystem::path logPath = std::filesystem::path(logDir).append("crt.log");
         const auto *logPathStr = new std::string{logPath.string()};
         struct aws_logger_standard_options logger_options = {
             .level = awsLogLevel,
