@@ -33,23 +33,68 @@ struct atoms {
     ErlDrvTermData certificate_update;
 };
 static struct atoms ATOMS {};
+static const char *CONSOLE = "console";
+static const char *EMQX_LOG_TO_ENV_VAR = "EMQX_LOG__TO";
+static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
 static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 
+static aws_log_level stringToLogLevel(const std::string &level) {
+    // Erlang log levels
+    // debug, info, notice, warning, error, critical, alert, emergency
+    if (level == "debug") {
+        return AWS_LL_TRACE;
+    }
+    if (level == "info") {
+        return AWS_LL_DEBUG;
+    }
+    if (level == "notice") {
+        return AWS_LL_INFO;
+    }
+    if (level == "warning") {
+        return AWS_LL_WARN;
+    }
+    if (level == "error") {
+        return AWS_LL_ERROR;
+    }
+    if (level == "emergency") {
+        return AWS_LL_FATAL;
+    }
+    // Default to warn
+    return AWS_LL_WARN;
+}
+
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
     (void)buff;
-    const char *logDir = std::getenv(EMQX_LOG_ENV_VAR);
-    if (logDir == nullptr) {
+    const char *logLocation = std::getenv(EMQX_LOG_TO_ENV_VAR);
+    if (logLocation == nullptr) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
         return ERL_DRV_ERROR_BADARG;
     }
-    const std::filesystem::path logPath = std::filesystem::path(logDir) / "crt.log";
-    const auto *logPathStr = new std::string{logPath.string()};
-    struct aws_logger_standard_options logger_options = {
-        .level = AWS_LL_TRACE,
-        .filename = logPathStr->c_str(),
-    };
-    aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
+    const char *logLevel = std::getenv(EMQX_LOG_LEVEL_ENV_VAR); // Log level may be null
+    aws_log_level awsLogLevel = stringToLogLevel(logLevel == nullptr ? "" : logLevel);
+    if (std::string_view{CONSOLE} == logLocation) {
+        struct aws_logger_standard_options logger_options = {
+            .level = awsLogLevel,
+            .file = stderr,
+        };
+        aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
+    } else {
+        const char *logDir = std::getenv(EMQX_LOG_ENV_VAR);
+        if (logDir == nullptr) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
+            return ERL_DRV_ERROR_BADARG;
+        }
+        const std::filesystem::path logPath = std::filesystem::path(logDir) / "crt.log";
+        // try to create the log directories as needed, ignoring errors
+        std::filesystem::create_directories(logPath);
+        const auto *logPathStr = new std::string{logPath.string()};
+        struct aws_logger_standard_options logger_options = {
+            .level = awsLogLevel,
+            .filename = logPathStr->c_str(),
+        };
+        aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
+    }
     aws_logger_set(&our_logger);
 
     LOG_I(PORT_DRIVER_SUBJECT, "Starting AWS Greengrass auth driver");
