@@ -202,6 +202,7 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
         LOG_E(CDA_INTEG_SUBJECT, FAILED_NO_RESPONSE_VALUE, VERIFY_CLIENT_DEVICE_IDENTITY);
         return false;
     }
+    operation->Close();
     return isValid.value();
 }
 
