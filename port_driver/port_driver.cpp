@@ -194,25 +194,6 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
-                                     const char returnCode) {
-    auto port = driver_mk_port(context->port);
-
-    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer, true or false
-    // atom]}}
-
-    // Request ID in this case is a pointer to stack memory, but that's fine because erl_drv_output_term copies
-    // the data immediately into the Erlang heap.
-    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port,       ERL_DRV_INT64, reinterpret_cast<ErlDrvTermData>(&requestId),
-                             ERL_DRV_ATOM,  ATOMS.data, ERL_DRV_INT,   static_cast<ErlDrvTermData>(returnCode),
-                             ERL_DRV_ATOM,  result,     ERL_DRV_LIST,  2,
-                             ERL_DRV_TUPLE, 2,          ERL_DRV_TUPLE, 3};
-    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting term");
-    }
-}
-
 static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     int type;
     int entry_size = 0;
@@ -263,29 +244,6 @@ static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
     }
     }
     return buf;
-}
-
-static void handle_client_id_and_pem(DriverContext *context, char *buff, int index,
-                                     bool (ClientDeviceAuthIntegration::*func)(const char *clientId, const char *pem)) {
-    char return_code = RETURN_CODE_UNEXPECTED;
-    ErlDrvTermData result_atom = ATOMS.unknown;
-
-    defer { write_atom_to_port(context, result_atom, return_code); };
-
-    auto client_id = decode_string(buff, &index);
-    if (!client_id) {
-        return;
-    }
-
-    auto pem = decode_string(buff, &index);
-    if (!pem) {
-        return;
-    }
-
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s", client_id.get())
-    bool result = (context->cda_integration->*func)(client_id.get(), pem.get());
-    result_atom = result ? ATOMS.pass : ATOMS.fail;
-    return_code = RETURN_CODE_SUCCESS;
 }
 
 static void handle_get_auth_token(DriverContext *context, char *buff, int index) {
@@ -387,61 +345,6 @@ void handle_certificate_update_subscription(DriverContext *context) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
-struct packer {
-    std::unique_ptr<char[]> client_id;
-    std::unique_ptr<char[]> pem;
-    DriverContext *context;
-    ErlDrvTermData result = ATOMS.fail;
-    char returnCode = RETURN_CODE_UNEXPECTED;
-    EI_LONGLONG requestId;
-};
-
-void client_connect(void *buf) {
-    auto *pack = reinterpret_cast<packer *>(buf);
-
-    LOG_D(PORT_DRIVER_SUBJECT, "Handling request with client id %s", pack->client_id.get());
-    bool result = pack->context->cda_integration->on_client_connect(pack->client_id.get(), pack->pem.get());
-    if (result) {
-        pack->result = ATOMS.pass;
-    }
-    pack->returnCode = RETURN_CODE_SUCCESS;
-}
-
-void client_connect_complete(void *buf) {
-    auto *pack = reinterpret_cast<packer *>(buf);
-
-    defer { delete pack; };
-
-    write_async_bool_to_port(pack->context, pack->requestId, pack->result, pack->returnCode);
-}
-
-void handle_on_client_connect(DriverContext *context, char *buff, int index) {
-    char return_code = RETURN_CODE_UNEXPECTED;
-    ErlDrvTermData result = ATOMS.unknown;
-
-    defer { write_atom_to_port(context, result, return_code); };
-    auto client_id = decode_string(buff, &index);
-    if (!client_id) {
-        return;
-    }
-    auto pem = decode_string(buff, &index);
-    if (!pem) {
-        return;
-    }
-    auto *packed = new packer{
-        .client_id = std::move(client_id),
-        .pem = std::move(pem),
-        .context = context,
-    };
-    // Decode the request ID which is used to identify the caller back in Erlang
-    if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
-        return;
-    }
-    driver_async(context->port, nullptr, &client_connect, packed, &client_connect_complete);
-    result = ATOMS.invalid;
-    return_code = RETURN_CODE_ASYNC;
-}
-
 static void handle_unknown_op(DriverContext *context) {
     write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
@@ -486,19 +389,6 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
     }
 
     switch (op) {
-    case ON_CLIENT_CONNECT: {
-        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CONNECT")
-        handle_on_client_connect(context, buff, index);
-        break;
-    }
-    case ON_CLIENT_CONNECTED:
-        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CONNECTED")
-        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_connected);
-        break;
-    case ON_CLIENT_DISCONNECT:
-        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_DISCONNECT")
-        handle_client_id_and_pem(context, buff, index, &ClientDeviceAuthIntegration::on_client_disconnected);
-        break;
     case GET_CLIENT_DEVICE_AUTH_TOKEN:
         LOG_I(PORT_DRIVER_SUBJECT, "GET_CLIENT_DEVICE_AUTH_TOKEN")
         handle_get_auth_token(context, buff, index);

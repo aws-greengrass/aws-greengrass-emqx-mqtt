@@ -38,7 +38,7 @@ endif()
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -fPIC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fPIC -Wconversion -Werror -Wno-missing-field-initializers")
-endif (UNIX)    
+endif (UNIX)
 
 if (WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
