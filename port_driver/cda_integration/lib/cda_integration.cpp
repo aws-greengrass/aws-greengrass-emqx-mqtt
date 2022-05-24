@@ -71,13 +71,13 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
         return {};
     }
 
-    auto responseFuture = operation->GetResult();
+    auto responseFuture = operation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN);
         return {};
     }
 
-    auto response = responseFuture.get();
+    auto response = GG::GetClientDeviceAuthTokenResult(responseFuture.get());
     auto responseType = response.GetResultType();
     if (responseType != OPERATION_RESPONSE) {
         handle_response_error(GET_CLIENT_DEVICE_AUTH_TOKEN, responseType, response.GetOperationError());
@@ -120,13 +120,13 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
         return false;
     }
 
-    auto responseFuture = authorizationOperation->GetResult();
+    auto responseFuture = authorizationOperation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION);
         return false;
     }
 
-    auto response = responseFuture.get();
+    auto response = GG::AuthorizeClientDeviceActionResult(responseFuture.get());
     auto responseType = response.GetResultType();
 
     if (responseType != OPERATION_RESPONSE) {
@@ -166,13 +166,13 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
         return false;
     }
 
-    auto responseFuture = operation->GetResult();
+    auto responseFuture = operation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, VERIFY_CLIENT_DEVICE_IDENTITY);
         return false;
     }
 
-    auto response = responseFuture.get();
+    auto response = GG::VerifyClientDeviceIdentityResult(responseFuture.get());
     auto responseType = response.GetResultType();
     if (responseType != OPERATION_RESPONSE) {
         handle_response_error(VERIFY_CLIENT_DEVICE_IDENTITY, responseType, response.GetOperationError());
