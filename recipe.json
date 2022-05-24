@@ -1,0 +1,114 @@
+{
+  "RecipeFormatVersion": "2020-01-25",
+  "ComponentName": "aws.greengrass.clientdevices.mqtt.Emqx",
+  "ComponentType": "aws.greengrass.generic",
+  "ComponentDescription": "The EMQ X MQTT broker component provides an MQTT v5 broker, based on the EMQ X MQTT broker, for client devices to connect to your Greengrass core device.",
+  "ComponentPublisher": "AWS",
+  "ComponentConfiguration": {
+    "DefaultConfiguration": {
+      "accessControl": {
+        "aws.greengrass.clientdevices.Auth": {
+          "aws.greengrass.clientdevices.mqtt.EMQX:auth:1": {
+            "policyDescription": "Access to client device auth operations.",
+            "operations": [
+              "aws.greengrass#SubscribeToCertificateUpdates",
+              "aws.greengrass#VerifyClientDeviceIdentity",
+              "aws.greengrass#GetClientDeviceAuthToken",
+              "aws.greengrass#AuthorizeClientDeviceAction"
+            ],
+            "resources": [
+              "*"
+            ]
+          }
+        }
+      },
+      "logLevel": "debug",
+      "restartIdentifier": "",
+      "startupTimeoutSeconds": "240",
+      "logLocation": "file"
+    }
+  },
+  "ComponentDependencies": {
+    "aws.greengrass.clientdevices.Auth": {
+      "VersionRequirement": ">=2.2.0 <2.3.0",
+      "DependencyType": "SOFT"
+    }
+  },
+  "Manifests": [
+    {
+      "Platform": {
+        "os": "windows"
+      },
+      "Lifecycle": {
+        "startup": {
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "timeout": "{configuration:/startupTimeoutSeconds}"
+        },
+        "setEnv": {
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
+          "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
+          "EMQX_NODE__DATA_DIR": "{work:path}\\data",
+          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
+          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
+          "EMQX_LOG__DIR": "{work:path}\\logs"
+        },
+        "shutdown": {
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
+        }
+      },
+      "Artifacts": [
+        {
+          "URI": "s3://aws.greengrass.clientdevices.mqtt.EMQX/emqx.zip",
+          "Unarchive": "ZIP",
+          "Permission": {
+              "Read": "OWNER",
+              "Execute": "OWNER"
+          }
+        }
+      ]
+    },
+    {
+      "Platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "Lifecycle": {
+        "Startup": {
+          "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx foreground",
+          "RequiresPrivilege": true,
+          "Timeout": "{configuration:/startupTimeoutSeconds}"
+        },
+        "setEnv": {
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}/data/key.pem",
+          "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}/data/cert.pem",
+          "EMQX_NODE__DATA_DIR": "{work:path}/data",
+          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}/plugin-data",
+          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}/data/cacert.pem",
+          "EMQX_LOG__DIR": "{work:path}/logs",
+          "RUNNER_DATA_DIR": "{work:path}/data",
+          "DEBUG": "1"
+        },
+        "Shutdown": {
+          "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",
+          "RequiresPrivilege": true
+        }
+      },
+      "Artifacts": [
+        {
+          "URI": "s3://aws.greengrass.clientdevices.mqtt.EMQX/emqx.zip",
+          "Unarchive": "ZIP",
+          "Permission": {
+              "Read": "OWNER",
+              "Execute": "OWNER"
+          }
+        }
+      ]
+    }
+  ]
+}
