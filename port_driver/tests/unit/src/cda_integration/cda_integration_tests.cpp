@@ -46,18 +46,6 @@ void CDAIntegrationTester::SetUp() {
 
 void CDAIntegrationTester::TearDown() { cda_integration_close(cda_integ); }
 
-TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectTest) {
-    EXPECT_TRUE(cda_integ->on_client_connect(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-}
-
-TEST_F(CDAIntegrationTester, CDAIntegrationOnClientConnectedTest) {
-    EXPECT_TRUE(cda_integ->on_client_connected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-}
-
-TEST_F(CDAIntegrationTester, CDAIntegrationOnClientDisconnectTest) {
-    EXPECT_TRUE(cda_integ->on_client_disconnected(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str()));
-}
-
 TEST_F(CDAIntegrationTester, CDAIntegrationOnClientAuthenticateTest) {
     auto response = cda_integ->get_client_device_auth_token(TEST_CLIENT_ID.c_str(), TEST_CLIENT_PEM.c_str());
     EXPECT_FALSE(response);

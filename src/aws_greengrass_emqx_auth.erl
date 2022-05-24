@@ -9,8 +9,6 @@
 
 -import(port_driver_integration, [get_auth_token/2
 , on_client_connect/2
-, on_client_connected/2
-, on_client_disconnected/2
 , on_client_check_acl/4
 ]).
 
@@ -22,9 +20,8 @@
 %% Client Lifecycle Hooks
 %%--------------------------------------------------------------------
 
--export([on_client_connect/3
-  , on_client_connected/3
-  , on_client_disconnected/4
+-export([
+  on_client_connect/3
   , on_client_authenticate/3
   , on_client_check_acl/5
 ]).
@@ -32,8 +29,6 @@
 %% Called when the plugin application start
 load(Env) ->
   emqx:hook('client.connect', {?MODULE, on_client_connect, [Env]}),
-  emqx:hook('client.connected', {?MODULE, on_client_connected, [Env]}),
-  emqx:hook('client.disconnected', {?MODULE, on_client_disconnected, [Env]}),
   emqx:hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
   emqx:hook('client.check_acl', {?MODULE, on_client_check_acl, [Env]}).
 
@@ -52,38 +47,6 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
 
   case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
     {ok, pass} -> {ok, Props};
-    {ok, fail} -> stop;
-    {error, Reason} ->
-      logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
-      stop;
-    Other ->
-      logger:error("Unknown response ~p", [Other]),
-      stop
-  end.
-
-on_client_connected(ClientInfo = #{clientid := ClientId}, ConnInfo, _Env) ->
-  logger:debug("Client(~s) connected, ClientInfo:~n~p~n, ConnInfo:~n~p~n, Env:~n~p~n",
-    [ClientId, ClientInfo, ConnInfo, _Env]),
-
-  PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_connected(ClientId, PeerCertEncoded) of
-    {ok, pass} -> ok;
-    {ok, fail} -> stop;
-    {error, Reason} ->
-      logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
-      stop;
-    Other ->
-      logger:error("Unknown response ~p", [Other]),
-      stop
-  end.
-
-on_client_disconnected(ClientInfo = #{clientid := ClientId}, ReasonCode, ConnInfo, _Env) ->
-  logger:debug("Client(~s) disconnected due to ~p, ClientInfo:~n~p~n, ConnInfo:~n~p~n, Env:~n~p~n",
-    [ClientId, ReasonCode, ClientInfo, ConnInfo, _Env]),
-
-  PeerCertEncoded = get(cert_pem),
-  case port_driver_integration:on_client_disconnected(ClientId, PeerCertEncoded) of
-    {ok, pass} -> ok;
     {ok, fail} -> stop;
     {error, Reason} ->
       logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
@@ -185,7 +148,5 @@ encode_peer_cert(PeerCert) ->
 
 unload() ->
   emqx:unhook('client.connect', {?MODULE, on_client_connect}),
-  emqx:unhook('client.connected', {?MODULE, on_client_connected}),
-  emqx:unhook('client.disconnected', {?MODULE, on_client_disconnected}),
   emqx:unhook('client.authenticate', {?MODULE, on_client_authenticate}),
   emqx:unhook('client.check_acl', {?MODULE, on_client_check_acl}).
