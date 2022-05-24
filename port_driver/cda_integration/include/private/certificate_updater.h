@@ -55,7 +55,6 @@ class CertificateUpdater {
   public:
     CertificateUpdater(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
 
-    // TODO: Improve return codes
     CertSubscribeUpdateStatus
     subscribeToUpdates(std::unique_ptr<std::filesystem::path> basePath,
                        std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);

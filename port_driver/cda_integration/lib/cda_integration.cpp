@@ -42,24 +42,6 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_client_connect(const char *clientId, const char *pem) {
-    std::cout << "on_client_connect called with clientId: " << clientId << " and pem: " << pem << std::endl;
-    return true;
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_client_connected(const char *clientId, const char *pem) {
-    std::cout << "on_client_connected called with clientId: " << clientId << " and pem: " << pem << std::endl;
-    return true;
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool ClientDeviceAuthIntegration::on_client_disconnected(const char *clientId, const char *pem) {
-    std::cout << "on_client_disconnected called with clientId: " << clientId << " and pem: " << pem << std::endl;
-    return true;
-}
-
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,
                                                                                        const char *pem) {
     LOG_D(CDA_INTEG_SUBJECT, "get_client_device_auth_token called with clientId: %s", clientId);
