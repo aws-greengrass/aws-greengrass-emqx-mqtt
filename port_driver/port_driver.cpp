@@ -166,7 +166,7 @@ struct packer {
     EI_LONGLONG requestId;
 };
 
-static void write_async_bool_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
+static void write_async_atom_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
                                      const char returnCode) {
     auto port = driver_mk_port(context->port);
     // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
@@ -253,15 +253,15 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void write_bool_packer_async(void *buf) {
+static void write_async_atom_response_and_free(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
     defer { delete pack; };
 
-    write_async_bool_to_port(pack->context, pack->requestId, pack->result, pack->returnCode);
+    write_async_atom_to_port(pack->context, pack->requestId, pack->result, pack->returnCode);
 }
 
-static void write_string_packer_async(void *buf) {
+static void write_async_string_response_and_free(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
     defer { delete pack; };
@@ -361,7 +361,7 @@ static void handle_get_auth_token(DriverContext *context, char *buff, int index)
         return;
     }
 
-    driver_async(context->port, nullptr, &get_auth_token, packed, &write_string_packer_async);
+    driver_async(context->port, nullptr, &get_auth_token, packed, &write_async_string_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
@@ -417,7 +417,7 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
-    driver_async(context->port, nullptr, &check_acl, packed, &write_bool_packer_async);
+    driver_async(context->port, nullptr, &check_acl, packed, &write_async_atom_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
@@ -450,7 +450,7 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
-    driver_async(context->port, nullptr, &verify_client_certificate, packed, &write_bool_packer_async);
+    driver_async(context->port, nullptr, &verify_client_certificate, packed, &write_async_atom_response_and_free);
     result_atom = ATOMS.invalid;
     return_code = RETURN_CODE_ASYNC;
 }
