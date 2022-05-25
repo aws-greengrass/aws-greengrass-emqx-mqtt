@@ -323,10 +323,11 @@ static void get_auth_token(void *buf) {
 
     if (result) {
         pack->strResult = std::move(result);
+        pack->returnCode = RETURN_CODE_SUCCESS;
     } else {
         pack->strResult = std::make_unique<std::string>("");
+        pack->returnCode = RETURN_CODE_FAILED_OP;
     }
-    pack->returnCode = RETURN_CODE_SUCCESS;
 }
 
 static void handle_get_auth_token(DriverContext *context, char *buff, int index) {
