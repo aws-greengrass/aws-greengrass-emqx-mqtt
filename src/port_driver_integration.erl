@@ -117,13 +117,13 @@ on_client_connect(ClientId, CertPem) ->
   call_port({?ON_CLIENT_CONNECT, ClientId, CertPem}, async).
 
 get_auth_token(ClientId, CertPem) ->
-  call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}).
+  call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).
 
 on_client_check_acl(ClientId, AuthToken, Topic, PubSub) ->
-  call_port({?ON_CLIENT_CHECK_ACL, ClientId, AuthToken, Topic, PubSub}).
+  call_port({?ON_CLIENT_CHECK_ACL, ClientId, AuthToken, Topic, PubSub}, async).
 
 verify_client_certificate(CertPem) ->
-  call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}).
+  call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}, async).
 
 request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
