@@ -44,7 +44,6 @@ def main():
         # Copy development IPC SDK into C++ SDK submodule
         print("Copying development SDK")
         shutil.copytree("patches/greengrass_ipc", "aws-iot-device-sdk-cpp-v2/greengrass_ipc", dirs_exist_ok=True)
-        shutil.copytree("patches/event_stream", "aws-iot-device-sdk-cpp-v2/eventstream_rpc", dirs_exist_ok=True)
         print("Building IPC SDK")
         pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
         os.chdir("_build_sdk")
