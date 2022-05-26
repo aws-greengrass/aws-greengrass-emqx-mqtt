@@ -18,6 +18,17 @@ class ClientDeviceAuthIntegration {
   private:
     GreengrassIPCWrapper greengrassIpcWrapper;
     CertificateUpdater certificateUpdater;
+    static const char *FAILED_OPERATION_FMT;
+    static const char *FAILED_ACTIVATION_FMT;
+    static const char *FAILED_TIMEOUT_ERROR_FMT;
+    static const char *FAILED_RESPONSE_TYPE_FMT;
+    static const char *FAILED_RESPONSE_MESSAGE_FMT;
+    static const char *FAILED_RPC_ERROR_FMT;
+    static const char *FAILED_NO_RESPONSE_VALUE;
+
+    static const char *GET_CLIENT_DEVICE_AUTH_TOKEN_OP;
+    static const char *AUTHORIZE_CLIENT_DEVICE_ACTION;
+    static const char *VERIFY_CLIENT_DEVICE_IDENTITY;
 
   public:
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
@@ -41,7 +52,7 @@ class ClientDeviceAuthIntegration {
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
                            std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 
-    static void handle_response_error(const std::string &action, const Aws::Eventstreamrpc::ResultType &responseType,
+    static void handle_response_error(const char *&action, const Aws::Eventstreamrpc::ResultType &responseType,
                                       Aws::Eventstreamrpc::OperationError *error);
 };
 
