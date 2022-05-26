@@ -52,7 +52,7 @@ class ClientDeviceAuthIntegration {
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
                            std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
 
-    static void handle_response_error(const char *&action, const Aws::Eventstreamrpc::ResultType &responseType,
+    static void handle_response_error(const char *action, const Aws::Eventstreamrpc::ResultType &responseType,
                                       Aws::Eventstreamrpc::OperationError *error);
 };
 

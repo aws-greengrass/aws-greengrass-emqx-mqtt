@@ -204,7 +204,7 @@ ClientDeviceAuthIntegration *cda_integration_init() { return cda_integration_ini
 
 void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_integ; }
 
-void ClientDeviceAuthIntegration::handle_response_error(const char *&action,
+void ClientDeviceAuthIntegration::handle_response_error(const char *action,
                                                         const Aws::Eventstreamrpc::ResultType &responseType,
                                                         Aws::Eventstreamrpc::OperationError *error) {
     LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action, responseType);
