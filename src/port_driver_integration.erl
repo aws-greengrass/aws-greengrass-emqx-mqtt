@@ -7,7 +7,6 @@
 
 -export([start/0, stop/0, init/1]).
 -export([get_auth_token/2
-  , on_client_connect/2
   , on_client_check_acl/4
   , verify_client_certificate/1
   , register_fun/2
@@ -17,7 +16,6 @@
 -include("emqx.hrl").
 
 %% OPERATIONS
--define(ON_CLIENT_CONNECT, 0).
 -define(GET_CLIENT_DEVICE_AUTH_TOKEN, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
@@ -112,9 +110,6 @@ loop(Port, Inflight, Counter, FunMap) ->
       logger:error("Port terminated ~p", [Reason]),
       exit(port_terminated)
   end.
-
-on_client_connect(ClientId, CertPem) ->
-  call_port({?ON_CLIENT_CONNECT, ClientId, CertPem}, async).
 
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).
