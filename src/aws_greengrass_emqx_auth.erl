@@ -8,7 +8,6 @@
 -include("emqx.hrl").
 
 -import(port_driver_integration, [get_auth_token/2
-, on_client_connect/2
 , on_client_check_acl/4
 ]).
 
@@ -44,17 +43,7 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Prop
   %% Client cert is not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
   %% Putting the value in the erlang process's dictionary
   put(cert_pem, PeerCertEncoded),
-
-  case port_driver_integration:on_client_connect(ClientId, PeerCertEncoded) of
-    {ok, pass} -> {ok, Props};
-    {ok, fail} -> stop;
-    {error, Reason} ->
-      logger:error("Client(~s). Failed to call driver. Reason:~p", [ClientId, Reason]),
-      stop;
-    Other ->
-      logger:error("Unknown response ~p", [Other]),
-      stop
-  end.
+  {ok, Props}.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
