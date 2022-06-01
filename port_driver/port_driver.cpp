@@ -154,12 +154,12 @@ static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom)
 }
 
 struct packer {
-    std::unique_ptr<char[]> client_id;
-    std::unique_ptr<char[]> pem;
-    std::unique_ptr<char[]> auth_token;
-    std::unique_ptr<char[]> resource;
-    std::unique_ptr<char[]> operation;
-    std::unique_ptr<std::string> strResult;
+    std::unique_ptr<char[]> client_id = {};
+    std::unique_ptr<char[]> pem = {};
+    std::unique_ptr<char[]> auth_token = {};
+    std::unique_ptr<char[]> resource = {};
+    std::unique_ptr<char[]> operation = {};
+    std::unique_ptr<std::string> strResult = {};
     DriverContext *context;
     ErlDrvTermData result = ATOMS.fail;
     char returnCode = RETURN_CODE_UNEXPECTED;
