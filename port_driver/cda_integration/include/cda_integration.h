@@ -14,12 +14,14 @@
 
 namespace GG = Aws::Greengrass;
 
+// clang-format off
 enum class AuthorizationStatus : int {
     AUTHORIZED = 0,
     UNAUTHORIZED = -1,
     BAD_AUTH_TOKEN = -2,
     UNKNOWN_ERROR = -3
 };
+// clang-format on
 
 class ClientDeviceAuthIntegration {
   private:
