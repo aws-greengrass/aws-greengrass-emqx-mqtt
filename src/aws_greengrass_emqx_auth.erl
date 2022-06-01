@@ -127,8 +127,12 @@ check_authorization(ClientId, AuthToken, Resource, Action) ->
         undefined ->
           logger:info("Attempting to get valid auth token."),
           put(is_auth_retried, true),
-          authenticate_client_device(ClientId, get(cert_pem)),
-          check_authorization(ClientId, get(cda_auth_token), Resource, Action);
+          case authenticate_client_device(ClientId, get(cert_pem)) of
+            ok -> check_authorization(ClientId, get(cda_auth_token), Resource, Action);
+            stop ->
+              logger:info("Could not get a new auth token"),
+              unauthorized
+          end;
         true ->
           logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
             [ClientId, Action, Resource]),
