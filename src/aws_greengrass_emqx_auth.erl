@@ -111,13 +111,34 @@ check_authorization(ClientId, AuthToken, Resource, Action) ->
   case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action) of
     {ok, authorized} ->
       logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+      erase(is_auth_retried),
       authorized;
     {ok, unauthorized} ->
       logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+      erase(is_auth_retried),
       unauthorized;
+    {ok, bad_token} ->
+      logger:warning("Client(~s) has a bad token", [ClientId]),
+
+      %% Remove the auth token from the process dictionary before getting a new token.
+      erase(cda_auth_token),
+
+      case get(is_auth_retried) of
+        undefined ->
+          logger:info("Attempting to get valid auth token."),
+          put(is_auth_retried, true),
+          authenticate_client_device(ClientId, get(cert_pem)),
+          check_authorization(ClientId, get(cda_auth_token), Resource, Action);
+        true ->
+          logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
+            [ClientId, Action, Resource]),
+          erase(is_auth_retried),
+          unauthorized
+      end;
     {error, Error} ->
       logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
         [ClientId, Action, Resource, Error]),
+      erase(is_auth_retried),
       unauthorized
   end.
 

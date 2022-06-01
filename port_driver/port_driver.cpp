@@ -28,6 +28,7 @@ struct atoms {
     ErlDrvTermData invalid;
     ErlDrvTermData authorized;
     ErlDrvTermData unauthorized;
+    ErlDrvTermData bad_token;
     ErlDrvTermData unknown;
     ErlDrvTermData event;
     ErlDrvTermData certificate_update;
@@ -108,6 +109,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
     ATOMS.invalid = driver_mk_atom(const_cast<char *>("invalid"));
     ATOMS.authorized = driver_mk_atom(const_cast<char *>("authorized"));
     ATOMS.unauthorized = driver_mk_atom(const_cast<char *>("unauthorized"));
+    ATOMS.bad_token = driver_mk_atom(const_cast<char *>("bad_token"));
     ATOMS.unknown = driver_mk_atom(const_cast<char *>("unknown"));
     ATOMS.certificate_update = driver_mk_atom(const_cast<char *>("certificate_update"));
     ATOMS.event = driver_mk_atom(const_cast<char *>("event"));
@@ -367,10 +369,22 @@ static void check_acl(void *buf) {
           "action %s",
           pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
 
-    bool authorized = pack->context->cda_integration->on_check_acl(pack->client_id.get(), pack->auth_token.get(),
-                                                                   pack->resource.get(), pack->operation.get());
-
-    pack->result = authorized ? ATOMS.authorized : ATOMS.unauthorized;
+    AuthorizationStatus authorized = pack->context->cda_integration->on_check_acl(
+        pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
+    switch (authorized) {
+    case AuthorizationStatus::AUTHORIZED:
+        pack->result = ATOMS.authorized;
+        break;
+    case AuthorizationStatus::UNAUTHORIZED:
+        pack->result = ATOMS.unauthorized;
+        break;
+    case AuthorizationStatus::BAD_AUTH_TOKEN:
+        pack->result = ATOMS.bad_token;
+        break;
+    case AuthorizationStatus::UNKNOWN_ERROR:
+    default:
+        pack->result = ATOMS.unknown;
+    }
     pack->returnCode = RETURN_CODE_SUCCESS;
 }
 

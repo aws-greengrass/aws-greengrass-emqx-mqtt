@@ -14,6 +14,13 @@
 
 namespace GG = Aws::Greengrass;
 
+enum class AuthorizationStatus : int {
+    AUTHORIZED = 0,
+    UNAUTHORIZED = -1,
+    BAD_AUTH_TOKEN = -2,
+    UNKNOWN_ERROR = -3
+};
+
 class ClientDeviceAuthIntegration {
   private:
     GreengrassIPCWrapper greengrassIpcWrapper;
@@ -30,6 +37,8 @@ class ClientDeviceAuthIntegration {
     static const char *AUTHORIZE_CLIENT_DEVICE_ACTION;
     static const char *VERIFY_CLIENT_DEVICE_IDENTITY;
 
+    static const char *INVALID_AUTH_TOKEN_ERROR;
+
   public:
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
         : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()){};
@@ -42,7 +51,8 @@ class ClientDeviceAuthIntegration {
 
     std::unique_ptr<std::string> get_client_device_auth_token(const char *clientId, const char *pem);
 
-    bool on_check_acl(const char *clientId, const char *authToken, const char *resource, const char *operation);
+    AuthorizationStatus on_check_acl(const char *clientId, const char *authToken, const char *resource,
+                                     const char *operation);
 
     bool verify_client_certificate(const char *certPem);
 
