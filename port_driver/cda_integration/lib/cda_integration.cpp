@@ -12,17 +12,18 @@
 
 #define TIMEOUT_SECONDS 2
 
-static const char *FAILED_OPERATION_FMT = "Failed creating %s";
-static const char *FAILED_ACTIVATION_FMT = "%s failed to activate with error %s";
-static const char *FAILED_TIMEOUT_ERROR_FMT = "%s timed out while waiting for response from Greengrass Core";
-static const char *FAILED_RESPONSE_TYPE_FMT = "%s failed with response type %d";
-static const char *FAILED_RESPONSE_MESSAGE_FMT = "%s failure response: %s";
-static const char *FAILED_RPC_ERROR_FMT = "RPC error during %s";
-static const char *FAILED_NO_RESPONSE_VALUE = "%s response does not have a value";
+const char *ClientDeviceAuthIntegration::FAILED_OPERATION_FMT = "Failed creating %s";
+const char *ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT = "%s failed to activate with error %s";
+const char *ClientDeviceAuthIntegration::FAILED_TIMEOUT_ERROR_FMT =
+    "%s timed out while waiting for response from Greengrass Core";
+const char *ClientDeviceAuthIntegration::FAILED_RESPONSE_TYPE_FMT = "%s failed with response type %d";
+const char *ClientDeviceAuthIntegration::FAILED_RESPONSE_MESSAGE_FMT = "%s failure response: %s";
+const char *ClientDeviceAuthIntegration::FAILED_RPC_ERROR_FMT = "RPC error during %s";
+const char *ClientDeviceAuthIntegration::FAILED_NO_RESPONSE_VALUE = "%s response does not have a value";
 
-static const char *GET_CLIENT_DEVICE_AUTH_TOKEN = "GetClientDeviceAuthToken";
-static const char *AUTHORIZE_CLIENT_DEVICE_ACTION = "AuthorizeClientDeviceAction";
-static const char *VERIFY_CLIENT_DEVICE_IDENTITY = "VerifyClientDeviceIdentity";
+const char *ClientDeviceAuthIntegration::GET_CLIENT_DEVICE_AUTH_TOKEN_OP = "GetClientDeviceAuthToken";
+const char *ClientDeviceAuthIntegration::AUTHORIZE_CLIENT_DEVICE_ACTION = "AuthorizeClientDeviceAction";
+const char *ClientDeviceAuthIntegration::VERIFY_CLIENT_DEVICE_IDENTITY = "VerifyClientDeviceIdentity";
 
 void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.connect();
@@ -60,33 +61,33 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
 
     auto operation = greengrassIpcWrapper.getIPCClient().NewGetClientDeviceAuthToken();
     if (!operation) {
-        LOG_E(CDA_INTEG_SUBJECT, FAILED_OPERATION_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN);
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_OPERATION_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN_OP);
         return {};
     }
 
     auto activate = operation->Activate(request).get();
     if (!activate) {
-        LOG_E(CDA_INTEG_SUBJECT, FAILED_ACTIVATION_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN,
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_ACTIVATION_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN_OP,
               activate.StatusToString().c_str());
         return {};
     }
 
     auto responseFuture = operation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
-        LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN);
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN_OP);
         return {};
     }
 
     auto response = GG::GetClientDeviceAuthTokenResult(responseFuture.get());
     auto responseType = response.GetResultType();
     if (responseType != OPERATION_RESPONSE) {
-        handle_response_error(GET_CLIENT_DEVICE_AUTH_TOKEN, responseType, response.GetOperationError());
+        handle_response_error(GET_CLIENT_DEVICE_AUTH_TOKEN_OP, responseType, response.GetOperationError());
         return {};
     }
 
     auto token = response.GetOperationResponse()->GetClientDeviceAuthToken();
     if (!token.has_value()) {
-        LOG_E(CDA_INTEG_SUBJECT, FAILED_NO_RESPONSE_VALUE, GET_CLIENT_DEVICE_AUTH_TOKEN);
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_NO_RESPONSE_VALUE, GET_CLIENT_DEVICE_AUTH_TOKEN_OP);
         return {};
     }
     return std::make_unique<std::string>(token.value());
@@ -203,16 +204,15 @@ ClientDeviceAuthIntegration *cda_integration_init() { return cda_integration_ini
 
 void cda_integration_close(ClientDeviceAuthIntegration *cda_integ) { delete cda_integ; }
 
-void ClientDeviceAuthIntegration::handle_response_error(const std::string &action,
+void ClientDeviceAuthIntegration::handle_response_error(const char *action,
                                                         const Aws::Eventstreamrpc::ResultType &responseType,
                                                         Aws::Eventstreamrpc::OperationError *error) {
-    LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action.c_str(), responseType);
+    LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_TYPE_FMT, action, responseType);
     if (responseType == OPERATION_ERROR) {
         if (error != nullptr) {
-            LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_MESSAGE_FMT, VERIFY_CLIENT_DEVICE_IDENTITY,
-                  error->GetMessage().value().c_str());
+            LOG_E(CDA_INTEG_SUBJECT, FAILED_RESPONSE_MESSAGE_FMT, action, error->GetMessage().value().c_str());
         }
     } else {
-        LOG_E(CDA_INTEG_SUBJECT, FAILED_RPC_ERROR_FMT, VERIFY_CLIENT_DEVICE_IDENTITY);
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_RPC_ERROR_FMT, action);
     }
 }
