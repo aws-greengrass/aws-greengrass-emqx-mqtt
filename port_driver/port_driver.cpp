@@ -382,6 +382,7 @@ static void check_acl(void *buf) {
         pack->result = ATOMS.bad_token;
         break;
     case AuthorizationStatus::UNKNOWN_ERROR:
+        [[fallthrough]];
     default:
         pack->result = ATOMS.unknown;
     }
