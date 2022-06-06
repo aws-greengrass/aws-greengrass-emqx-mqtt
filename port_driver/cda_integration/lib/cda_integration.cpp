@@ -133,7 +133,7 @@ AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *client
     auto responseType = response.GetResultType();
 
     if (responseType != OPERATION_RESPONSE) {
-        auto error = response.GetOperationError();
+        auto *error = response.GetOperationError();
         handle_response_error(AUTHORIZE_CLIENT_DEVICE_ACTION, responseType, error);
         if (error != nullptr && strcmp(INVALID_AUTH_TOKEN_ERROR, error->GetModelName().c_str()) == 0) {
             return AuthorizationStatus::BAD_AUTH_TOKEN;
