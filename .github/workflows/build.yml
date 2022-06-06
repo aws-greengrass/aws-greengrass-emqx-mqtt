@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-add-repository "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" && sudo apt update && sudo apt install -y clang-tidy-14
           # Add llvm-14 binaries into the path early on
-          export PATH=/usr/lib/llvm-14/bin:$PATH
+          echo "/usr/lib/llvm-14/bin" >> $GITHUB_PATH
       - name: Build
         run: |
           python3 -m pip install -r bin/requirements.txt
