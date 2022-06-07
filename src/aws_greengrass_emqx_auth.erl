@@ -11,7 +11,6 @@
 , on_client_check_acl/4
 ]).
 
--import(string,[substr/3, len/1]).
 
 -export([load/1
   , unload/0
