@@ -136,7 +136,6 @@ check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
     {error, Error} ->
       logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
         [ClientId, Action, Resource, Error]),
-      erase(is_auth_retried),
       unauthorized
   end.
 
