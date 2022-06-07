@@ -118,7 +118,7 @@ check_authorization(ClientId, AuthToken, Resource, Action) ->
       erase(is_auth_retried),
       unauthorized;
     {ok, bad_token} ->
-      logger:warning("Client(~s) has a bad token", [ClientId]),
+      logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
 
       %% Remove the auth token from the process dictionary before getting a new token.
       erase(cda_auth_token),
@@ -137,6 +137,8 @@ check_authorization(ClientId, AuthToken, Resource, Action) ->
           logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
             [ClientId, Action, Resource]),
           erase(is_auth_retried),
+
+          %% TODO: Disconnect the client. Client should reconnect to get a new token. 
           unauthorized
       end;
     {error, Error} ->
