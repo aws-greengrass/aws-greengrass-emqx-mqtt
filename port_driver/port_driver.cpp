@@ -28,6 +28,7 @@ struct atoms {
     ErlDrvTermData invalid;
     ErlDrvTermData authorized;
     ErlDrvTermData unauthorized;
+    ErlDrvTermData bad_token;
     ErlDrvTermData unknown;
     ErlDrvTermData event;
     ErlDrvTermData certificate_update;
@@ -108,6 +109,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readabili
     ATOMS.invalid = driver_mk_atom(const_cast<char *>("invalid"));
     ATOMS.authorized = driver_mk_atom(const_cast<char *>("authorized"));
     ATOMS.unauthorized = driver_mk_atom(const_cast<char *>("unauthorized"));
+    ATOMS.bad_token = driver_mk_atom(const_cast<char *>("bad_token"));
     ATOMS.unknown = driver_mk_atom(const_cast<char *>("unknown"));
     ATOMS.certificate_update = driver_mk_atom(const_cast<char *>("certificate_update"));
     ATOMS.event = driver_mk_atom(const_cast<char *>("event"));
@@ -367,10 +369,23 @@ static void check_acl(void *buf) {
           "action %s",
           pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
 
-    bool authorized = pack->context->cda_integration->on_check_acl(pack->client_id.get(), pack->auth_token.get(),
-                                                                   pack->resource.get(), pack->operation.get());
-
-    pack->result = authorized ? ATOMS.authorized : ATOMS.unauthorized;
+    AuthorizationStatus authorized = pack->context->cda_integration->on_check_acl(
+        pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
+    switch (authorized) {
+    case AuthorizationStatus::AUTHORIZED:
+        pack->result = ATOMS.authorized;
+        break;
+    case AuthorizationStatus::UNAUTHORIZED:
+        pack->result = ATOMS.unauthorized;
+        break;
+    case AuthorizationStatus::BAD_AUTH_TOKEN:
+        pack->result = ATOMS.bad_token;
+        break;
+    case AuthorizationStatus::UNKNOWN_ERROR:
+        [[fallthrough]];
+    default:
+        pack->result = ATOMS.unknown;
+    }
     pack->returnCode = RETURN_CODE_SUCCESS;
 }
 
@@ -475,7 +490,7 @@ static void handle_unknown_op(DriverContext *context) {
     write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
 
-static bool decode_operation_header(const char *buff, int *index, unsigned long *op) {
+static bool decode_operation_header(const char *buff, int *index, unsigned long *operation) {
     // Input must look like: [{OperationULong, ...Operation specific inputs}]
 
     int version = 0;
@@ -495,26 +510,26 @@ static bool decode_operation_header(const char *buff, int *index, unsigned long 
         return false;
     }
     // Decode the first member of the tuple which must be the operation
-    if (ei_decode_ulong(buff, index, op) < 0) {
+    if (ei_decode_ulong(buff, index, operation) < 0) {
         return false;
     }
     return true;
 }
 
-void drv_output(ErlDrvData handle, ErlIOVec *ev) {
+void drv_output(ErlDrvData handle, ErlIOVec *erlIoVec) {
     // Input must look like: [{OperationUlong, ...Operation specific inputs}]
     auto *context = reinterpret_cast<DriverContext *>(handle);
-    ErlDrvBinary *bin = ev->binv[1];
+    ErlDrvBinary *bin = erlIoVec->binv[1];
     char *buff = &bin->orig_bytes[0];
     int index = 0;
-    unsigned long op;
-    if (!decode_operation_header(buff, &index, &op)) {
+    unsigned long operation;
+    if (!decode_operation_header(buff, &index, &operation)) {
         LOG_E(PORT_DRIVER_SUBJECT, "Failed to parse operation input");
         handle_unknown_op(context);
         return;
     }
 
-    switch (op) {
+    switch (operation) {
     case GET_CLIENT_DEVICE_AUTH_TOKEN:
         LOG_I(PORT_DRIVER_SUBJECT, "GET_CLIENT_DEVICE_AUTH_TOKEN")
         handle_get_auth_token(context, buff, index);
@@ -532,7 +547,7 @@ void drv_output(ErlDrvData handle, ErlIOVec *ev) {
         handle_certificate_update_subscription(context);
         break;
     default:
-        LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", op);
+        LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", operation);
         handle_unknown_op(context);
     }
 }

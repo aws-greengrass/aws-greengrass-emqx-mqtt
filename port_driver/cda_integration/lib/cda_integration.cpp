@@ -25,6 +25,8 @@ const char *ClientDeviceAuthIntegration::GET_CLIENT_DEVICE_AUTH_TOKEN_OP = "GetC
 const char *ClientDeviceAuthIntegration::AUTHORIZE_CLIENT_DEVICE_ACTION = "AuthorizeClientDeviceAction";
 const char *ClientDeviceAuthIntegration::VERIFY_CLIENT_DEVICE_IDENTITY = "VerifyClientDeviceIdentity";
 
+const char *ClientDeviceAuthIntegration::INVALID_AUTH_TOKEN_ERROR = "aws.greengrass#InvalidClientDeviceAuthTokenError";
+
 void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.connect();
     greengrassIpcWrapper.setAsRunning();
@@ -93,8 +95,8 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
     return std::make_unique<std::string>(token.value());
 }
 
-bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *token, const char *resource,
-                                               const char *operation) {
+AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char *token,
+                                                              const char *resource, const char *operation) {
 
     LOG_D(CDA_INTEG_SUBJECT, "on_check_acl called with clientId: %s, token: %s, resource: %s, operation: %s", clientId,
           token, resource, operation);
@@ -111,36 +113,40 @@ bool ClientDeviceAuthIntegration::on_check_acl(const char *clientId, const char 
     auto authorizationOperation = greengrassIpcWrapper.getIPCClient().NewAuthorizeClientDeviceAction();
     if (!authorizationOperation) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_OPERATION_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION);
-        return false;
+        return AuthorizationStatus::UNKNOWN_ERROR;
     }
 
     auto activate = authorizationOperation->Activate(request).get();
     if (!activate) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_ACTIVATION_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION,
               activate.StatusToString().c_str());
-        return false;
+        return AuthorizationStatus::UNKNOWN_ERROR;
     }
 
     auto responseFuture = authorizationOperation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION);
-        return false;
+        return AuthorizationStatus::UNKNOWN_ERROR;
     }
 
     auto response = GG::AuthorizeClientDeviceActionResult(responseFuture.get());
     auto responseType = response.GetResultType();
 
     if (responseType != OPERATION_RESPONSE) {
-        handle_response_error(AUTHORIZE_CLIENT_DEVICE_ACTION, responseType, response.GetOperationError());
-        return false;
+        auto *error = response.GetOperationError();
+        handle_response_error(AUTHORIZE_CLIENT_DEVICE_ACTION, responseType, error);
+        if (error != nullptr && strcmp(INVALID_AUTH_TOKEN_ERROR, error->GetModelName().c_str()) == 0) {
+            return AuthorizationStatus::BAD_AUTH_TOKEN;
+        }
+        return AuthorizationStatus::UNKNOWN_ERROR;
     }
 
     auto isAllowed = response.GetOperationResponse()->GetIsAuthorized();
     if (!isAllowed.has_value()) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_NO_RESPONSE_VALUE, AUTHORIZE_CLIENT_DEVICE_ACTION);
-        return false;
+        return AuthorizationStatus::UNKNOWN_ERROR;
     }
-    return isAllowed.value();
+    return isAllowed.value() ? AuthorizationStatus::AUTHORIZED : AuthorizationStatus::UNAUTHORIZED;
 }
 
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
