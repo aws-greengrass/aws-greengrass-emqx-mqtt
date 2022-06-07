@@ -11,6 +11,8 @@
 , on_client_check_acl/4
 ]).
 
+-import(string,[substr/3, len/1]).
+
 -export([load/1
   , unload/0
 ]).
@@ -107,46 +109,40 @@ on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     _ -> {stop, deny}
   end.
 
-check_authorization(ClientId, AuthToken, Resource, Action) ->
+check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
   case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action) of
     {ok, authorized} ->
       logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-      erase(is_auth_retried),
       authorized;
     {ok, unauthorized} ->
       logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-      erase(is_auth_retried),
       unauthorized;
-    {ok, bad_token} ->
+    {ok, bad_token} when IsRetry == false ->
       logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
 
       %% Remove the auth token from the process dictionary before getting a new token.
       erase(cda_auth_token),
-
-      case get(is_auth_retried) of
-        undefined ->
-          logger:info("Attempting to get valid auth token."),
-          put(is_auth_retried, true),
-          case authenticate_client_device(ClientId, get(cert_pem)) of
-            ok -> check_authorization(ClientId, get(cda_auth_token), Resource, Action);
-            stop ->
-              logger:info("Could not get a new auth token"),
-              unauthorized
-          end;
-        true ->
-          logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
-            [ClientId, Action, Resource]),
-          erase(is_auth_retried),
-
-          %% TODO: Disconnect the client. Client should reconnect to get a new token. 
+      logger:info("Attempting to get new auth token."),
+      case authenticate_client_device(ClientId, get(cert_pem)) of
+        ok -> check_authorization(ClientId, get(cda_auth_token), Resource, Action, true);
+        stop ->
+          logger:info("Could not get a new auth token"),
           unauthorized
       end;
+    {ok, bad_token} when IsRetry == true ->
+      logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
+        [ClientId, Action, Resource]),
+      %% TODO: Disconnect v3 client. Return correct response code for v5 client.
+      unauthorized;
     {error, Error} ->
       logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
         [ClientId, Action, Resource, Error]),
       erase(is_auth_retried),
       unauthorized
   end.
+
+check_authorization(ClientId, AuthToken, Resource, Action) ->
+  check_authorization(ClientId, AuthToken, Resource, Action, false).
 
 encode_peer_cert(PeerCert) ->
   case PeerCert of
