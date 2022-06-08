@@ -37,28 +37,16 @@ RUN apk add --no-cache \
 
 COPY . /build
 
-ARG EMQX_NAME=emqx
-ENV EMQX_RELUP=false
-
 RUN cd /build \
-    && export PROFILE="$EMQX_NAME" \
-    && export EMQX_NAME=${EMQX_NAME%%-elixir} \
-    && export EMQX_LIB_PATH="emqx/_build/$EMQX_NAME/lib" \
-    && export EMQX_REL_PATH="/build/emqx/_build/$EMQX_NAME/rel/emqx" \
-    && export EMQX_REL_FORM='docker' \
-    && cd emqx \
-    && rm -rf $EMQX_LIB_PATH \
-    && make $PROFILE \
-    && mkdir -p /emqx-rel \
-    && mv $EMQX_REL_PATH /emqx-rel \
-    && cd /build/sdk/build \
-    && cmake -DCMAKE_INSTALL_PREFIX="/build/sdk" ../aws-iot-device-sdk-cpp-v2 \
-    && cmake --build .
+    && python3 -u -m pip install -r bin/requirements.txt \
+    && python3 -u -m bin \
+    && cd build \
+    && unzip -q emqx.zip
 
 FROM ${RUN_FROM}
 
-COPY emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
-COPY --from=builder /emqx-rel/emqx /opt/emqx
+COPY --from=builder /build/emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
+COPY --from=builder /build/build/emqx/ /opt/emqx
 
 RUN ln -s /opt/emqx/bin/* /usr/local/bin/
 RUN apk add --no-cache curl ncurses-libs openssl libstdc++ bash
@@ -67,7 +55,7 @@ WORKDIR /opt/emqx
 
 RUN adduser -D -u 1000 emqx
 
-RUN chgrp -Rf emqx /opt/emqx && chmod -Rf g+w /opt/emqx \
+RUN chgrp -Rf emqx /opt/emqx && chmod -Rf a+x /opt/emqx \
     && chown -Rf emqx /opt/emqx
 
 USER emqx
