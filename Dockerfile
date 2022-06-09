@@ -29,6 +29,7 @@ RUN apk add --no-cache \
     openssl-dev \
     py3-pip \
     python3 \
+    sudo \
     tar \
     unixodbc-dev \
     wget \
