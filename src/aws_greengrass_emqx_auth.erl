@@ -36,14 +36,15 @@ load(Env) ->
 %% Client Lifecycle Hooks Impl
 %%--------------------------------------------------------------------
 
-on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert}, Props, _Env) ->
+on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
   logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
     [ClientId, ConnInfo, Props, _Env]),
 
   PeerCertEncoded = encode_peer_cert(PeerCert),
-  %% Client cert is not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
+  %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
   %% Putting the value in the erlang process's dictionary
   put(cert_pem, PeerCertEncoded),
+  put(client_version, ClientVersion),
   {ok, Props}.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
@@ -131,7 +132,18 @@ check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
     {ok, bad_token} when IsRetry == true ->
       logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
         [ClientId, Action, Resource]),
-      %% TODO: Disconnect v3 client. Return correct response code for v5 client.
+      ClientVersion = get(client_version),
+      if
+      %% Version 3 and 4 are considered v3.
+        ClientVersion < 5 ->
+          logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]),
+          emqx_mgmt:kickout_client(ClientId);
+        ClientVersion == 5 ->
+          logger:info("Not disconnecting MQTTv5 client(~s)", [ClientId]);
+        true ->
+          logger:info("Client(~s) has an unknown MQTT version ~p. Disconnecting client", [ClientId, ClientVersion]),
+          emqx_mgmt:kickout_client(ClientId)
+      end,
       unauthorized;
     {error, Error} ->
       logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
