@@ -26,4 +26,4 @@ jobs:
           context: .
           push: false
           platforms: linux/amd64,linux/arm64
-          tags: aws.greengrass.clientdevices.mqtt.Emqx:latest
+          tags: aws.greengrass.clientdevices.mqtt.emqx:latest
