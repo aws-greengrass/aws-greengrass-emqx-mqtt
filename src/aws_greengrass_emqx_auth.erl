@@ -138,9 +138,7 @@ check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
         ClientVersion < 5 ->
           logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]),
           emqx_mgmt:kickout_client(ClientId);
-        ClientVersion == 5 ->
-          logger:info("Not disconnecting MQTTv5 client(~s)", [ClientId]);
-        true ->
+        ClientVersion /= 5 ->
           logger:info("Client(~s) has an unknown MQTT version ~p. Disconnecting client", [ClientId, ClientVersion]),
           emqx_mgmt:kickout_client(ClientId)
       end,
