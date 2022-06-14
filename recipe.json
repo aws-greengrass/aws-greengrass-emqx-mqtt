@@ -24,6 +24,8 @@
       },
       "restartIdentifier": "",
       "startupTimeoutSeconds": "240",
+      "crtLogLevel": "",
+      "ipcTimeoutSeconds": "5",
       "emqx": {
         "mqtt.max_packet_size": "268435455",
         "listener.ssl.external": "8883",
@@ -67,7 +69,9 @@
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
           "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
-          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}"
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
+          "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -110,7 +114,9 @@
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
           "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
-          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}"
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
+          "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
         },
         "Shutdown": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",

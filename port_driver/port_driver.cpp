@@ -39,8 +39,36 @@ static const char *EMQX_LOG_TO_ENV_VAR = "EMQX_LOG__TO";
 static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
 static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
+static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
 
-static aws_log_level stringToLogLevel(const std::string &level) {
+static aws_log_level crtStringToLogLevel(const std::string &level) {
+    // Crt defined log levels
+    if (level == "none") {
+        return AWS_LL_NONE;
+    }
+    if (level == "trace") {
+        return AWS_LL_TRACE;
+    }
+    if (level == "debug") {
+        return AWS_LL_DEBUG;
+    }
+    if (level == "info") {
+        return AWS_LL_INFO;
+    }
+    if (level == "warn") {
+        return AWS_LL_WARN;
+    }
+    if (level == "error") {
+        return AWS_LL_ERROR;
+    }
+    if (level == "fatal") {
+        return AWS_LL_FATAL;
+    }
+    // Default to warn
+    return AWS_LL_WARN;
+}
+
+static aws_log_level erlangStringToLogLevel(const std::string &level) {
     // Erlang log levels
     // debug, info, notice, warning, error, critical, alert, emergency
     if (level == "debug") {
@@ -65,15 +93,24 @@ static aws_log_level stringToLogLevel(const std::string &level) {
     return AWS_LL_WARN;
 }
 
-EXPORTED ErlDrvData drv_start(ErlDrvPort port, char *buff) { // NOLINT(readability-non-const-parameter)
-    (void)buff;
+EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { // NOLINT(readability-non-const-parameter)
     const char *logLocation = std::getenv(EMQX_LOG_TO_ENV_VAR);
     if (logLocation == nullptr) {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
         return ERL_DRV_ERROR_BADARG;
     }
-    const char *logLevel = std::getenv(EMQX_LOG_LEVEL_ENV_VAR); // Log level may be null
-    aws_log_level awsLogLevel = stringToLogLevel(logLevel == nullptr ? "" : logLevel);
+
+    aws_log_level awsLogLevel;
+    const char *crtLogLevel = std::getenv(CRT_LOG_LEVEL_ENV_VAR); // Log level may be null or empty
+    if (crtLogLevel != nullptr && strlen(crtLogLevel) != 0) {
+        // Use CRT_LOG_LEVEL when it is provided a non-empty
+        awsLogLevel = crtStringToLogLevel(crtLogLevel);
+    } else {
+        // Otherwise, get the log level from the EMQX log level envvar
+        const char *logLevel = std::getenv(EMQX_LOG_LEVEL_ENV_VAR); // Log level may be null or empty
+        awsLogLevel = erlangStringToLogLevel(logLevel == nullptr ? "" : logLevel);
+    }
+
     if (std::string_view{CONSOLE} == logLocation) {
         struct aws_logger_standard_options logger_options = {
             .level = awsLogLevel,
