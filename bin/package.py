@@ -42,11 +42,6 @@ def patch(original, patch_file):
     return out.getvalue().decode()
 
 
-def overwrite(replacement_file):
-    with open(replacement_file, 'r') as f:
-        return f.read()
-
-
 def do_patch(zip_path, erts_version="11.0", add=None):
     # ini file is only for windows, but we'll just throw it in no matter what. Use \r\n for windows line endings
     with open("build/erl.ini", "w") as erl_ini:
@@ -59,12 +54,12 @@ def do_patch(zip_path, erts_version="11.0", add=None):
     if add is None:
         add = {}
     add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
+    add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
 
     update_zip(zipname=zip_path, updates={
         "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
         "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
-        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff"),
-        "emqx/data/loaded_plugins": lambda o: overwrite("patches/loaded_plugins"),
+        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
     }, add=add)
 
 
