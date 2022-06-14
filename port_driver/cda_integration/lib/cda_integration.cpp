@@ -6,11 +6,10 @@
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <functional>
-#include <iostream>
 
 #include "cda_integration.h"
 
-#define TIMEOUT_SECONDS 2
+#define DEFAULT_TIMEOUT_SECONDS 5.0
 
 const char *ClientDeviceAuthIntegration::FAILED_OPERATION_FMT = "Failed creating %s";
 const char *ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT = "%s failed to activate with error %s";
@@ -26,6 +25,8 @@ const char *ClientDeviceAuthIntegration::AUTHORIZE_CLIENT_DEVICE_ACTION = "Autho
 const char *ClientDeviceAuthIntegration::VERIFY_CLIENT_DEVICE_IDENTITY = "VerifyClientDeviceIdentity";
 
 const char *ClientDeviceAuthIntegration::INVALID_AUTH_TOKEN_ERROR = "aws.greengrass#InvalidClientDeviceAuthTokenError";
+
+const char *IPC_TIMEOUT_SECONDS_ENV_VAR = "IPC_TIMEOUT_SECONDS";
 
 void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.connect();
@@ -75,7 +76,7 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
     }
 
     auto responseFuture = operation->GetOperationResult();
-    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+    if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN_OP);
         return {};
     }
@@ -124,7 +125,7 @@ AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *client
     }
 
     auto responseFuture = authorizationOperation->GetOperationResult();
-    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+    if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION);
         return AuthorizationStatus::UNKNOWN_ERROR;
     }
@@ -174,7 +175,7 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
     }
 
     auto responseFuture = operation->GetOperationResult();
-    if (responseFuture.wait_for(std::chrono::seconds(TIMEOUT_SECONDS)) == std::future_status::timeout) {
+    if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, VERIFY_CLIENT_DEVICE_IDENTITY);
         return false;
     }
@@ -197,7 +198,21 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
 ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *client) {
     ClientDeviceAuthIntegration *cda_integ = nullptr;
     try {
-        cda_integ = new ClientDeviceAuthIntegration(client);
+        double timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
+        const char *timeoutSecondsC = std::getenv(IPC_TIMEOUT_SECONDS_ENV_VAR);
+        if (timeoutSecondsC == nullptr) {
+            LOG_E(CDA_INTEG_SUBJECT, "Environment variable %s was not set", IPC_TIMEOUT_SECONDS_ENV_VAR);
+        } else {
+            try {
+                auto timeoutSecondsStr = std::string{timeoutSecondsC};
+                // Parse as a double even though we want it to be an int due to gson conversion from int to double
+                timeoutSeconds = std::stod(timeoutSecondsStr);
+            } catch (std::exception &e) {
+                LOG_E(CDA_INTEG_SUBJECT, "Failed to parse timeout value %s as a double. Falling back to %f",
+                      timeoutSecondsC, timeoutSeconds);
+            }
+        }
+        cda_integ = new ClientDeviceAuthIntegration(client, static_cast<int>(timeoutSeconds));
     } catch (std::exception &e) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed to initialize CDA integration %s", e.what());
     } catch (...) {
