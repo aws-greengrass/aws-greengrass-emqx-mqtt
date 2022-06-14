@@ -1,4 +1,4 @@
-{emqx_management, false}.
+{emqx_management, true}.
 {emqx_dashboard, false}.
 {emqx_modules, false}.
 {emqx_recon, true}.
