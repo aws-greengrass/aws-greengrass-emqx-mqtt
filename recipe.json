@@ -22,10 +22,18 @@
           }
         }
       },
-      "logLevel": "debug",
       "restartIdentifier": "",
       "startupTimeoutSeconds": "240",
-      "logLocation": "file"
+      "emqx": {
+        "mqtt.max_packet_size": "268435455",
+        "listener.ssl.external": "8883",
+        "log.to": "console",
+        "log.level": "debug",
+        "listener.ssl.external.max_connections": "1024000",
+        "listener.ssl.external.rate_limit": "",
+        "listener.ssl.external.handshake_timeout": "15s",
+        "listener.ssl.external.max_conn_rate": "500"
+      }
     }
   },
   "ComponentDependencies": {
@@ -45,15 +53,21 @@
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
-          "EMQX_LOG__DIR": "{work:path}\\logs"
+          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
+          "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
+          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
+          "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -61,7 +75,7 @@
       },
       "Artifacts": [
         {
-          "URI": "s3://aws.greengrass.clientdevices.mqtt.EMQX/emqx.zip",
+          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
               "Read": "OWNER",
@@ -82,17 +96,21 @@
           "Timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}/data/key.pem",
           "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "EMQX_NODE__DATA_DIR": "{work:path}\\data",
+          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}/data/cert.pem",
-          "EMQX_NODE__DATA_DIR": "{work:path}/data",
-          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}/plugin-data",
-          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}/data/cacert.pem",
-          "EMQX_LOG__DIR": "{work:path}/logs",
-          "RUNNER_DATA_DIR": "{work:path}/data",
-          "DEBUG": "1"
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
+          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
+          "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
+          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
+          "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
+          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}"
         },
         "Shutdown": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",
@@ -101,7 +119,7 @@
       },
       "Artifacts": [
         {
-          "URI": "s3://aws.greengrass.clientdevices.mqtt.EMQX/emqx.zip",
+          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
               "Read": "OWNER",
