@@ -27,6 +27,7 @@ class ClientDeviceAuthIntegration {
   private:
     GreengrassIPCWrapper greengrassIpcWrapper;
     CertificateUpdater certificateUpdater;
+    int timeoutSeconds;
     static const char *FAILED_OPERATION_FMT;
     static const char *FAILED_ACTIVATION_FMT;
     static const char *FAILED_TIMEOUT_ERROR_FMT;
@@ -42,8 +43,9 @@ class ClientDeviceAuthIntegration {
     static const char *INVALID_AUTH_TOKEN_ERROR;
 
   public:
-    ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient)
-        : greengrassIpcWrapper(ipcClient), certificateUpdater(greengrassIpcWrapper.getIPCClient()){};
+    ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient, int timeoutSeconds)
+        : greengrassIpcWrapper(ipcClient, timeoutSeconds), certificateUpdater(greengrassIpcWrapper.getIPCClient()),
+          timeoutSeconds(timeoutSeconds){};
 
     bool on_client_connect(const char *clientId, const char *pem);
 
