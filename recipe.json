@@ -27,7 +27,7 @@
       "emqx": {
         "mqtt.max_packet_size": "268435455",
         "listener.ssl.external": "8883",
-        "log.to": "file",
+        "log.to": "console",
         "log.level": "debug",
         "listener.ssl.external.max_connections": "1024000",
         "listener.ssl.external.rate_limit": "",
@@ -48,9 +48,6 @@
         "os": "windows"
       },
       "Lifecycle": {
-        "install": {
-          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\data {work:path}\\data loaded_plugins loaded_modules"
-        },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
@@ -61,8 +58,6 @@
           "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
-          "EMQX_MODULES__LOADED_FILE": "{work:path}\\data\\loaded_modules",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
@@ -106,8 +101,6 @@
           "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
-          "EMQX_MODULES__LOADED_FILE": "{work:path}\\data\\loaded_modules",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
