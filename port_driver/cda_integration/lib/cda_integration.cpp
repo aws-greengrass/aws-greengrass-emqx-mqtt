@@ -201,7 +201,8 @@ ClientDeviceAuthIntegration *cda_integration_init(GG::GreengrassCoreIpcClient *c
         double timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
         const char *timeoutSecondsC = std::getenv(IPC_TIMEOUT_SECONDS_ENV_VAR);
         if (timeoutSecondsC == nullptr) {
-            LOG_W(CDA_INTEG_SUBJECT, "Environment variable %s was not set", IPC_TIMEOUT_SECONDS_ENV_VAR);
+            LOG_W(CDA_INTEG_SUBJECT, "Environment variable %s was not set. Falling back to %f",
+                  IPC_TIMEOUT_SECONDS_ENV_VAR, timeoutSeconds);
         } else {
             try {
                 auto timeoutSecondsStr = std::string{timeoutSecondsC};
