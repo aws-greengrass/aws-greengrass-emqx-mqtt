@@ -8,8 +8,6 @@
 #include <aws/crt/Api.h>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
-#define CONNECT_TIMEOUT_SECONDS 10
-
 void ConnectionEventsHandler::OnConnectCallback() { LOG_I(IPC_WRAPPER_SUBJECT, "Connected to Greengrass Core"); }
 
 void ConnectionEventsHandler::OnDisconnectCallback(RpcError status) {
@@ -23,9 +21,10 @@ bool ConnectionEventsHandler::OnErrorCallback(RpcError status) {
     return true;
 }
 
-GreengrassIPCWrapper::GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client)
+GreengrassIPCWrapper::GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client, int timeoutSeconds)
     : crtApiHandle(new CRT::ApiHandle()), clientBootstrap(getClientBootstrap()),
-      ipcClient(client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap)) {
+      ipcClient(client != nullptr ? client : new GG::GreengrassCoreIpcClient(clientBootstrap)),
+      timeoutSeconds(timeoutSeconds) {
     if (ipcClient == nullptr) {
         throw std::runtime_error("Failed to create IPC Client");
     }
@@ -63,5 +62,5 @@ void GreengrassIPCWrapper::setAsRunning() {
     request.SetState(Aws::Greengrass::REPORTED_LIFECYCLE_STATE_RUNNING);
     auto fut = operation->Activate(request, nullptr);
     fut.wait();
-    operation->GetOperationResult().wait_for(std::chrono::seconds(CONNECT_TIMEOUT_SECONDS));
+    operation->GetOperationResult().wait_for(std::chrono::seconds(timeoutSeconds));
 }

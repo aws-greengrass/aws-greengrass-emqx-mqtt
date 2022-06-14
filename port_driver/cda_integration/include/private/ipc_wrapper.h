@@ -29,11 +29,12 @@ class GreengrassIPCWrapper {
     CRT::Io::ClientBootstrap &clientBootstrap;
     GG::GreengrassCoreIpcClient *ipcClient;
     ConnectionEventsHandler connectionEventsHandler;
+    int timeoutSeconds;
 
     static CRT::Io::ClientBootstrap &getClientBootstrap();
 
   public:
-    GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client);
+    GreengrassIPCWrapper(GG::GreengrassCoreIpcClient *client, int timeoutSeconds);
     void connect();
     ~GreengrassIPCWrapper();
 
