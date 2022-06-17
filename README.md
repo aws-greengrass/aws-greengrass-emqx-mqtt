@@ -13,6 +13,5 @@ This project is licensed under the Apache-2.0 License.
 ## Distribution
 
 This software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio
-Community 2022. By downloading this software, you are deemed to agree to such license terms,
-which can be found [here](https://visualstudio.microsoft.com/license-terms/vs2022-ga-community/),
-with respect to that code
+Community 2022. By downloading this software, you agree to that code's license terms, which can be found
+[here](https://visualstudio.microsoft.com/license-terms/vs2022-ga-community)
