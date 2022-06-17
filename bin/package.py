@@ -55,6 +55,7 @@ def do_patch(zip_path, erts_version="11.0", add=None):
         add = {}
     add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
     add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
+    add["emqx/THIRD-PARTY-LICENSES"] = "THIRD-PARTY-LICENSES"
 
     update_zip(zipname=zip_path, updates={
         "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
