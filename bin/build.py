@@ -1,5 +1,7 @@
 #  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #  SPDX-License-Identifier: Apache-2.0
+
+import argparse
 import pathlib
 import shutil
 import subprocess
@@ -20,16 +22,21 @@ def change_dir_permissions_recursive(path, mode):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--quick', action='store_true')
+    parser.add_argument('--test-only', action='store_true')
+    parser.add_argument('--no-test', action='store_true')
+    parser.add_argument('--sdk-only', action='store_true')
+
+    args = parser.parse_args()
     # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
     # Run a full build before doing a quick build.
-    quick_mode = False
-    if len(sys.argv) == 2 and sys.argv[1] == "quick":
+    quick_mode = args.quick
+    if quick_mode:
         print("Quick mode! Portions of the build will be skipped")
-        quick_mode = True
-    test_mode = False
-    if len(sys.argv) == 2 and sys.argv[1] == "test":
+    test_mode = args.test_only
+    if test_mode:
         print("Test mode! Portions of the build will be skipped")
-        test_mode = True
     current_abs_path = os.path.abspath(os.getcwd())
 
     release_type = "RelWithDebInfo"
@@ -51,6 +58,8 @@ def main():
         subprocess.check_call(f"cmake -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=\"{release_type}\""
                               " -DBUILD_TESTING=OFF ../aws-iot-device-sdk-cpp-v2", shell=True)
         subprocess.check_call(f"cmake --build . --target install {config}", shell=True)
+        if args.sdk_only:
+            return
 
     # Build plugin
     print("Building native plugin")
@@ -58,28 +67,23 @@ def main():
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
-    enable_unit_test_flag = ""
-    if not quick_mode or test_mode:
-        # enabled by default
+    enable_unit_test_flag = "-DBUILD_TESTS=OFF"
+    do_test = not (quick_mode or args.no_test or os.name == "nt") or test_mode
+    if do_test:
         print("Enabling unit tests")
-        if os.name != 'nt':
-            # install lcov on non-windows for coverage
-            zip_name = "lcov-master.zip"
-            dir_name = "lcov-master"
-            if os.path.isfile(zip_name):
-                os.remove(zip_name)
-            if os.path.isdir(dir_name):
-                shutil.rmtree(dir_name)
-            wget.download("https://github.com/linux-test-project/lcov/archive/master.zip")
-            shutil.unpack_archive(zip_name, ".")
-            os.chdir(dir_name)
-            change_dir_permissions_recursive("bin", 0o777)
-            subprocess.check_call("sudo make install", shell=True)
-        else:
-            # Do not build unit tests on Windows
-            enable_unit_test_flag = "-DBUILD_TESTS=OFF"
-    else:
-        enable_unit_test_flag = "-DBUILD_TESTS=OFF"
+        enable_unit_test_flag = ""
+        # install lcov on non-windows for coverage
+        zip_name = "lcov-master.zip"
+        dir_name = "lcov-master"
+        if os.path.isfile(zip_name):
+            os.remove(zip_name)
+        if os.path.isdir(dir_name):
+            shutil.rmtree(dir_name)
+        wget.download("https://github.com/linux-test-project/lcov/archive/master.zip")
+        shutil.unpack_archive(zip_name, ".")
+        os.chdir(dir_name)
+        change_dir_permissions_recursive("bin", 0o777)
+        subprocess.check_call("sudo make install", shell=True)
 
     os.chdir(current_abs_path)
     os.chdir("_build")
@@ -112,11 +116,10 @@ def main():
               "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
 
     subprocess.check_call(f"cmake --build . {config}", shell=True)
-    if not quick_mode or test_mode:
+    if do_test:
         print("Running unit tests")
-        if os.name != 'nt':
-            # run UTs with coverage
-            subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
+        # run UTs with coverage
+        subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
     os.chdir(current_abs_path)
     # Put the output driver library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
