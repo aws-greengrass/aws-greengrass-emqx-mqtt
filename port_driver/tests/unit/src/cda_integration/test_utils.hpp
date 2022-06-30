@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <logger.h>
+#include <string>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
 namespace GG = Aws::Greengrass;
@@ -17,12 +19,19 @@ static const std::string testPrivateKey = "testPrivateKey";
 static const std::string testCert = "testCert";
 static const std::string testCACert = "testCACert";
 
+static struct aws_logger our_logger {};
+static struct aws_logger_standard_options logger_options = {
+        .level = AWS_LL_WARN,
+        .file = stderr,
+};
+
 static const void delete_file(std::string fileName) {
     if (!std::filesystem::remove(fileName)) {
         std::cout << "Failed to delete " << fileName << std::endl;
     }
 }
 
+[[maybe_unused]]
 static const void delete_certs() {
     if (std::filesystem::exists(filePath)) {
         if (std::filesystem::exists(privateKeyFilePath)) {
@@ -36,4 +45,10 @@ static const void delete_certs() {
         }
         delete_file(filePath);
     }
+}
+
+static inline void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
 }

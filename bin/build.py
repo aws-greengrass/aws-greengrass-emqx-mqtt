@@ -114,8 +114,6 @@ def main():
         if os.name != 'nt':
             # run UTs with coverage
             subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
-        else:
-            subprocess.check_call(f".\\bin\\{release_type}\\port_driver_unit_tests.exe", shell=True)
     os.chdir(current_abs_path)
     # Put the output driver library into priv which will be built into the EMQ X distribution bundle
     shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
