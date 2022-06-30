@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     linux-headers \
     lksctp-tools-dev \
     make \
+    maven \
     ncurses-dev \
     openjdk8 \
     openssh-client \

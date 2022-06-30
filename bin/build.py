@@ -75,6 +75,9 @@ def main():
             os.chdir(dir_name)
             change_dir_permissions_recursive("bin", 0o777)
             subprocess.check_call("sudo make install", shell=True)
+        else:
+            # Do not build unit tests on Windows
+            enable_unit_test_flag = "-DBUILD_TESTS=OFF"
     else:
         enable_unit_test_flag = "-DBUILD_TESTS=OFF"
 

@@ -96,7 +96,9 @@ class IPCEventStreamServiceTest {
             }
         });
 
+        print("ipc_start");
         br = Files.newBufferedReader(Paths.get(fifoPath));
+        print("pipe_open");
     }
 
     @AfterEach

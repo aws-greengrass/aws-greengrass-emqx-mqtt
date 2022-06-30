@@ -19,7 +19,9 @@ static const std::string testPrivateKey = "testPrivateKey";
 static const std::string testCert = "testCert";
 static const std::string testCACert = "testCACert";
 
+[[maybe_unused]]
 static struct aws_logger our_logger {};
+[[maybe_unused]]
 static struct aws_logger_standard_options logger_options = {
         .level = AWS_LL_WARN,
         .file = stderr,

@@ -77,25 +77,26 @@ void CDAIntegrationTester::SetUp() {
     remove(writePath.c_str());
     int rc = mkfifo(writePath.c_str(), 0666);
     if (rc != 0) {
-        std::cout << std::strerror(errno) << std::endl;
         throw std::runtime_error("mkfifo() failed");
     }
 
     setenv("SVCUID", "", 1);
     setenv("AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT", "/tmp/ggIpc.sock", 1);
 
-    pipe = popen("cd ../../port_driver/test_support && mvn verify", "r");
+    pipe = popen("cd ../../port_driver/test_support && mvn -ntp verify", "r");
     if (!pipe) {
         throw std::runtime_error("popen() failed!");
     }
 
+    auto command = NextCommand();
     writePipe.open(writePath);
+    command = NextCommand();
 
     cda_integ = cda_integration_init();
     EXPECT_NE(nullptr, cda_integ);
 
     // Wait for IPC server to be up, then try to connect, then verify that we call update_state
-    auto command = NextCommand();
+    command = NextCommand();
     EXPECT_EQ(command, "up");
     cda_integ->connect();
     command = NextCommand();
