@@ -22,6 +22,7 @@ RUN apk add --no-cache \
     linux-headers \
     lksctp-tools-dev \
     make \
+    maven \
     ncurses-dev \
     openjdk8 \
     openssh-client \
@@ -38,9 +39,13 @@ RUN apk add --no-cache \
 
 COPY . /build
 
+# Build SDK first for docker caching
 RUN cd /build \
     && python3 -u -m pip install -r bin/requirements.txt \
-    && python3 -u -m bin \
+    && python3 -u -m bin --sdk-only
+
+RUN cd /build \
+    && python3 -u -m bin --no-test \
     && cd build \
     && unzip -q emqx.zip
 
