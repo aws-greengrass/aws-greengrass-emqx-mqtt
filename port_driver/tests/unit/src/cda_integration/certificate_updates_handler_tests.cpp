@@ -34,6 +34,7 @@ class CertificateUpdatesHandlerTester : public ::testing::Test {
 };
 
 void CertificateUpdatesHandlerTester::SetUp() {
+    delete_certs();
     testCertUpdate = CertificateUpdate();
     optionalTestCertUpdate = Optional<CertificateUpdate>(testCertUpdate);
     testResponse = new CertificateUpdateEvent();
