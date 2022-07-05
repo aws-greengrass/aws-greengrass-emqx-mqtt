@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractAuthorizeClientDeviceActionOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractGetClientDeviceAuthTokenOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractUpdateStateOperationHandler;
+import software.amazon.awssdk.aws.greengrass.GeneratedAbstractVerifyClientDeviceIdentityOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GreengrassCoreIPCService;
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionRequest;
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionResponse;
@@ -20,6 +21,8 @@ import software.amazon.awssdk.aws.greengrass.model.InvalidClientDeviceAuthTokenE
 import software.amazon.awssdk.aws.greengrass.model.InvalidCredentialError;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateRequest;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateResponse;
+import software.amazon.awssdk.aws.greengrass.model.VerifyClientDeviceIdentityRequest;
+import software.amazon.awssdk.aws.greengrass.model.VerifyClientDeviceIdentityResponse;
 import software.amazon.awssdk.eventstreamrpc.model.EventStreamJsonMessage;
 
 import java.io.BufferedReader;
@@ -107,6 +110,37 @@ class IPCEventStreamServiceTest {
                         }
                 }
                 return new AuthorizeClientDeviceActionResponse();
+            }
+
+            @Override
+            public void handleStreamEvent(EventStreamJsonMessage streamRequestEvent) {
+            }
+        });
+
+        ipcService.setVerifyClientDeviceIdentityHandler((context) -> new GeneratedAbstractVerifyClientDeviceIdentityOperationHandler(context) {
+            @Override
+            protected void onStreamClosed() {
+            }
+
+            @Override
+            public VerifyClientDeviceIdentityResponse handleRequest(VerifyClientDeviceIdentityRequest request) {
+                print("verify_client_device_identity");
+
+                switch (value) {
+                    case "with_false":
+                        return new VerifyClientDeviceIdentityResponse().withIsValidClientDevice(false);
+                    case "with_true":
+                        return new VerifyClientDeviceIdentityResponse().withIsValidClientDevice(true);
+                    case "with_error":
+                        throw new InvalidCredentialError("Bad");
+                    case "with_timeout":
+                        try {
+                            // Default timeout in CPP is 5 seconds
+                            Thread.sleep(6_000);
+                        } catch (InterruptedException ignored) {
+                        }
+                }
+                return new VerifyClientDeviceIdentityResponse();
             }
 
             @Override
