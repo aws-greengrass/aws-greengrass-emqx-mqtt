@@ -180,6 +180,33 @@ TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
     EXPECT_EQ(command, "authorize_client_device_action");
 }
 
+TEST_F(CDAIntegrationTester, CDAIntegrationVerifyIdentityTest) {
+    EXPECT_FALSE(cda_integ->verify_client_certificate(TEST_CLIENT_PEM.c_str()));
+
+    auto command = NextCommand();
+    EXPECT_EQ(command, "verify_client_device_identity");
+
+    SendCommand("set with_true");
+    EXPECT_TRUE(cda_integ->verify_client_certificate(TEST_CLIENT_PEM.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "verify_client_device_identity");
+
+    SendCommand("set with_false");
+    EXPECT_FALSE(cda_integ->verify_client_certificate(TEST_CLIENT_PEM.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "verify_client_device_identity");
+
+    SendCommand("set with_error");
+    EXPECT_FALSE(cda_integ->verify_client_certificate(TEST_CLIENT_PEM.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "verify_client_device_identity");
+
+    SendCommand("set with_timeout");
+    EXPECT_FALSE(cda_integ->verify_client_certificate(TEST_CLIENT_PEM.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "verify_client_device_identity");
+}
+
 } // namespace unit
 } // namespace tests
 } // namespace port_driver
