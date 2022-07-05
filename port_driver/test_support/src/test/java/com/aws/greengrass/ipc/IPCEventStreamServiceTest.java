@@ -10,15 +10,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractAuthorizeClientDeviceActionOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractGetClientDeviceAuthTokenOperationHandler;
+import software.amazon.awssdk.aws.greengrass.GeneratedAbstractSubscribeToCertificateUpdatesOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractUpdateStateOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractVerifyClientDeviceIdentityOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GreengrassCoreIPCService;
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionRequest;
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionResponse;
+import software.amazon.awssdk.aws.greengrass.model.CertificateUpdate;
+import software.amazon.awssdk.aws.greengrass.model.CertificateUpdateEvent;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenRequest;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenResponse;
 import software.amazon.awssdk.aws.greengrass.model.InvalidClientDeviceAuthTokenError;
 import software.amazon.awssdk.aws.greengrass.model.InvalidCredentialError;
+import software.amazon.awssdk.aws.greengrass.model.SubscribeToCertificateUpdatesRequest;
+import software.amazon.awssdk.aws.greengrass.model.SubscribeToCertificateUpdatesResponse;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateRequest;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateResponse;
 import software.amazon.awssdk.aws.greengrass.model.VerifyClientDeviceIdentityRequest;
@@ -29,6 +34,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 class IPCEventStreamServiceTest {
     private IPCEventStreamService ipcEventStreamService;
@@ -141,6 +147,52 @@ class IPCEventStreamServiceTest {
                         }
                 }
                 return new VerifyClientDeviceIdentityResponse();
+            }
+
+            @Override
+            public void handleStreamEvent(EventStreamJsonMessage streamRequestEvent) {
+            }
+        });
+
+        ipcService.setSubscribeToCertificateUpdatesHandler((context) -> new GeneratedAbstractSubscribeToCertificateUpdatesOperationHandler(context) {
+            @Override
+            protected void onStreamClosed() {
+            }
+
+            @Override
+            public SubscribeToCertificateUpdatesResponse handleRequest(SubscribeToCertificateUpdatesRequest request) {
+                print("subscribe_to_certificate_updates");
+
+                switch (value) {
+                    case "with_success":
+                        return new SubscribeToCertificateUpdatesResponse();
+                    case "with_error":
+                        throw new InvalidCredentialError("Bad");
+                    case "with_callback":
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(1_000);
+                            } catch (InterruptedException ignored) {
+                            }
+                            sendStreamEvent(new CertificateUpdateEvent().withCertificateUpdate(
+                                    new CertificateUpdate()
+                                            .withCertificate("certificate")
+                                            .withCaCertificates(Arrays.asList("ca1", "ca2"))
+                                            .withPrivateKey("privateKey")
+                                            .withPublicKey("publicKey"))).
+                            whenComplete((a, b) -> {
+                                print("sent_certificates");
+                            });
+                        }).start();
+                        return new SubscribeToCertificateUpdatesResponse();
+                    case "with_timeout":
+                        try {
+                            // Default timeout in CPP is 10 seconds
+                            Thread.sleep(11_000);
+                        } catch (InterruptedException ignored) {
+                        }
+                }
+                return new SubscribeToCertificateUpdatesResponse();
             }
 
             @Override

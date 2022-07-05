@@ -207,6 +207,48 @@ TEST_F(CDAIntegrationTester, CDAIntegrationVerifyIdentityTest) {
     EXPECT_EQ(command, "verify_client_device_identity");
 }
 
+TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesTest) {
+    std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
+    SendCommand("set with_success");
+    auto subscription_callback =
+        std::make_unique<std::function<void(CertificateUpdateEvent *)>>([](CertificateUpdateEvent *) {});
+    EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS,
+              cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
+    auto command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_certificate_updates");
+
+    testPath = std::make_unique<std::filesystem::path>(filePath);
+    SendCommand("set with_error");
+    subscription_callback =
+        std::make_unique<std::function<void(CertificateUpdateEvent *)>>([](CertificateUpdateEvent *) {});
+    EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE,
+              cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_certificate_updates");
+
+    testPath = std::make_unique<std::filesystem::path>(filePath);
+    SendCommand("set with_timeout");
+    subscription_callback =
+        std::make_unique<std::function<void(CertificateUpdateEvent *)>>([](CertificateUpdateEvent *) {});
+    EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_TIMEOUT_RESPONSE,
+              cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_certificate_updates");
+
+    bool received = false;
+    testPath = std::make_unique<std::filesystem::path>(filePath);
+    SendCommand("set with_callback");
+    subscription_callback = std::make_unique<std::function<void(CertificateUpdateEvent *)>>(
+        [&received](CertificateUpdateEvent *) { received = true; });
+    EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS,
+              cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_certificate_updates");
+    command = NextCommand();
+    EXPECT_EQ(command, "sent_certificates");
+    EXPECT_TRUE(received);
+}
+
 } // namespace unit
 } // namespace tests
 } // namespace port_driver
