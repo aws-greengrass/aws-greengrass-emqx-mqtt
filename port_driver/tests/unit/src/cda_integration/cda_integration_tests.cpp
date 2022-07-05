@@ -144,6 +144,40 @@ TEST_F(CDAIntegrationTester, CDAIntegrationOnCheckAclTest) {
 
     auto command = NextCommand();
     EXPECT_EQ(command, "authorize_client_device_action");
+
+    SendCommand("set with_true");
+    EXPECT_EQ(AuthorizationStatus::AUTHORIZED, cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(),
+                                                                       TEST_TOPIC.c_str(), TEST_ACTION.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "authorize_client_device_action");
+
+    SendCommand("set with_false");
+    EXPECT_EQ(AuthorizationStatus::UNAUTHORIZED,
+              cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
+                                      TEST_ACTION.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "authorize_client_device_action");
+
+    SendCommand("set with_error");
+    EXPECT_EQ(AuthorizationStatus::UNKNOWN_ERROR,
+              cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
+                                      TEST_ACTION.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "authorize_client_device_action");
+
+    SendCommand("set with_bad_token_error");
+    EXPECT_EQ(AuthorizationStatus::BAD_AUTH_TOKEN,
+              cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
+                                      TEST_ACTION.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "authorize_client_device_action");
+
+    SendCommand("set with_timeout");
+    EXPECT_EQ(AuthorizationStatus::UNKNOWN_ERROR,
+              cda_integ->on_check_acl(TEST_CLIENT_ID.c_str(), TEST_AUTH_TOKEN.c_str(), TEST_TOPIC.c_str(),
+                                      TEST_ACTION.c_str()));
+    command = NextCommand();
+    EXPECT_EQ(command, "authorize_client_device_action");
 }
 
 } // namespace unit

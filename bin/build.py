@@ -71,7 +71,7 @@ def main():
     do_test = not (quick_mode or args.no_test or os.name == "nt") or test_mode
     if do_test:
         print("Enabling unit tests")
-        enable_unit_test_flag = ""
+        enable_unit_test_flag = "-DBUILD_TESTS=ON"
         # install lcov on non-windows for coverage
         zip_name = "lcov-master.zip"
         dir_name = "lcov-master"
