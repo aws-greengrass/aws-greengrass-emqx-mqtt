@@ -16,6 +16,7 @@ import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionRe
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionResponse;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenRequest;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenResponse;
+import software.amazon.awssdk.aws.greengrass.model.InvalidClientDeviceAuthTokenError;
 import software.amazon.awssdk.aws.greengrass.model.InvalidCredentialError;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateRequest;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateResponse;
@@ -88,6 +89,23 @@ class IPCEventStreamServiceTest {
             @Override
             public AuthorizeClientDeviceActionResponse handleRequest(AuthorizeClientDeviceActionRequest request) {
                 print("authorize_client_device_action");
+
+                switch (value) {
+                    case "with_false":
+                        return new AuthorizeClientDeviceActionResponse().withIsAuthorized(false);
+                    case "with_true":
+                        return new AuthorizeClientDeviceActionResponse().withIsAuthorized(true);
+                    case "with_error":
+                        throw new InvalidCredentialError("Bad");
+                    case "with_bad_token_error":
+                        throw new InvalidClientDeviceAuthTokenError("Bad 2");
+                    case "with_timeout":
+                        try {
+                            // Default timeout in CPP is 5 seconds
+                            Thread.sleep(6_000);
+                        } catch (InterruptedException ignored) {
+                        }
+                }
                 return new AuthorizeClientDeviceActionResponse();
             }
 
