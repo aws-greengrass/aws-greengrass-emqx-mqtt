@@ -136,18 +136,18 @@ def main():
         with open('emqx.commit', 'r') as file:
             emqx_commit_id = file.read().rstrip()
         os.chdir("emqx")
-        subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
-        pathlib.Path("_checkouts").mkdir(parents=True, exist_ok=True)
+        subprocess.check_call(f"git fetch -a -p", shell=True)
+        #subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
         os.chdir(current_abs_path)
-        shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
+        #shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
 
         print("Setting up EMQ X plugin checkout symlink")
         try:
             # Remove existing symlink (if any) before linking
-            os.remove(f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth")
+            os.remove(f"{current_abs_path}/emqx/apps/aws_greengrass_emqx_auth")
         except FileNotFoundError:
             pass
-        os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
+        os.symlink(current_abs_path, f"{current_abs_path}/emqx/apps/aws_greengrass_emqx_auth",
                    target_is_directory=True)
 
         os.chdir("emqx")
