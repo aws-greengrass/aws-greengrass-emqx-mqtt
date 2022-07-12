@@ -18,6 +18,7 @@ RUN apk add --no-cache \
     jq \
     libc-dev \
     libffi-dev \
+    libtool \
     libunwind-dev \
     linux-headers \
     lksctp-tools-dev \

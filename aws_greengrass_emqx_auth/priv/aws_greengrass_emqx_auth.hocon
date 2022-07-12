@@ -1,0 +1,4 @@
+aws_greengrass_emqx_auth {
+    auth_mode = enabled
+    use_greengrass_managed_certificates = true
+}
