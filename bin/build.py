@@ -46,7 +46,7 @@ def main():
 
     if not quick_mode and not test_mode:
         print("Pulling all submodules recursively")
-        subprocess.check_call("git submodule update --init --recursive", shell=True)
+        #subprocess.check_call("git submodule update --init --recursive", shell=True)
 
         print("Building IPC SDK")
         pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
@@ -179,13 +179,19 @@ def main():
                                   env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
         erts_version = None
+        emqx_version = None
         with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as f:
             for line in f.readlines():
                 if line.startswith('ERTS_VSN'):
                     erts_version = line.split('ERTS_VSN=')[1].strip().strip("\"")
+                elif line.startswith("REL_VSN"):
+                    emqx_version = line.split("REL_VSN=")[1].strip().strip("\"")
         if erts_version is None:
             raise ValueError("Didn't find ERTS version")
+        if emqx_version is None:
+            raise ValueError("Didn't find EMQX version")
         print(f'ERTS version {erts_version}')
+        print(f'EMQX version {emqx_version}')
 
         # Remove erl.ini. This, paired with not cd-ing in emqx.cmd,
         # will allow erlang to use the greengrass work dir as its
@@ -207,7 +213,12 @@ def main():
             os.remove("build/emqx.zip")
         except FileNotFoundError:
             pass
+
         print("Zipping EMQ X")
+        try:
+            os.remove(f"emqx/_build/emqx/rel/emqx/emqx-{emqx_version}.tar.gz")
+        except FileNotFoundError:
+            pass
         shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
         print("Patching EMQ X")

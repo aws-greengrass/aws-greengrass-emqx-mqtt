@@ -13,8 +13,6 @@
   , request_certificates/0
 ]).
 
--include("emqx.hrl").
-
 %% OPERATIONS
 -define(GET_CLIENT_DEVICE_AUTH_TOKEN, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).

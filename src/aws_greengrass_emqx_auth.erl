@@ -5,7 +5,8 @@
 
 -module(aws_greengrass_emqx_auth).
 
--include("emqx.hrl").
+-include_lib("emqx/include/emqx.hrl").
+-include_lib("emqx/include/emqx_hooks.hrl").
 
 -define(AUTH_CHAIN_PASSTHROUGH, ok).
 
@@ -18,9 +19,9 @@
 
 %% Called when the plugin application starts
 load(Env) ->
-  emqx:hook('client.connect', {?MODULE, on_client_connect, [Env]}),
-  emqx:hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
-  emqx:hook('client.check_acl', {?MODULE, on_client_check_acl, [Env]}).
+  hook('client.connect', {?MODULE, on_client_connect, [Env]}),
+  hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
+  hook('client.check_acl', {?MODULE, on_client_check_acl, [Env]}).
 
 %%--------------------------------------------------------------------
 %% Client Lifecycle Hooks Impl
@@ -184,6 +185,14 @@ encode_peer_cert(PeerCert) ->
 %%--------------------------------------------------------------------
 
 unload() ->
-  emqx:unhook('client.connect', {?MODULE, on_client_connect}),
-  emqx:unhook('client.authenticate', {?MODULE, on_client_authenticate}),
-  emqx:unhook('client.check_acl', {?MODULE, on_client_check_acl}).
+  unhook('client.connect', {?MODULE, on_client_connect}),
+  unhook('client.authenticate', {?MODULE, on_client_authenticate}),
+  unhook('client.check_acl', {?MODULE, on_client_check_acl}).
+
+hook(HookPoint, MFA) ->
+  %% use highest hook priority so this module's callbacks
+  %% are evaluated before the default hooks in EMQX
+  emqx_hooks:add(HookPoint, MFA, _Property = ?HP_HIGHEST).
+
+unhook(HookPoint, MFA) ->
+  emqx_hooks:del(HookPoint, MFA).
