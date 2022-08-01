@@ -7,10 +7,8 @@
 
 -include("emqx.hrl").
 
--import(port_driver_integration, [get_auth_token/2
-, on_client_check_acl/4
-]).
-
+-import(port_driver_integration, [get_auth_token/2, on_client_check_acl/4]).
+-import(aws_greengrass_emqx_auth_app, [plugin_status/0]).
 
 -export([load/1
   , unload/0
@@ -37,28 +35,43 @@ load(Env) ->
 %%--------------------------------------------------------------------
 
 on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
-  logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
-    [ClientId, ConnInfo, Props, _Env]),
+  PluginStatus = plugin_status(),
+  logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n, PluginStatus: ~p",
+    [ClientId, ConnInfo, Props, _Env, PluginStatus]),
 
-  PeerCertEncoded = encode_peer_cert(PeerCert),
-  %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
-  %% Putting the value in the erlang process's dictionary
-  put(cert_pem, PeerCertEncoded),
-  put(client_version, ClientVersion),
-  {ok, Props}.
+  case PluginStatus of
+    active ->
+      PeerCertEncoded = encode_peer_cert(PeerCert),
+      %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
+      %% Putting the value in the erlang process's dictionary
+      put(cert_pem, PeerCertEncoded),
+      put(client_version, ClientVersion),
+      {ok, Props};
+    inactive ->
+      %% Pass-through to next handler in chain
+      ok
+  end.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
-  logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
-    [ClientId, ClientInfo, Result, _Env]),
-  PeerCertEncoded = get(cert_pem),
-  case authenticate_client_device(ClientId, PeerCertEncoded) of
-    ok -> 
-      AuthToken = get(cda_auth_token),
-      authorize_client_connect(ClientId, AuthToken, Result);
-    stop ->
-      {stop, Result#{auth_result => not_authorized}};
-    _ -> 
-      {stop, Result#{auth_result => not_authorized}}
+  PluginStatus = plugin_status(),
+  logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n, PluginStatus: ~p",
+    [ClientId, ClientInfo, Result, _Env, PluginStatus]),
+
+  case PluginStatus of
+    active ->
+      PeerCertEncoded = get(cert_pem),
+      case authenticate_client_device(ClientId, PeerCertEncoded) of
+        ok ->
+          AuthToken = get(cda_auth_token),
+          authorize_client_connect(ClientId, AuthToken, Result);
+        stop ->
+          {stop, Result#{auth_result => not_authorized}};
+        _ ->
+          {stop, Result#{auth_result => not_authorized}}
+      end;
+    inactive ->
+      %% Pass-through to next handler in chain
+      ok
   end.
 
 authenticate_client_device(ClientId, CertPem) -> 
@@ -77,7 +90,7 @@ authenticate_client_device(ClientId, CertPem) ->
       stop
   end.
 
-%% Retrives authToken from CDA if not stored in process dictionary
+%% Retrieves authToken from CDA if not stored in process dictionary
 get_auth_token_for_client(ClientId, CertPem) ->
   case get(cda_auth_token) of
     undefined -> port_driver_integration:get_auth_token(ClientId, CertPem);
@@ -94,19 +107,27 @@ authorize_client_connect(ClientId, AuthToken, Result) ->
   end.
 
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
-  logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
-    [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-  AuthToken = get(cda_auth_token),
-  case PubSub of
-    publish -> Action = "mqtt:publish",
-      TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
-    subscribe -> Action = "mqtt:subscribe",
-      TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
-  end,
-  case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
-    authorized -> {stop, allow};
-    unauthorized -> {stop, deny};
-    _ -> {stop, deny}
+  PluginStatus = plugin_status(),
+  logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n, PluginStatus: ~p",
+    [ClientId, PubSub, Topic, ClientInfo, Result, _Env, PluginStatus]),
+
+  case PluginStatus of
+    active ->
+      AuthToken = get(cda_auth_token),
+      case PubSub of
+        publish -> Action = "mqtt:publish",
+          TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
+        subscribe -> Action = "mqtt:subscribe",
+          TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
+      end,
+      case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
+        authorized -> {stop, allow};
+        unauthorized -> {stop, deny};
+        _ -> {stop, deny}
+      end;
+    inactive ->
+      %% Pass-through to next handler in chain
+      ok
   end.
 
 check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->

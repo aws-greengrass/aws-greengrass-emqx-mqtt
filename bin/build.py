@@ -10,7 +10,7 @@ import os
 import sys
 import wget
 
-from .package import do_patch
+from .package import do_patch, apply_patch
 
 
 def change_dir_permissions_recursive(path, mode):
@@ -150,6 +150,11 @@ def main():
                        target_is_directory=True)
         except FileExistsError:
             pass
+
+        print("Patch EMQ X source files")
+        # re-configure default plugins (including our greengrass plugin) in emqx source
+        # to allow emqx to generate proper loaded_plugins file in work directory.
+        apply_patch('emqx/src/emqx_plugins.erl', 'patches/emqx_plugins.erl.patch')
 
         os.chdir("emqx")
         print("Building EMQ X")

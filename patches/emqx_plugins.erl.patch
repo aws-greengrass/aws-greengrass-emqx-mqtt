@@ -1,0 +1,20 @@
+Index: src/emqx_plugins.erl
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/emqx_plugins.erl b/src/emqx_plugins.erl
+--- a/src/emqx_plugins.erl	(revision bd640a174821614745b4846bd96da24cf6ef8e7c)
++++ b/src/emqx_plugins.erl	(date 1658783293679)
+@@ -217,8 +217,9 @@
+ ensure_file(File) ->
+     case filelib:is_file(File) of
+         false ->
+-            DefaultPlugins = [ {emqx_management, true}
+-                             , {emqx_dashboard, true}
++            DefaultPlugins = [ {aws_greengrass_emqx_auth, true}
++                             , {emqx_management, true}
++                             , {emqx_dashboard, false}
+                              , {emqx_modules, false}
+                              , {emqx_recon, true}
+                              , {emqx_retainer, true}

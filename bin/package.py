@@ -42,6 +42,19 @@ def patch(original, patch_file):
     return out.getvalue().decode()
 
 
+def apply_patch(original: str, patch_file: str) -> None:
+    """
+    Patch and overwrite the provided file.
+
+    :param original: path to original file
+    :param patch_file: path to patch file
+    """
+    with open(original, 'rb') as f:
+        patched_contents = patch(f.read(), patch_file)
+    with open(original, 'w') as f:
+        f.write(patched_contents)
+
+
 def do_patch(zip_path, erts_version="11.0", add=None):
     # ini file is only for windows, but we'll just throw it in no matter what. Use \r\n for windows line endings
     with open("build/erl.ini", "w") as erl_ini:
@@ -54,7 +67,6 @@ def do_patch(zip_path, erts_version="11.0", add=None):
     if add is None:
         add = {}
     add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
-    add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
     add["emqx/THIRD-PARTY-LICENSES"] = "THIRD-PARTY-LICENSES"
 
     update_zip(zipname=zip_path, updates={

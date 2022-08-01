@@ -5,9 +5,9 @@
 
 -module(aws_greengrass_emqx_certs).
 
--export([load/0
-]).
+-export([load/0]).
 -import(port_driver_integration, [register_fun/2, request_certificates/0]).
+-import(aws_greengrass_emqx_auth_app, [plugin_status/0]).
 
 %% Called when the plugin application start
 load() ->
@@ -16,13 +16,14 @@ load() ->
   port_driver_integration:request_certificates().
 
 % Clean EMQX Pem Cache
+-spec(cleanPemCache() -> ok).
 cleanPemCache() ->
-  try
-    ok = emqx_mgmt:clean_pem_cache(),
-    logger:info("Finished cleaning pem cache!"),
-    ok
-  catch
-    error:{badmatch, ok} ->
-      logger:error("Failed to clean PEM cache!"),
+  case plugin_status() of
+    active ->
+      case catch emqx_mgmt:clean_pem_cache() of
+        ok -> logger:info("Finished cleaning pem cache!");
+        _ -> logger:error("Failed to clean PEM cache!")
+      end;
+    inactive ->
       ok
   end.

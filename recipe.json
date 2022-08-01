@@ -1,11 +1,21 @@
 {
   "RecipeFormatVersion": "2020-01-25",
-  "ComponentName": "aws.greengrass.clientdevices.mqtt.Emqx",
+  "ComponentName": "aws.greengrass.clientdevices.mqtt.EMQX",
   "ComponentType": "aws.greengrass.generic",
-  "ComponentDescription": "The EMQ X MQTT broker component provides an MQTT v5 broker, based on the EMQ X MQTT broker, for client devices to connect to your Greengrass core device.",
+  "ComponentDescription": "The EMQX MQTT broker component provides an MQTT v5 broker, based on the EMQX MQTT broker, for client devices to connect to your Greengrass core device.On Windows operating systems this software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio Community 2022. By downloading this software, you agree to that code's license terms, which can be found at https://visualstudio.microsoft.com/license-terms/vs2022-ga-community.",
   "ComponentPublisher": "AWS",
   "ComponentConfiguration": {
     "DefaultConfiguration": {
+      "emqx": {
+        "mqtt.max_packet_size": "268435455",
+        "log.to": "console",
+        "listener.ssl.external.rate_limit": "",
+        "listener.ssl.external.handshake_timeout": "15s",
+        "listener.ssl.external.max_conn_rate": "500",
+        "log.level": "debug",
+        "listener.ssl.external.max_connections": "1024000",
+        "listener.ssl.external": "8883"
+      },
       "accessControl": {
         "aws.greengrass.clientdevices.Auth": {
           "aws.greengrass.clientdevices.mqtt.EMQX:auth:1": {
@@ -22,20 +32,11 @@
           }
         }
       },
-      "restartIdentifier": "",
-      "startupTimeoutSeconds": "240",
       "crtLogLevel": "",
-      "ipcTimeoutSeconds": "5",
-      "emqx": {
-        "mqtt.max_packet_size": "268435455",
-        "listener.ssl.external": "8883",
-        "log.to": "console",
-        "log.level": "debug",
-        "listener.ssl.external.max_connections": "1024000",
-        "listener.ssl.external.rate_limit": "",
-        "listener.ssl.external.handshake_timeout": "15s",
-        "listener.ssl.external.max_conn_rate": "500"
-      }
+      "requiresPrivilege": "true",
+      "restartIdentifier": "",
+      "startupTimeoutSeconds": "90",
+      "ipcTimeoutSeconds": "5"
     }
   },
   "ComponentDependencies": {
@@ -55,23 +56,25 @@
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
-          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
+          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
-          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
-          "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
+          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
+          "EMQX_MODULES__LOADED_FILE": "{work:path}\\data\\loaded_modules",
+          "EMQX_LISTENER__SSL__EXTERNAL": "",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
-          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
-          "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
+          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -82,8 +85,8 @@
           "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
-              "Read": "OWNER",
-              "Execute": "OWNER"
+            "Read": "OWNER",
+            "Execute": "OWNER"
           }
         }
       ]
@@ -100,23 +103,25 @@
           "Timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/logLocation}",
-          "EMQX_LOG__DIR": "{work:path}\\logs",
-          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
-          "EMQX_NODE__DATA_DIR": "{work:path}\\data",
-          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
-          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
-          "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
+          "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
+          "EMQX_LOG__DIR": "{work:path}/logs",
+          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
+          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}",
+          "EMQX_NODE__DATA_DIR": "{work:path}/data",
+          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}/plugin-data",
+          "EMQX_PLUGINS__LOADED_FILE": "{work:path}/data/loaded_plugins",
+          "EMQX_MODULES__LOADED_FILE": "{work:path}/data/loaded_modules",
+          "EMQX_LISTENER__SSL__EXTERNAL": "",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
-          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
-          "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}/data/cacert.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}/data/cert.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}/data/key.pem",
+          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
+          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}"
         },
         "Shutdown": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",
@@ -128,8 +133,8 @@
           "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
-              "Read": "OWNER",
-              "Execute": "OWNER"
+            "Read": "OWNER",
+            "Execute": "OWNER"
           }
         }
       ]
