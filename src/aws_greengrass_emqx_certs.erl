@@ -18,12 +18,7 @@ load() ->
 % Clean EMQX Pem Cache
 -spec(cleanPemCache() -> ok).
 cleanPemCache() ->
-  case plugin_status() of
-    active ->
-      case catch emqx_mgmt:clean_pem_cache() of
-        ok -> logger:info("Finished cleaning pem cache!");
-        _ -> logger:error("Failed to clean PEM cache!")
-      end;
-    inactive ->
-      ok
+  case catch emqx_mgmt:clean_pem_cache() of
+    ok -> logger:info("Finished cleaning pem cache!");
+    _ -> logger:error("Failed to clean PEM cache!")
   end.
