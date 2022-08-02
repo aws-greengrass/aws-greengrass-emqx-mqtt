@@ -1,0 +1,9 @@
+{aws_greengrass_emqx_auth, true}.
+{emqx_management, true}.
+{emqx_dashboard, false}.
+{emqx_modules, false}.
+{emqx_recon, true}.
+{emqx_retainer, true}.
+{emqx_telemetry, true}.
+{emqx_rule_engine, true}.
+{emqx_bridge_mqtt, false}.

@@ -51,6 +51,9 @@
         "os": "windows"
       },
       "Lifecycle": {
+        "install": {
+          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\data {work:path}\\data loaded_plugins loaded_modules"
+        },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
@@ -97,6 +100,9 @@
         "architecture": "amd64"
       },
       "Lifecycle": {
+        "install": {
+          "script": "cp {artifacts:decompressedPath}/emqx/emqx/data/loaded_plugins {artifacts:decompressedPath}/emqx/emqx/data/loaded_modules {work:path}/data"
+        },
         "Startup": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx foreground",
           "RequiresPrivilege": true,
