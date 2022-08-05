@@ -39,14 +39,15 @@ set_custom_verify_fun(Listener, Fun) ->
   apply_ssl_opts(Listener, UpdatedSslOpts).
 
 %% Remove the custom verify function, for either a list of ssl options or a listener.
--spec(remove_custom_verify_fun(list() | emqx_listeners:listener(), function()) -> list()).
+-spec(remove_custom_verify_fun(list() | emqx_listeners:listener(), function()) -> {ok | nochange, list()}).
 remove_custom_verify_fun([{verify_fun, {CurrFun, _}} | SslOpts], Fun) when is_function(Fun) and CurrFun =:= Fun ->
-  remove_custom_verify_fun(SslOpts, Fun);
-remove_custom_verify_fun(SslOpts, Fun) when is_function(Fun)->
-  SslOpts;
+  {_, NewOpts} = remove_custom_verify_fun(SslOpts, Fun),
+  {ok, NewOpts};
+remove_custom_verify_fun(SslOpts, Fun) when is_function(Fun) ->
+  {nochange, SslOpts};
 remove_custom_verify_fun(Listener, Fun) when is_function(Fun) ->
-  UpdatedSslOpts = remove_custom_verify_fun(get_ssl_opts(Listener), Fun),
-  apply_ssl_opts(Listener, UpdatedSslOpts).
+  {Result, UpdatedSslOpts} = remove_custom_verify_fun(get_ssl_opts(Listener), Fun),
+  {Result, apply_ssl_opts(Listener, UpdatedSslOpts)}.
 
 %% Return a new listener config with updated options.
 -spec(apply_opts(emqx_listeners:listener(), list()) -> emqx_listeners:listener()).

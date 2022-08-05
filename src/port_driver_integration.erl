@@ -6,7 +6,10 @@
 -module(port_driver_integration).
 
 -export([start/0, stop/0, init/1]).
--export([get_auth_token/2
+-export([
+    get_auth_token/2
+  , register_config_change_handler/2
+  , get_config/1
   , on_client_check_acl/4
   , verify_client_certificate/1
   , register_fun/2
@@ -110,6 +113,15 @@ loop(Port, Inflight, Counter, FunMap) ->
       logger:error("Port terminated ~p", [Reason]),
       exit(port_terminated)
   end.
+
+%% TODO impl. This is just a placeholder interface, feel free to change.
+-spec(get_config(Name :: atom() | string()) -> atom() | string()).
+get_config(Name) ->
+  undefined.
+
+%% TODO impl. This is just a placeholder interface, feel free to change.
+register_config_change_handler(ConfigName, Handler) ->
+  ok.
 
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).

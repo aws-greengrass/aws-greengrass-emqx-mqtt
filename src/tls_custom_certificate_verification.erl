@@ -26,15 +26,18 @@ enable() ->
   end.
 
 %% Disables custom certificate verification
-%% by restarting ssl listener without custom certificate verification
+%% by restarting ssl listener without custom certificate verification.
+%% If verification is already disabled, no restart will occur.
 -spec(disable() -> ok | {error, any()} | nossl).
 disable() ->
   case get_ssl_listener() of
     false ->
       nossl;
     Listener ->
-      UpdatedListener = remove_custom_verify_fun(Listener, fun custom_verify/3),
-      restart_updated_listener(UpdatedListener)
+      case remove_custom_verify_fun(Listener, fun custom_verify/3) of
+        {ok, UpdatedListener} -> restart_updated_listener(UpdatedListener);
+        _ -> ok
+      end
   end.
 
 %% Restart the provided listener and log the result
