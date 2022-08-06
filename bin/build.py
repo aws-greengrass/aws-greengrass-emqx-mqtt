@@ -137,7 +137,7 @@ def main():
             emqx_commit_id = file.read().rstrip()
         os.chdir("emqx")
         subprocess.check_call(f"git fetch -a -p", shell=True)
-        #subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
+        subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
         os.chdir(current_abs_path)
         #shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
 
