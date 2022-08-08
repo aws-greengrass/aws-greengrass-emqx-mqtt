@@ -1,76 +1,84 @@
---- emqx.cmd	2023-02-14 09:08:36.000000000 -0500
-+++ emqx.cmd	2023-02-14 09:13:49.000000000 -0500
-@@ -38,11 +38,23 @@
- @set rel_dir=%rel_root_dir%\releases\%rel_vsn%
- @set RUNNER_ROOT_DIR=%rel_root_dir%
- 
--@set etc_dir=%rel_root_dir%\etc
-+@if defined EMQX_NODE__ETC_DIR (
-+  set etc_dir=%EMQX_NODE__ETC_DIR%
-+) else (
-+  @set etc_dir=%rel_root_dir%\etc
-+)
- @set lib_dir=%rel_root_dir%\lib
--@set data_dir=%rel_root_dir%\data
+diff --git a/bin/emqx.cmd b/bin/emqx.cmd
+--- a/bin/emqx.cmd	(revision 5835120d8e6f039271f63ac6fdeff1dd5dc1cc4a)
++++ b/bin/emqx.cmd	(date 1659990599796)
+@@ -67,36 +67,35 @@
+ @set EMQX_NODE__DB_BACKEND=mnesia
+ @set EMQX_NODE__DB_ROLE=core
+
+-:: Write the erl.ini file to set up paths relative to this script
+-@call :write_ini
++:: erl.ini is written when greengrass builds emqx;
++:: It cannot be written in this script because there
++:: are no write permissions in greengrass artifact dirs.
++:: @call :write_ini
+
+-:: If a start.boot file is not present, copy one from the named .boot file
+-@if not exist "%rel_dir%\start.boot" (
+-  copy "%rel_dir%\%rel_name%.boot" "%rel_dir%\start.boot" >nul
+-)
++:: There are no write permissions in greengrass artifact dirs,
++:: so this copy step is not necessary.
++:: @if not exist "%rel_dir%\start.boot" (
++::   copy "%rel_dir%\%rel_name%.boot" "%rel_dir%\start.boot" >nul
++:: )
+
+ @set conf_path="%etc_dir%\emqx.conf"
+
+-@for /f "usebackq tokens=1,2 delims==" %%a in (`"%escript% %nodetool% hocon -s %schema_mod% -c %conf_path% multi_get node.name node.cookie node.data_dir"`) do @(
++:: navigate to release directory before any erlang process is called
++:: this is because the properties in greengrass-generated erl.ini file are relative to the rel dir.
++:: normally erl.ini would have absolute dirs.
++@chdir /d "%rel_root_dir%"
++
++:: remove data dir looking from config file,
++:: use env vars for data dir since that's how
++:: greengrass exposes user configuration
++@for /f "usebackq tokens=1,2 delims==" %%a in (`"%escript% %nodetool% hocon -s %schema_mod% -c %conf_path% multi_get node.name node.cookie"`) do @(
+   if "%%a"=="node.name" set node_name=%%b
+   if "%%a"=="node.cookie" set node_cookie=%%b
+-  if "%%a"=="node.data_dir" set data_dir=%%b
+ )
+-
+-@set data_dir=%data_dir:"=%
+-:: remove trailing /
+-@if %data_dir:~-1%==/ SET data_dir=%data_dir:~0,-1%
+-:: remove trailing \
+-@if %data_dir:~-1%==\ SET data_dir=%data_dir:~0,-1%
+-
+-@set abs_data_dir=%rel_root_dir%\%data_dir%
+-@if exist %abs_data_dir% (
+-  @set data_dir=%abs_data_dir%
+-)
+-
+-@if not exist %data_dir%\ (
+-  @echo ERROR: data_dir %data_dir% does not exist
+-  @goto :eof
 +@if defined EMQX_NODE__DATA_DIR (
-+  set data_dir=%EMQX_NODE__DATA_DIR%
++  @set data_dir=%EMQX_NODE__DATA_DIR%
 +) else (
 +  @set data_dir=%rel_root_dir%\data
-+)
- @set emqx_conf=%etc_dir%\emqx.conf
- 
-+:: Ensure erlang has the right dlls
-+@set greengrass_auth_plugin_bin_dir=%rel_root_dir%\lib\aws_greengrass_emqx_auth-1.0.0\priv
-+@set PATH=%greengrass_auth_plugin_bin_dir%;%PATH%
-+
- @call :find_erts_dir
- @call :find_vm_args
- @call :find_sys_config
-@@ -72,7 +84,7 @@
  )
- 
- :: Write the erl.ini file to set up paths relative to this script
--@call :write_ini
-+:: @call :write_ini
- 
- :: If a start.boot file is not present, copy one from the named .boot file
- @if not exist "%rel_dir%\start.boot" (
-@@ -149,7 +161,7 @@
- @goto :eof
- 
- :generate_app_config
--@set gen_config_cmd=%escript% %cuttlefish% -i %rel_dir%\emqx.schema -c %etc_dir%\emqx.conf -d %data_dir%\configs generate
-+@set gen_config_cmd=%escript% %cuttlefish% -i %rel_dir%\emqx.schema -c %emqx_conf% -d %data_dir%\configs generate
- @for /f "delims=" %%A in ('%%gen_config_cmd%%') do @(
-   set generated_config_args=%%A
- )
-@@ -224,6 +236,15 @@
- :: window service?
- :: @%erlsrv% stop %service_name%
- @%escript% %nodetool% %node_type% %node_name% -setcookie %node_cookie% stop
-+@IF %ERRORLEVEL% NEQ 0 (
-+    @exit /b
-+)
-+:TryPinging
-+@%escript% %nodetool% ping %node_type% "%node_name%" -setcookie "%node_cookie%"
-+@IF %ERRORLEVEL% EQU 0 (
-+    @goto TryPinging
-+)
-+@%epmd% -kill
- @goto :eof
- 
- :: Relup and reldown
-@@ -243,11 +264,9 @@
+
+ @if "%1"=="install" @goto install
+@@ -183,10 +182,7 @@
  @call :create_mnesia_dir
  @call :generate_app_config
- @set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
+ @set args=-detached %generated_config_args% -mnesia dir '%mnesia_dir%'
+-@echo off
+-cd /d "%rel_root_dir%"
+-@echo on
+-@start "%rel_name%" %werl%  -mode embedded -boot "%boot_file_name%" %args%
++@%werl% -mode embedded -boot "%boot_file_name%" %args%
+ @goto :eof
+
+ :: Stop the Windows service
+@@ -203,9 +199,6 @@
+ @call :create_mnesia_dir
+ @call :generate_app_config
+ @set args=%generated_config_args% -mnesia dir '%mnesia_dir%'
 -@echo off
 -cd /d %rel_root_dir%
- @echo on
--%erl_exe% -boot "%boot_script%" %args%
--@echo emqx is started!
-+@title "%rel_root_dir%\bin\%rel_name% console"
-+@%erl_exe% -noshell -boot "%boot_script%" %args% || exit /b
+-@echo on
+ %erl_exe% -mode embedded -boot "%boot_file_name%" %args%
  @goto :eof
- 
- :: Ping the running node
+
