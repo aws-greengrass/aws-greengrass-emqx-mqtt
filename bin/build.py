@@ -139,7 +139,6 @@ def main():
         subprocess.check_call(f"git fetch -a -p", shell=True)
         subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
         os.chdir(current_abs_path)
-        #shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
 
         print("Setting up EMQ X plugin checkout symlink")
         try:
@@ -152,31 +151,36 @@ def main():
 
         os.chdir("emqx")
         print("Building EMQ X")
+
+        emqx_build_cmd = 'make -j'
+        emqx_build_env = dict(
+            os.environ,
+            # https://github.com/emqx/emqx/issues/8477
+            BUILD_WITHOUT_ROCKSDB="true"
+        )
+
+        # ensure visual studio environment is set properly
+        # when building on Windows
         if os.name == 'nt':
-            print("Setting additional env var for Windows")
-            vs_paths = {("C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files (x86)\\Microsoft Visual "
-                         "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files\\Microsoft Visual "
-                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files\\Microsoft Visual "
-                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")}
-            for vs_path in vs_paths:
-                vs_arch = vs_path[1]
-                vs_path = vs_path[0]
-                if os.path.exists(vs_path):
-                    break
-            else:
-                raise FileNotFoundError("Unable to find where VS is installed!")
-            additional_env_var_script = f'call "{vs_path}" {vs_arch}'
-            subprocess.check_call(f"{additional_env_var_script} && make -j", shell=True,
-                                  env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
-        else:
-            subprocess.check_call(f"make -j", shell=True,
-                                  env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
+            vcvars_paths = {
+                ("C:\\Program Files (x86)\\Microsoft Visual "
+                 "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                ("C:\\Program Files (x86)\\Microsoft Visual "
+                 "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                ("C:\\Program Files\\Microsoft Visual "
+                 "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                ("C:\\Program Files\\Microsoft Visual "
+                 "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+                ("C:\\Program Files (x86)\\Microsoft Visual "
+                 "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")}
+            vcvars_path, arch = next(filter(lambda path: os.path.exists(path[0]), vcvars_paths), (None, None))
+            if not vcvars_path:
+                raise FileNotFoundError("vcvarsall.bat/VsDevCmd.bat not found, "
+                                        "please ensure visual studio is installed")
+            emqx_build_cmd = f'call "{vcvars_path}" {arch} && {emqx_build_cmd}'
+
+        # build emqx
+        subprocess.check_call(emqx_build_cmd, env=emqx_build_env, shell=True)
 
         erts_version = None
         emqx_version = None
