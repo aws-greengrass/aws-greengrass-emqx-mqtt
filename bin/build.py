@@ -2,15 +2,24 @@
 #  SPDX-License-Identifier: Apache-2.0
 
 import argparse
+import datetime
+import io
+import json
 import pathlib
 import shutil
 import subprocess
+import tarfile
 
 import os
 import sys
+from typing import Tuple
+
 import wget
 
 from .package import do_patch
+
+AUTH_PLUGIN_NAME = 'aws_greengrass_emqx_auth'
+AUTH_PLUGIN_VERSION = '1.0.0'  # TODO get this dynamically
 
 
 def change_dir_permissions_recursive(path, mode):
@@ -19,6 +28,26 @@ def change_dir_permissions_recursive(path, mode):
             os.chmod(dir, mode)
     for file in [os.path.join(root, f) for f in files]:
         os.chmod(file, mode)
+
+
+def find_vcvars_path() -> Tuple[str, str]:
+    vcvars_paths = {
+        ("C:\\Program Files (x86)\\Microsoft Visual "
+         "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+        ("C:\\Program Files (x86)\\Microsoft Visual "
+         "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+        ("C:\\Program Files\\Microsoft Visual "
+         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+        ("C:\\Program Files\\Microsoft Visual "
+         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
+        ("C:\\Program Files (x86)\\Microsoft Visual "
+         "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")
+    }
+    vcvars_path, arch = next(filter(lambda path: os.path.exists(path[0]), vcvars_paths), (None, None))
+    if not vcvars_path:
+        raise FileNotFoundError("vcvarsall.bat/VsDevCmd.bat not found, "
+                                "please ensure visual studio is installed")
+    return vcvars_path, arch
 
 
 def main():
@@ -118,8 +147,6 @@ def main():
         # run UTs with coverage
         subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
     os.chdir(current_abs_path)
-    # Put the output driver library into priv which will be built into the EMQ X distribution bundle
-    shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
 
     if test_mode:
         return
@@ -138,7 +165,6 @@ def main():
         os.chdir("emqx")
         subprocess.check_call(f"git fetch -a -p", shell=True)
         subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
-        os.chdir(current_abs_path)
 
         print("Setting up EMQ X plugin checkout symlink")
         try:
@@ -151,36 +177,23 @@ def main():
 
         os.chdir("emqx")
         print("Building EMQ X")
-
         emqx_build_cmd = 'make -j'
-        emqx_build_env = dict(
-            os.environ,
-            # https://github.com/emqx/emqx/issues/8477
-            BUILD_WITHOUT_ROCKSDB="true"
-        )
+        emqx_build_env = dict(os.environ)
 
-        # ensure visual studio environment is set properly
-        # when building on Windows
         if os.name == 'nt':
-            vcvars_paths = {
-                ("C:\\Program Files (x86)\\Microsoft Visual "
-                 "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                ("C:\\Program Files (x86)\\Microsoft Visual "
-                 "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                ("C:\\Program Files\\Microsoft Visual "
-                 "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                ("C:\\Program Files\\Microsoft Visual "
-                 "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                ("C:\\Program Files (x86)\\Microsoft Visual "
-                 "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")}
-            vcvars_path, arch = next(filter(lambda path: os.path.exists(path[0]), vcvars_paths), (None, None))
-            if not vcvars_path:
-                raise FileNotFoundError("vcvarsall.bat/VsDevCmd.bat not found, "
-                                        "please ensure visual studio is installed")
+            # ensure visual studio environment is set properly
+            # when building on Windows
+            vcvars_path, arch = find_vcvars_path()
             emqx_build_cmd = f'call "{vcvars_path}" {arch} && {emqx_build_cmd}'
+            # https://github.com/emqx/emqx/issues/8477
+            emqx_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
 
         # build emqx
-        subprocess.check_call(emqx_build_cmd, env=emqx_build_env, shell=True)
+        subprocess.check_call(
+            emqx_build_cmd,
+            env=emqx_build_env,
+            shell=True
+        )
 
         erts_version = None
         emqx_version = None
@@ -218,32 +231,95 @@ def main():
         except FileNotFoundError:
             pass
 
+        print("Building AWS Greengrass Auth Plugin")
+        plugin_libs = [os.path.abspath('_build/driver_lib')]
+        if os.name == 'nt':
+            plugin_libs.extend([
+                os.path.abspath('patches/msvcp140.dll'),
+                os.path.abspath('patches/vcruntime140.dll'),
+                os.path.abspath('patches/vcruntime140_1.dll'),
+            ])
+
+        os.chdir(AUTH_PLUGIN_NAME)
+
+        for lib in plugin_libs:
+            if os.path.isdir(lib):
+                shutil.copytree(lib, 'priv', dirs_exist_ok=True)
+            else:
+                shutil.copy(lib, 'priv')
+
+        plugin_build_cmd = 'make release'
+        plugin_build_env = dict(os.environ)
+
+        if os.name == 'nt':
+            vcvars_path, arch = find_vcvars_path()
+            plugin_build_cmd = f'call "{vcvars_path}" {arch} && {plugin_build_cmd}'
+            plugin_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
+
+        subprocess.check_call(
+            plugin_build_cmd,
+            env=plugin_build_env,
+            shell=True
+        )
+
+        print("Packaging AWS Greengrass Auth Plugin")
+        release_info = json.dumps({
+            "authors": [
+                "AWS Greengrass"
+            ],
+            "builder": {
+                "contact": "",
+                "name": "AWS IoT Greengrass",
+                "website": "https://aws.amazon.com/greengrass/"
+            },
+            "built_on_otp_release": "24",
+            "compatibility": {
+                "emqx": "~> 5.0.4"
+            },
+            "date": datetime.date.today(),
+            "description": "Plugin that enables EMQX to authenticate/authorize requests via Greengrass",
+            "functionality": [
+                "AuthN", "AuthZ"
+            ],
+            "git_ref": subprocess.check_output('git rev-parse HEAD').decode('utf-8').strip(),
+            "metadata_vsn": "0.1.0",
+            "name": AUTH_PLUGIN_NAME,
+            "rel_apps": [
+                f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}'
+            ],
+            "rel_vsn": AUTH_PLUGIN_VERSION,
+            "repo": "https://github.com/aws-greengrass/aws-greengrass-emqx-mqtt"
+        }, indent=4, default=str)
+
+        plugin_archive_name = f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}.tar.gz'
+        try:
+            os.remove(plugin_archive_name)
+        except OSError:
+            pass
+        with tarfile.open(plugin_archive_name, 'w:gz') as tar:
+            plugin_lib_dir = os.path.normpath(f'_build/default/lib/{AUTH_PLUGIN_NAME}/')
+            tar.add(plugin_lib_dir, arcname=plugin_archive_name.removesuffix('.tar.gz'))
+            info = tarfile.TarInfo(name='release.json')
+            info.size = len(release_info)
+            tar.addfile(info, io.BytesIO(release_info.encode('utf-8')))
+
+        os.chdir(current_abs_path)
         print("Zipping EMQ X")
         try:
             os.remove(f"emqx/_build/emqx/rel/emqx/emqx-{emqx_version}.tar.gz")
         except FileNotFoundError:
             pass
+        shutil.move(src=os.path.join(AUTH_PLUGIN_NAME, plugin_archive_name),
+                    dst=os.path.join('emqx/_build/emqx/rel/emqx/plugins', plugin_archive_name))
         shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
         print("Patching EMQ X")
-        add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf",
-               "emqx/etc/acl.conf": "patches/acl.conf",
-               "emqx/etc/emqx.conf": "patches/emqx.conf"}
 
+        add = {
+            "emqx/etc/acl.conf": "patches/acl.conf",
+            "emqx/etc/emqx.conf": "patches/emqx.conf"
+        }
         # On Windows, bundle in msvc runtime 120
         if os.name == 'nt':
             add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
         do_patch("build/emqx.zip", add=add)
-
-    os.chdir(current_abs_path)
-    if quick_mode:
-        subprocess.check_call("rebar3 compile", shell=True)
-        shutil.copytree("_build/default/lib/aws_greengrass_emqx_auth/ebin",
-                        "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/ebin", dirs_exist_ok=True),
-
-    # If EMQ X is already unzipped into build, then update our built plugin native code so we don't need to unzip again
-    if os.path.exists("build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv"):
-        shutil.copytree("_build/driver_lib", "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv", dirs_exist_ok=True)

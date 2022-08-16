@@ -45,7 +45,6 @@ def patch(original, patch_file):
 def do_patch(zip_path, add=None):
     if add is None:
         add = {}
-    add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
     add["emqx/THIRD-PARTY-LICENSES"] = "THIRD-PARTY-LICENSES"
 
     update_zip(
