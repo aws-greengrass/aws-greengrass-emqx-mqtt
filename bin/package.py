@@ -51,6 +51,7 @@ def do_patch(zip_path, add=None):
         zipname=zip_path,
         updates={
             "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
+            "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
             "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
         },
         add=add

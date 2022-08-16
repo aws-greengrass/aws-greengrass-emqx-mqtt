@@ -79,6 +79,6 @@ diff --git a/bin/emqx.cmd b/bin/emqx.cmd
 -@echo off
 -cd /d %rel_root_dir%
 -@echo on
- %erl_exe% -mode embedded -boot "%boot_file_name%" %args%
+ %erl_exe% -noshell -mode embedded -boot "%boot_file_name%" %args%
  @goto :eof
 
