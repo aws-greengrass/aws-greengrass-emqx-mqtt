@@ -8,6 +8,7 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("public_key/include/public_key.hrl").
 
+-import(emqx_listeners, [restart_listener/3, parse_listener_id/1]).
 -import(port_driver_integration, [verify_client_certificate/1]).
 
 -export([enable/0]).
@@ -25,23 +26,17 @@ enable() ->
 update_ssl_listener_options() ->
   case find_ssl_listener(emqx_listeners:list()) of
     nossl -> nossl;
-    SslListener ->
-      NewListenerOpts = add_custom_verify_to_ssl_options(maps:get('opts', SslListener, [])),
-      maps:put('opts', NewListenerOpts, SslListener)
+    {ListenerId, ListenerOptions} ->
+      {ListenerId, add_custom_verify_to_ssl_options(ListenerOptions)}
   end.
 
--spec(add_custom_verify_to_ssl_options(Options :: list()) -> list()).
+-spec(add_custom_verify_to_ssl_options(Options :: map()) -> map()).
 add_custom_verify_to_ssl_options(Options) ->
-  case proplists:get_value(ssl_options, Options) of
+  case maps:get(ssl_options, Options, undefined) of
     undefined -> Options;
     SslOpts ->
-      NewSslOpts = lists:append(SslOpts,
-        [{verify_fun,
-          {
-            fun custom_verify/3, []
-          }
-        }]),
-      replace(Options, ssl_options, NewSslOpts)
+      %% Store verify_fun in the ssl_options, then return the modified options
+      maps:put(ssl_options, maps:put(verify_fun, fun custom_verify/3, SslOpts), Options)
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
@@ -91,17 +86,10 @@ otpcert_to_pem(OtpCert) ->
 
 -spec(find_ssl_listener(Listeners :: list()) -> emqx_listeners:listener() | nossl).
 find_ssl_listener([]) -> nossl;
-find_ssl_listener([#{name := "external", proto := 'ssl'} = L | _]) -> L;
+find_ssl_listener([{'ssl:mtls', _} = L | _]) -> L;
 find_ssl_listener([_ | Rest]) -> find_ssl_listener(Rest).
 
 -spec(update_ssl_listener_env(emqx_listeners:listener()) -> ok).
-update_ssl_listener_env(SslListener) ->
-  Listener = emqx_listeners:list(),
-  Listener1 = lists:filter(
-    fun(#{name := Name, proto := Proto}) ->
-      not (Name =:= maps:get(name, SslListener) andalso Proto =:= maps:get(proto, SslListener))
-    end, Listener),
-  Listener2 = [SslListener | Listener1],
-  emqx:update_config([listeners], Listener2, #{persistent => false, override_to => local}).
-
-replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
+update_ssl_listener_env({ListenerId, Conf}) ->
+  {ok, #{type := Type, name := Name}} = emqx_listeners:parse_listener_id(ListenerId),
+  emqx_listeners:restart_listener(Type, Name, {Conf, Conf}).

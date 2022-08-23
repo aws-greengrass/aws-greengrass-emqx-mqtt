@@ -56,6 +56,7 @@ def main():
     parser.add_argument('--test-only', action='store_true')
     parser.add_argument('--no-test', action='store_true')
     parser.add_argument('--sdk-only', action='store_true')
+    parser.add_argument('--no-sdk', action='store_true')
 
     args = parser.parse_args()
     # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
@@ -73,9 +74,9 @@ def main():
     if os.name == "nt":
         config = f"--config {release_type}"
 
-    if not quick_mode and not test_mode:
+    if not quick_mode and not test_mode and not args.no_sdk:
         print("Pulling all submodules recursively")
-        #subprocess.check_call("git submodule update --init --recursive", shell=True)
+        subprocess.check_call("git submodule update --init --recursive", shell=True)
 
         print("Building IPC SDK")
         pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
@@ -195,126 +196,133 @@ def main():
             shell=True
         )
 
-        erts_version = None
-        emqx_version = None
-        with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as f:
-            for line in f.readlines():
-                if line.startswith('ERTS_VSN'):
-                    erts_version = line.split('ERTS_VSN=')[1].strip().strip("\"")
-                elif line.startswith("REL_VSN"):
-                    emqx_version = line.split("REL_VSN=")[1].strip().strip("\"")
-        if erts_version is None:
-            raise ValueError("Didn't find ERTS version")
-        if emqx_version is None:
-            raise ValueError("Didn't find EMQX version")
-        print(f'ERTS version {erts_version}')
-        print(f'EMQX version {emqx_version}')
+    erts_version = None
+    emqx_version = None
+    with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
+        for l in file.readlines():
+            if l.startswith("ERTS_VSN"):
+                erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
+            elif l.startswith("REL_VSN"):
+                emqx_version = l.split("REL_VSN=")[1].strip().strip("\"")
+    if erts_version is None:
+        raise ValueError("Didn't find ERTS version")
+    if emqx_version is None:
+        raise ValueError("Didn't find EMQX version")
+    print("ERTS version", erts_version)
+    print("EMQX version", emqx_version)
 
-        # Remove erl.ini. This, paired with not cd-ing in emqx.cmd,
-        # will allow erlang to use the greengrass work dir as its
-        # working directory.  We want this because in Windows,
-        # we moved the etc and data dirs to the work dir.
-        #
-        # Ideally this removal should happen during do_patch,
-        # but ZipFile doesn't support the removal of files.
-        try:
-            os.remove(f'_build/emqx/rel/emqx/erts-{erts_version}/bin/erl.ini')
-        except FileNotFoundError:
-            pass
-        # Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
-        shutil.rmtree("_build/emqx/rel/emqx/etc/certs")
+    # Remove erl.ini. This, paired with not cd-ing in emqx.cmd,
+    # will allow erlang to use the greengrass work dir as its
+    # working directory.  We want this because in Windows,
+    # we moved the etc and data dirs to the work dir.
+    #
+    # Ideally this removal should happen during do_patch,
+    # but ZipFile doesn't support the removal of files.
+    try:
+        os.remove(f'_build/emqx/rel/emqx/erts-{erts_version}/bin/erl.ini')
+    except FileNotFoundError:
+        pass
+    # Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
+    shutil.rmtree("_build/emqx/rel/emqx/etc/certs")
 
-        os.chdir(current_abs_path)
-        pathlib.Path("build").mkdir(parents=True, exist_ok=True)
-        try:
-            os.remove("build/emqx.zip")
-        except FileNotFoundError:
-            pass
+    os.chdir(current_abs_path)
+    pathlib.Path("build").mkdir(parents=True, exist_ok=True)
+    try:
+        os.remove("build/emqx.zip")
+    except FileNotFoundError:
+        pass
 
-        print("Building AWS Greengrass Auth Plugin")
-        plugin_libs = [os.path.abspath('_build/driver_lib')]
-        if os.name == 'nt':
-            plugin_libs.extend([
-                os.path.abspath('patches/msvcp140.dll'),
-                os.path.abspath('patches/vcruntime140.dll'),
-                os.path.abspath('patches/vcruntime140_1.dll'),
-            ])
+    print("Building AWS Greengrass Auth Plugin")
+    plugin_libs = [os.path.abspath('_build/driver_lib')]
+    if os.name == 'nt':
+        plugin_libs.extend([
+            os.path.abspath('patches/msvcp140.dll'),
+            os.path.abspath('patches/vcruntime140.dll'),
+            os.path.abspath('patches/vcruntime140_1.dll'),
+        ])
 
-        os.chdir(AUTH_PLUGIN_NAME)
+    os.chdir(AUTH_PLUGIN_NAME)
 
-        for lib in plugin_libs:
-            if os.path.isdir(lib):
-                shutil.copytree(lib, 'priv', dirs_exist_ok=True)
-            else:
-                shutil.copy(lib, 'priv')
+    for lib in plugin_libs:
+        if os.path.isdir(lib):
+            shutil.copytree(lib, 'priv', dirs_exist_ok=True)
+        else:
+            shutil.copy(lib, 'priv')
 
-        plugin_build_cmd = 'make release'
-        plugin_build_env = dict(os.environ)
+    plugin_build_cmd = 'make release'
+    plugin_build_env = dict(os.environ)
 
-        if os.name == 'nt':
-            vcvars_path, arch = find_vcvars_path()
-            plugin_build_cmd = f'call "{vcvars_path}" {arch} && {plugin_build_cmd}'
-            plugin_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
+    if os.name == 'nt':
+        vcvars_path, arch = find_vcvars_path()
+        plugin_build_cmd = f'call "{vcvars_path}" {arch} && {plugin_build_cmd}'
+        plugin_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
 
-        subprocess.check_call(
-            plugin_build_cmd,
-            env=plugin_build_env,
-            shell=True
-        )
+    subprocess.check_call(
+        plugin_build_cmd,
+        env=plugin_build_env,
+        shell=True
+    )
 
-        print("Packaging AWS Greengrass Auth Plugin")
-        release_info = json.dumps({
-            "authors": [
-                "AWS Greengrass"
-            ],
-            "builder": {
-                "contact": "",
-                "name": "AWS IoT Greengrass",
-                "website": "https://aws.amazon.com/greengrass/"
-            },
-            "built_on_otp_release": "24",
-            "compatibility": {
-                "emqx": "~> 5.0.4"
-            },
-            "date": datetime.date.today(),
-            "description": "Plugin that enables EMQX to authenticate/authorize requests via Greengrass",
-            "functionality": [
-                "AuthN", "AuthZ"
-            ],
-            "git_ref": subprocess.check_output('git rev-parse HEAD').decode('utf-8').strip(),
-            "metadata_vsn": "0.1.0",
-            "name": AUTH_PLUGIN_NAME,
-            "rel_apps": [
-                f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}'
-            ],
-            "rel_vsn": AUTH_PLUGIN_VERSION,
-            "repo": "https://github.com/aws-greengrass/aws-greengrass-emqx-mqtt"
-        }, indent=4, default=str)
+    release_info = {
+        "authors": [
+            "AWS Greengrass"
+        ],
+        "builder": {
+            "contact": "",
+            "name": "AWS IoT Greengrass",
+            "website": "https://aws.amazon.com/greengrass/"
+        },
+        "built_on_otp_release": "24",
+        "compatibility": {
+            "emqx": "~> 5.0.4"
+        },
+        "date": str(datetime.date.today()),
+        "description": "Plugin that enables EMQX to authenticate/authorize requests via Greengrass",
+        "functionality": [
+            "AuthN", "AuthZ"
+        ],
+        "git_ref": subprocess.check_output('git rev-parse HEAD').decode('utf-8').strip(),
+        "metadata_vsn": "0.1.0",
+        "name": AUTH_PLUGIN_NAME,
+        "rel_apps": [
+            f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}'
+        ],
+        "rel_vsn": AUTH_PLUGIN_VERSION,
+        "repo": "https://github.com/aws-greengrass/aws-greengrass-emqx-mqtt"
+    }
 
-        plugin_archive_name = f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}.tar.gz'
-        try:
-            os.remove(plugin_archive_name)
-        except OSError:
-            pass
-        with tarfile.open(plugin_archive_name, 'w:gz') as tar:
-            plugin_lib_dir = os.path.normpath(f'_build/default/lib/{AUTH_PLUGIN_NAME}/')
-            tar.add(plugin_lib_dir, arcname=plugin_archive_name.removesuffix('.tar.gz'))
-            info = tarfile.TarInfo(name='release.json')
-            info.size = len(release_info)
-            tar.addfile(info, io.BytesIO(release_info.encode('utf-8')))
+    os.chdir(current_abs_path)
 
-        os.chdir(current_abs_path)
+    try:
+        os.remove(f"emqx/_build/emqx/rel/emqx/emqx-{emqx_version}.tar.gz")
+    except FileNotFoundError:
+        pass
+
+    # Plugin structure in the released EMQX looks like
+    # plugins
+    # |--> pluginName-version
+    #      |--> release.json
+    #      |--> pluginName-version
+    #           |--> ebin, priv, src
+    plugin_release_path = f"{AUTH_PLUGIN_NAME}/_build/default/rel/{AUTH_PLUGIN_NAME}/lib/{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}"
+    if os.path.exists("build/emqx"):
+        shutil.copytree(src=plugin_release_path,
+                        dst=os.path.join('build/emqx/plugins', f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}',
+                                         f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}'),
+                        dirs_exist_ok=True, symlinks=False)
+    shutil.copytree(src=plugin_release_path,
+                    dst=os.path.join('emqx/_build/emqx/rel/emqx/plugins', f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}',
+                                     f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}'),
+                    dirs_exist_ok=True, symlinks=False)
+    with open(os.path.join('emqx/_build/emqx/rel/emqx/plugins', f'{AUTH_PLUGIN_NAME}-{AUTH_PLUGIN_VERSION}',
+                           'release.json'), "w") as w:
+        json.dump(release_info, w, indent=4)
+
+    if not quick_mode:
         print("Zipping EMQ X")
-        try:
-            os.remove(f"emqx/_build/emqx/rel/emqx/emqx-{emqx_version}.tar.gz")
-        except FileNotFoundError:
-            pass
-        shutil.move(src=os.path.join(AUTH_PLUGIN_NAME, plugin_archive_name),
-                    dst=os.path.join('emqx/_build/emqx/rel/emqx/plugins', plugin_archive_name))
         shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
         print("Patching EMQ X")
-
         add = {
             "emqx/etc/acl.conf": "patches/acl.conf",
             "emqx/etc/emqx.conf": "patches/emqx.conf"
