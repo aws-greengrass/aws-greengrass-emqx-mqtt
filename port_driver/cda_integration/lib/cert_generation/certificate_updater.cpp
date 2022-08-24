@@ -14,11 +14,9 @@
 // TODO: naming
 static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
-static const std::filesystem::path EMQX_CA_PATH = std::filesystem::path{"cacert.pem"};
 
-CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
-    const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue,
-    const std::vector<Aws::Crt::String, Aws::Crt::StlAllocator<Aws::Crt::String>> &allCAsValue) {
+CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(const Aws::Crt::String &privateKeyValue,
+                                                             const Aws::Crt::String &certValue) {
 
     if (!basePath) {
         return CertWriteStatus::WRITE_ERROR_BASE_PATH;
@@ -42,14 +40,6 @@ CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
         auto out_pem_path = std::ofstream(path / EMQX_PEM_PATH);
         out_pem_path << certValue.c_str();
         out_pem_path.close();
-
-        // TODO: ensure this chain order matches https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
-        auto out_ca_path = std::ofstream(path / EMQX_CA_PATH);
-        for (const auto &str : allCAsValue) {
-            out_ca_path << str << std::endl;
-        }
-        out_ca_path.close();
-
     } catch (std::exception &e) {
         // TODO: unit test for this branch
         LOG_E(CERT_UPDATER_SUBJECT, "Could not write certs to directory: %s", e.what());
@@ -91,7 +81,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         return;
     }
 
-    CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
+    CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value());
     if (writeStatus != CertWriteStatus::WRITE_SUCCESS) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int)writeStatus);
         return;
