@@ -37,8 +37,7 @@ class CertificateUpdatesHandler : public GG::SubscribeToCertificateUpdatesStream
 
     // TODO: move these out of public
     void OnStreamEvent(GG::CertificateUpdateEvent *response) override;
-    CertWriteStatus
-    writeCertsToFiles(const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue);
+    CertWriteStatus writeCertsToFiles(const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue);
 
   private:
     const std::unique_ptr<std::filesystem::path> basePath;

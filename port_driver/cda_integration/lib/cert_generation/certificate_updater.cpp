@@ -15,8 +15,8 @@
 static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pem"};
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
 
-CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(
-    const Aws::Crt::String &privateKeyValue, const Aws::Crt::String &certValue) {
+CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(const Aws::Crt::String &privateKeyValue,
+                                                             const Aws::Crt::String &certValue) {
 
     if (!basePath) {
         return CertWriteStatus::WRITE_ERROR_BASE_PATH;
