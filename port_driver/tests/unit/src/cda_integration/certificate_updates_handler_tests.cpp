@@ -58,7 +58,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNullptr) {
     handler->OnStreamEvent(nullptr);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoUpdate) {
@@ -66,7 +65,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoUpdate) {
     handler->OnStreamEvent(testResponse);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestValidResponse) {
@@ -81,7 +79,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestValidResponse) {
     handler->OnStreamEvent(testResponse);
     EXPECT_TRUE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_TRUE(std::filesystem::exists(certFilePath));
-    EXPECT_TRUE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoPrivateKey) {
@@ -93,7 +90,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoPrivateKey) {
     handler->OnStreamEvent(testResponse);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoCert) {
@@ -105,7 +101,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoCert) {
     handler->OnStreamEvent(testResponse);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoCaCert) {
@@ -117,7 +112,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoCaCert) {
     handler->OnStreamEvent(testResponse);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestInvalidCertWrite) {
@@ -130,7 +124,6 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestInvalidCertWrite) {
     handler->OnStreamEvent(testResponse);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestNullBasePath) {
@@ -139,11 +132,10 @@ TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestNullBasePath) {
     String crtPrivateKeyString(testPrivateKey);
     String crtCertString(testCert);
 
-    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
+    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString);
     EXPECT_EQ(retVal, CertWriteStatus::WRITE_ERROR_BASE_PATH);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestInvalidDir) {
@@ -155,11 +147,10 @@ TEST_F(CertificateUpdatesHandlerTester, WriteCertsToFilesTestInvalidDir) {
     auto cas = Vector<String>();
     cas.emplace_back(testCACert);
 
-    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString, cas);
+    CertWriteStatus retVal = handler->writeCertsToFiles(crtPrivateKeyString, crtCertString);
     EXPECT_EQ(retVal, CertWriteStatus::WRITE_ERROR_DIR_PATH);
     EXPECT_FALSE(std::filesystem::exists(privateKeyFilePath));
     EXPECT_FALSE(std::filesystem::exists(certFilePath));
-    EXPECT_FALSE(std::filesystem::exists(caCertFilePath));
 }
 
 } // namespace unit
