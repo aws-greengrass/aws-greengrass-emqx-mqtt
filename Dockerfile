@@ -73,7 +73,6 @@ ENV EMQX_LOG__DIR="/opt/emqx/log"
 ENV EMQX_NODE__DATA_DIR="/opt/emqx/data"
 ENV EMQX_LISTENER__SSL__EXTERNAL__KEYFILE="/opt/emqx/data/key.pem"
 ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
-ENV EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE="/opt/emqx/data/cacert.pem"
 
 # emqx will occupy these port:
 # - 8883 port for MQTT(SSL)
