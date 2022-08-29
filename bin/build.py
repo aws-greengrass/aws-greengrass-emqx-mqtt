@@ -48,9 +48,6 @@ def main():
         print("Pulling all submodules recursively")
         subprocess.check_call("git submodule update --init --recursive", shell=True)
 
-        # Copy development IPC SDK into C++ SDK submodule
-        print("Copying development SDK")
-        shutil.copytree("patches/greengrass_ipc", "aws-iot-device-sdk-cpp-v2/greengrass_ipc", dirs_exist_ok=True)
         print("Building IPC SDK")
         pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
         os.chdir("_build_sdk")
