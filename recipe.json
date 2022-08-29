@@ -51,7 +51,7 @@
       },
       "Lifecycle": {
         "install": {
-          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\data {work:path}\\data loaded_plugins"
+          "script": "copy /y {artifacts:decompressedPath}\\emqx\\emqx\\data\\loaded_plugins {work:path}\\data\\loaded_plugins"
         },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
