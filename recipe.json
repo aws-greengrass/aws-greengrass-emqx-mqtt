@@ -22,6 +22,7 @@
           }
         }
       },
+      "greengrassAuthEnabled": "true",
       "restartIdentifier": "",
       "startupTimeoutSeconds": "240",
       "crtLogLevel": "",
@@ -71,7 +72,8 @@
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
           "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+          "GREENGRASS_AUTH_ENABLED": "{configuration:/greengrassAuthEnabled}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -116,7 +118,8 @@
           "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
           "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+          "GREENGRASS_AUTH_ENABLED": "{configuration:/greengrassAuthEnabled}"
         },
         "Shutdown": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",
