@@ -2,7 +2,7 @@
   "RecipeFormatVersion": "2020-01-25",
   "ComponentName": "aws.greengrass.clientdevices.mqtt.EMQX",
   "ComponentType": "aws.greengrass.generic",
-  "ComponentDescription": "The EMQ X MQTT broker component provides an MQTT v5 broker, based on the EMQ X MQTT broker, for client devices to connect to your Greengrass core device.\\n\\nOn Windows operating systems this software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio Community 2022. By downloading this software, you agree to that code's license terms, which can be found at https://visualstudio.microsoft.com/license-terms/vs2022-ga-community.",
+  "ComponentDescription": "The EMQ X MQTT broker component provides an MQTT v5 broker, based on the EMQ X MQTT broker, for client devices to connect to your Greengrass core device.\n\nOn Windows operating systems this software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio Community 2022. By downloading this software, you agree to that code's license terms, which can be found at https://visualstudio.microsoft.com/license-terms/vs2022-ga-community.",
   "ComponentPublisher": "AWS",
   "ComponentConfiguration": {
     "DefaultConfiguration": {
