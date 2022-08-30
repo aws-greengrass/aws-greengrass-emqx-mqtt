@@ -1,8 +1,8 @@
 {
   "RecipeFormatVersion": "2020-01-25",
-  "ComponentName": "aws.greengrass.clientdevices.mqtt.Emqx",
+  "ComponentName": "aws.greengrass.clientdevices.mqtt.EMQX",
   "ComponentType": "aws.greengrass.generic",
-  "ComponentDescription": "The EMQ X MQTT broker component provides an MQTT v5 broker, based on the EMQ X MQTT broker, for client devices to connect to your Greengrass core device.",
+  "ComponentDescription": "The EMQX MQTT broker component provides an MQTT v5 broker, based on the EMQX MQTT broker, for client devices to connect to your Greengrass core device.\n\nOn Windows operating systems this software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio Community 2022. By downloading this software, you agree to that code's license terms, which can be found at https://visualstudio.microsoft.com/license-terms/vs2022-ga-community.",
   "ComponentPublisher": "AWS",
   "ComponentConfiguration": {
     "DefaultConfiguration": {
@@ -23,7 +23,7 @@
         }
       },
       "restartIdentifier": "",
-      "startupTimeoutSeconds": "240",
+      "startupTimeoutSeconds": "90",
       "crtLogLevel": "",
       "ipcTimeoutSeconds": "5",
       "emqx": {
@@ -34,7 +34,8 @@
         "listener.ssl.external.max_connections": "1024000",
         "listener.ssl.external.rate_limit": "",
         "listener.ssl.external.handshake_timeout": "15s",
-        "listener.ssl.external.max_conn_rate": "500"
+        "listener.ssl.external.max_conn_rate": "500",
+        "emqx.conf": ""
       }
     }
   },
@@ -50,20 +51,24 @@
         "os": "windows"
       },
       "Lifecycle": {
+        "install": {
+          "script": "copy /y /d {artifacts:decompressedPath}\\emqx\\emqx\\data\\loaded_plugins {work:path}\\data\\loaded_plugins"
+        },
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\copy_config.cmd && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
+          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
-          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
+          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
           "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
           "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
@@ -94,21 +99,25 @@
         "architecture": "amd64"
       },
       "Lifecycle": {
+        "install": {
+          "script": "cp {artifacts:decompressedPath}/emqx/emqx/data/loaded_plugins {work:path}/data"
+        },
         "Startup": {
           "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx foreground",
           "RequiresPrivilege": true,
           "Timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/logLocation}",
+          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
+          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
-          "EMQX_LOG__LEVEL": "{configuration:/logLevel}",
+          "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
+          "EMQX_PLUGINS__LOADED_FILE": "{work:path}/data/loaded_plugins",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CACERTFILE": "{work:path}\\data\\cacert.pem",
           "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
           "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
           "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
