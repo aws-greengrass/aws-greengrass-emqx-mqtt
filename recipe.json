@@ -34,7 +34,8 @@
         "listener.ssl.external.max_connections": "1024000",
         "listener.ssl.external.rate_limit": "",
         "listener.ssl.external.handshake_timeout": "15s",
-        "listener.ssl.external.max_conn_rate": "500"
+        "listener.ssl.external.max_conn_rate": "500",
+        "emqx.conf": ""
       }
     }
   },
@@ -54,10 +55,11 @@
           "script": "copy /y /d {artifacts:decompressedPath}\\emqx\\emqx\\data\\loaded_plugins {work:path}\\data\\loaded_plugins"
         },
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\copy_config.cmd && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
+          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
           "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
@@ -106,6 +108,7 @@
           "Timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
+          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
           "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
