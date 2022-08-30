@@ -8,6 +8,10 @@ for %%A in ("%script_dir%\..") do @(
 copy /d /y %rel_root_dir%\etc\emqx.conf emqx.conf
 set EMQX_NODE__EMQX_CONF=%CD%\emqx.conf
 
+:: Copy loaded_plugins file into work directory
+copy /d /y %rel_root_dir%\data\loaded_plugins data\loaded_plugins
+set EMQX_PLUGINS__LOADED_FILE=%CD%\data\loaded_plugins
+
 :: Must use delayed expansion and !variable! for multi-line variable support
 setlocal EnableDelayedExpansion
 
