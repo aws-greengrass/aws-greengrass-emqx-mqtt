@@ -2,7 +2,7 @@
 
 set -e
 
-COMPONENT_NAME='aws.greengrass.clientdevices.mqtt.Emqx'
+COMPONENT_NAME='aws.greengrass.clientdevices.mqtt.EMQX'
 VERSION='NEXT_PATCH'
 
 # Skip build as it is expensive. Just log instead. For now.
