@@ -8,7 +8,7 @@
         "custom_build_command" : "sh -c ./gdk-build.sh"
       },
       "publish": {
-        "bucket": "gg-dev-artifacts",
+        "bucket": "greengrass-mdombro",
         "region": "us-west-2"
       }
     }

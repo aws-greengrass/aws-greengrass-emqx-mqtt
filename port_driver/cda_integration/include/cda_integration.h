@@ -28,13 +28,6 @@ class ClientDeviceAuthIntegration {
     GreengrassIPCWrapper greengrassIpcWrapper;
     CertificateUpdater certificateUpdater;
     int timeoutSeconds;
-    static const char *FAILED_OPERATION_FMT;
-    static const char *FAILED_ACTIVATION_FMT;
-    static const char *FAILED_TIMEOUT_ERROR_FMT;
-    static const char *FAILED_RESPONSE_TYPE_FMT;
-    static const char *FAILED_RESPONSE_MESSAGE_FMT;
-    static const char *FAILED_RPC_ERROR_FMT;
-    static const char *FAILED_NO_RESPONSE_VALUE;
 
     static const char *GET_CLIENT_DEVICE_AUTH_TOKEN_OP;
     static const char *AUTHORIZE_CLIENT_DEVICE_ACTION;
@@ -43,6 +36,14 @@ class ClientDeviceAuthIntegration {
     static const char *INVALID_AUTH_TOKEN_ERROR;
 
   public:
+    static const char *FAILED_OPERATION_FMT;
+    static const char *FAILED_ACTIVATION_FMT;
+    static const char *FAILED_TIMEOUT_ERROR_FMT;
+    static const char *FAILED_RESPONSE_TYPE_FMT;
+    static const char *FAILED_RESPONSE_MESSAGE_FMT;
+    static const char *FAILED_RPC_ERROR_FMT;
+    static const char *FAILED_NO_RESPONSE_VALUE;
+
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient, int timeoutSeconds)
         : greengrassIpcWrapper(ipcClient, timeoutSeconds), certificateUpdater(greengrassIpcWrapper.getIPCClient()),
           timeoutSeconds(timeoutSeconds){};
@@ -61,6 +62,8 @@ class ClientDeviceAuthIntegration {
     bool verify_client_certificate(const char *certPem);
 
     void connect();
+
+    GreengrassIPCWrapper &getIPCWrapper();
 
     CertSubscribeUpdateStatus
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,

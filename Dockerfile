@@ -51,9 +51,12 @@ RUN cd /build \
 
 FROM ${RUN_FROM}
 
+COPY --from=builder /build/emqx/deploy/docker/entrypoint.sh /usr/bin/
 COPY --from=builder /build/emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
 COPY --from=builder /build/build/emqx/ /opt/emqx
 
+# Backup the etc files so that we always have the defaults available to us
+RUN cp -r /opt/emqx/etc /opt/emqx/etcOrig
 RUN ln -s /opt/emqx/bin/* /usr/local/bin/
 RUN apk add --no-cache curl ncurses-libs openssl libstdc++ bash
 
@@ -78,6 +81,6 @@ ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
 # - 8883 port for MQTT(SSL)
 EXPOSE 8883
 
-ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/entrypoint"]
 
-CMD ["/opt/emqx/bin/emqx", "foreground"]
+CMD ["/usr/bin/docker-entrypoint.sh", "/opt/emqx/bin/emqx", "foreground"]

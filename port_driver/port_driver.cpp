@@ -4,6 +4,7 @@
  */
 
 #include "port_driver.h"
+#include "common.h"
 #include "defer.h"
 #include <aws/crt/Api.h>
 #include <cda_integration.h>
@@ -17,8 +18,6 @@ using DriverContext = struct {
     ErlDrvPort port;
     ClientDeviceAuthIntegration *cda_integration;
 };
-
-static struct aws_logger our_logger {};
 
 struct atoms {
     ErlDrvTermData data;
@@ -40,58 +39,6 @@ static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
 static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
-
-static aws_log_level crtStringToLogLevel(const std::string &level) {
-    // Crt defined log levels
-    if (level == "none") {
-        return AWS_LL_NONE;
-    }
-    if (level == "trace") {
-        return AWS_LL_TRACE;
-    }
-    if (level == "debug") {
-        return AWS_LL_DEBUG;
-    }
-    if (level == "info") {
-        return AWS_LL_INFO;
-    }
-    if (level == "warn") {
-        return AWS_LL_WARN;
-    }
-    if (level == "error") {
-        return AWS_LL_ERROR;
-    }
-    if (level == "fatal") {
-        return AWS_LL_FATAL;
-    }
-    // Default to warn
-    return AWS_LL_WARN;
-}
-
-static aws_log_level erlangStringToLogLevel(const std::string &level) {
-    // Erlang log levels
-    // debug, info, notice, warning, error, critical, alert, emergency
-    if (level == "debug") {
-        return AWS_LL_TRACE;
-    }
-    if (level == "info") {
-        return AWS_LL_DEBUG;
-    }
-    if (level == "notice") {
-        return AWS_LL_INFO;
-    }
-    if (level == "warning") {
-        return AWS_LL_WARN;
-    }
-    if (level == "error") {
-        return AWS_LL_ERROR;
-    }
-    if (level == "emergency") {
-        return AWS_LL_FATAL;
-    }
-    // Default to warn
-    return AWS_LL_WARN;
-}
 
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { // NOLINT(readability-non-const-parameter)
     const char *logLocation = std::getenv(EMQX_LOG_TO_ENV_VAR);

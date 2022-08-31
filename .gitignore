@@ -1,9 +1,11 @@
 greengrass-build/
 build/
 target/
+config_writer
 *.dylib
 *.so
 *.dll
+*.exe
 *.iml
 .idea/
 _build/

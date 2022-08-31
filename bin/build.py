@@ -207,7 +207,8 @@ def main():
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
-            add["emqx/bin/copy_config.cmd"] = "patches/copy_config.cmd"
+        else:
+            add["emqx/deploy/docker/entrypoint.sh"] = "patches/entrypoint.sh"
         do_patch("build/emqx.zip", erts_version=erts_version, add=add)
 
     os.chdir(current_abs_path)
