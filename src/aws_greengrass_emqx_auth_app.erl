@@ -17,16 +17,15 @@
 ]).
 
 start(_StartType, _StartArgs) ->
-%%  Uncomment to load server certs in from the filesystem
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
   port_driver_integration:start(),
   case tls_custom_certificate_verification:enable() of
     ok -> ok;
     nossl ->
-      ErrorString = io_lib:format("Could not find active Ssl listener"),
+      ErrorString = "Could not find active SSL listener",
       throw({error, ErrorString});
     {error, Reason} ->
-      ErrorString = io_lib:format("Failed to enable ssl custom certificate verification. Error: ~s",
+      ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s",
         [Reason]),
       throw({error, ErrorString})
   end,
