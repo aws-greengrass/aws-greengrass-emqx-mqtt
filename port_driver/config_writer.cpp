@@ -7,6 +7,34 @@
 
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
 static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
+static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
+static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
+
+int copy_files(const std::filesystem::path &path) {
+    // Copy all etc and data files from read-only into the writable location
+    auto recursive_copy_options = std::filesystem::copy_options::recursive |
+                                  std::filesystem::copy_options::overwrite_existing |
+                                  std::filesystem::copy_options::skip_symlinks;
+
+    const char *original_etc_dir = std::getenv(EMQX_ETC_DIR_ENV_VAR);
+    if (original_etc_dir == nullptr || strlen(original_etc_dir) == 0) {
+        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_ETC_DIR_ENV_VAR);
+        return 1;
+    }
+    const char *original_data_dir = std::getenv(EMQX_DATA_DIR_ENV_VAR);
+    if (original_data_dir == nullptr || strlen(original_data_dir) == 0) {
+        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_DATA_DIR_ENV_VAR);
+        return 1;
+    }
+
+    auto new_etc_path = path / "etc";
+    std::filesystem::copy(original_etc_dir, new_etc_path, recursive_copy_options);
+    setenv(EMQX_ETC_DIR_ENV_VAR, new_etc_path.c_str(), 1);
+    auto new_data_path = path / "data";
+    std::filesystem::copy(original_data_dir, new_data_path, recursive_copy_options);
+    setenv(EMQX_DATA_DIR_ENV_VAR, new_data_path.c_str(), 1);
+    return 0;
+}
 
 int main() {
     aws_log_level awsLogLevel;
@@ -26,6 +54,12 @@ int main() {
     // Use the noalloc logger which logs synchronously, otherwise some logs may not be emitted
     aws_logger_init_noalloc(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
+
+    // Write customer-provided values to CWD
+    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
+    if (copy_files(BASE_PATH) != 0) {
+        return 1;
+    }
 
     static const char *GetConfigurationRequest = "GetConfigurationRequest";
     auto cda_integration = std::unique_ptr<ClientDeviceAuthIntegration>(cda_integration_init());
@@ -85,14 +119,13 @@ int main() {
         return 1;
     }
 
-    static const std::array<std::string, 38> allowed_files = {
+    static const std::array<std::string, 33> allowed_files = {
         "data/loaded_plugins",
         "data/loaded_modules",
         "etc/emqx.conf",
         "etc/acl.conf",
         "etc/psk.txt",
         "etc/ssl_dist.conf",
-        "etc/plugins/acl.conf.paho",
         "etc/plugins/aws_greengrass_emqx_auth.conf",
         "etc/plugins/emqx_auth_http.conf",
         "etc/plugins/emqx_auth_jwt.conf",
@@ -122,9 +155,6 @@ int main() {
         "etc/plugins/emqx_web_hook.conf",
     };
 
-    // Write customer-provided values to CWD
-    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
-
     for (const auto &item : configView.GetAllObjects()) {
         const auto key = item.first;
         const auto val = item.second;
@@ -134,14 +164,13 @@ int main() {
                 continue;
             }
             auto strVal = val.AsString();
-            if (!strVal.empty()) {
-                auto file_path = BASE_PATH / key.c_str();
-                // try to create the directories as needed, ignoring errors
-                std::filesystem::create_directories(file_path.parent_path());
-                auto out_path = std::ofstream(file_path);
-                defer { out_path.close(); };
-                out_path << strVal << std::endl;
-            }
+            auto file_path = BASE_PATH / key.c_str();
+            // try to create the directories as needed, ignoring errors
+            std::filesystem::create_directories(file_path.parent_path());
+            // Open file for appending
+            auto out_path = std::ofstream(file_path);
+            defer { out_path.close(); };
+            out_path << strVal << std::endl;
         } else {
             LOG_I(CONFIG_WRITER_SUBJECT, "Value of %s was not a string", key.c_str());
         }

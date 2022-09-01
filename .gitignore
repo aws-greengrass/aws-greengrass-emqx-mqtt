@@ -13,3 +13,4 @@ _build_sdk/
 emqx/
 __pycache__/
 .vscode
+.DS_STORE
