@@ -5,24 +5,23 @@
 
 -module(aws_greengrass_emqx_certs).
 
--export([load/0
-]).
--import(port_driver_integration, [register_fun/2, request_certificates/0]).
+-export([load/0]).
 
-%% Called when the plugin application start
 load() ->
-  % Register callback, then request certificates. loadAllServerCerts will be called whenever the certificates change.
-  port_driver_integration:register_fun(certificate_update, fun cleanPemCache/0),
-  port_driver_integration:request_certificates().
-
-% Clean EMQX Pem Cache
-cleanPemCache() ->
-  try
-    ok = emqx_mgmt:clean_pem_cache(),
-    logger:info("Finished cleaning pem cache!"),
-    ok
-  catch
-    error:{badmatch, ok} ->
-      logger:error("Failed to clean PEM cache!"),
+  case aws_greengrass_emqx_conf:greengrass_broker_server_certificate_mode() of
+    enabled ->
+      port_driver_integration:register_fun(certificate_update, fun cleanPemCache/0),
+      %% Subscribe to certificate updates. On update,
+      %% the certificate and its private key are written
+      %% to the EMQX component work directory. The EMQX
+      %% ssl listener is configured to read these files.
+      port_driver_integration:request_certificates();
+    disabled ->
       ok
+  end.
+
+cleanPemCache() ->
+  case catch emqx_mgmt:clean_pem_cache() of
+    ok -> logger:info("Finished cleaning pem cache!");
+    _ -> logger:error("Failed to clean PEM cache!")
   end.
