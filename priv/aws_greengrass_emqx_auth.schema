@@ -1,0 +1,14 @@
+%%--------------------------------------------------------------------
+%%  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+%%  SPDX-License-Identifier: Apache-2.0
+%%--------------------------------------------------------------------
+
+{mapping, "greengrass_authorization_mode", "aws_greengrass_emqx_auth.greengrass_authorization_mode", [
+  {default, enabled},
+  {datatype, {enum, [enabled, enabled_bypass_on_failure, bypass]}}
+]}.
+
+{mapping, "greengrass_broker_server_certificate_mode", "aws_greengrass_emqx_auth.greengrass_broker_server_certificate_mode", [
+  {default, enabled},
+  {datatype, {enum, [enabled, disabled]}}
+]}.
