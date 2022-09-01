@@ -48,8 +48,9 @@ execute_auth_hook(Hook) ->
   HookResult.
 
 on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
-  execute_auth_hook(
-    fun() ->
+  case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
+    bypass -> skip;
+    _ ->
       logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
         [ClientId, ConnInfo, Props, _Env]),
 
@@ -57,10 +58,9 @@ on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto
       %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
       %% Putting the value in the erlang process's dictionary
       put(cert_pem, PeerCertEncoded),
-      put(client_version, ClientVersion),
-      {ok, Props}
-    end
-  ).
+      put(client_version, ClientVersion)
+  end,
+  {ok, Props}.
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
