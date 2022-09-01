@@ -9,7 +9,7 @@
 -include_lib("public_key/include/public_key.hrl").
 
 -import(port_driver_integration, [verify_client_certificate/1]).
--import(aws_greengrass_emqx_listeners, [update_ssl_listener_options/1, start_updated_ssl_listener/1]).
+-import(aws_greengrass_emqx_listeners, [get_ssl_listener/1, set_custom_verify_fun/2, restart_listener/1]).
 
 -export([enable/0]).
 
@@ -17,9 +17,27 @@
 %% by restarting ssl listener with custom certificate verification
 -spec(enable() -> ok | {error, any()} | nossl).
 enable() ->
-  case update_ssl_listener_options(fun custom_verify/3) of
-    nossl -> nossl;
-    UpdatedSslListener -> start_updated_ssl_listener(UpdatedSslListener)
+  case get_ssl_listener("external") of
+    false ->
+      nossl;
+    Listener ->
+      UpdatedListener = set_custom_verify_fun(Listener, fun custom_verify/3),
+      restart_updated_listener(UpdatedListener)
+  end.
+
+%% Restart the provided listener and log the result
+-spec(restart_updated_listener(emqx_listeners:listener()) -> ok).
+restart_updated_listener(Listener) ->
+  Name = maps:get(name, Listener),
+  Proto = maps:get(proto, Listener),
+  ListenOn = maps:get(listen_on, Listener),
+  case restart_listener(Listener) of
+    ok ->
+      logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
+        [Name, Proto, ListenOn]);
+    {error, Reason} ->
+      logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
+        [Name, Proto, ListenOn, Reason])
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
