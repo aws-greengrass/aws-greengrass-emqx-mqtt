@@ -51,9 +51,6 @@
         "os": "windows"
       },
       "Lifecycle": {
-        "install": {
-          "script": "copy /y /d {artifacts:decompressedPath}\\emqx\\emqx\\data\\loaded_plugins {work:path}\\data\\loaded_plugins"
-        },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\copy_config.cmd && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
@@ -65,7 +62,6 @@
           "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
