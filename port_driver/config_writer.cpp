@@ -85,43 +85,45 @@ int main() {
         return 1;
     }
 
-    static const std::array<std::string, 36> allowed_files = {
-        "emqx.conf",
-        "acl.conf",
-        "psk.txt",
-        "ssl_dist.conf",
-        "plugins/acl.conf.paho",
-        "plugins/aws_greengrass_emqx_auth.conf",
-        "plugins/emqx_auth_http.conf",
-        "plugins/emqx_auth_jwt.conf",
-        "plugins/emqx_auth_ldap.conf",
-        "plugins/emqx_auth_mnesia.conf",
-        "plugins/emqx_auth_mongo.conf",
-        "plugins/emqx_auth_mysql.conf",
-        "plugins/emqx_auth_pgsql.conf",
-        "plugins/emqx_auth_redis.conf",
-        "plugins/emqx_bridge_mqtt.conf",
-        "plugins/emqx_coap.conf",
-        "plugins/emqx_dashboard.conf",
-        "plugins/emqx_exhook.conf",
-        "plugins/emqx_exproto.conf",
-        "plugins/emqx_lua_hook.conf",
-        "plugins/emqx_lwm2m.conf",
-        "plugins/emqx_management.conf",
-        "plugins/emqx_prometheus.conf",
-        "plugins/emqx_psk_file.conf",
-        "plugins/emqx_recon.conf",
-        "plugins/emqx_retainer.conf",
-        "plugins/emqx_rule_engine.conf",
-        "plugins/emqx_sasl.conf",
-        "plugins/emqx_sn.conf",
-        "plugins/emqx_stomp.conf",
-        "plugins/emqx_telemetry.conf",
-        "plugins/emqx_web_hook.conf",
+    static const std::array<std::string, 38> allowed_files = {
+        "data/loaded_plugins",
+        "data/loaded_modules",
+        "etc/emqx.conf",
+        "etc/acl.conf",
+        "etc/psk.txt",
+        "etc/ssl_dist.conf",
+        "etc/plugins/acl.conf.paho",
+        "etc/plugins/aws_greengrass_emqx_auth.conf",
+        "etc/plugins/emqx_auth_http.conf",
+        "etc/plugins/emqx_auth_jwt.conf",
+        "etc/plugins/emqx_auth_ldap.conf",
+        "etc/plugins/emqx_auth_mnesia.conf",
+        "etc/plugins/emqx_auth_mongo.conf",
+        "etc/plugins/emqx_auth_mysql.conf",
+        "etc/plugins/emqx_auth_pgsql.conf",
+        "etc/plugins/emqx_auth_redis.conf",
+        "etc/plugins/emqx_bridge_mqtt.conf",
+        "etc/plugins/emqx_coap.conf",
+        "etc/plugins/emqx_dashboard.conf",
+        "etc/plugins/emqx_exhook.conf",
+        "etc/plugins/emqx_exproto.conf",
+        "etc/plugins/emqx_lua_hook.conf",
+        "etc/plugins/emqx_lwm2m.conf",
+        "etc/plugins/emqx_management.conf",
+        "etc/plugins/emqx_prometheus.conf",
+        "etc/plugins/emqx_psk_file.conf",
+        "etc/plugins/emqx_recon.conf",
+        "etc/plugins/emqx_retainer.conf",
+        "etc/plugins/emqx_rule_engine.conf",
+        "etc/plugins/emqx_sasl.conf",
+        "etc/plugins/emqx_sn.conf",
+        "etc/plugins/emqx_stomp.conf",
+        "etc/plugins/emqx_telemetry.conf",
+        "etc/plugins/emqx_web_hook.conf",
     };
 
-    // Write customer-provided values to CWD/etc
-    const std::filesystem::path ETC_BASE_PATH = "etc";
+    // Write customer-provided values to CWD
+    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
 
     for (const auto &item : configView.GetAllObjects()) {
         const auto key = item.first;
@@ -133,7 +135,7 @@ int main() {
             }
             auto strVal = val.AsString();
             if (!strVal.empty()) {
-                auto file_path = ETC_BASE_PATH / key.c_str();
+                auto file_path = BASE_PATH / key.c_str();
                 // try to create the directories as needed, ignoring errors
                 std::filesystem::create_directories(file_path.parent_path());
                 auto out_path = std::ofstream(file_path);
