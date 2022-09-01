@@ -7,26 +7,16 @@
 
 -include("emqx.hrl").
 
--import(port_driver_integration, [get_auth_token/2
-, on_client_check_acl/4
-]).
+-define(AUTH_CHAIN_PASSTHROUGH, ok).
 
-
--export([load/1
-  , unload/0
-]).
+-export([load/1, unload/0]).
+-export([on_client_connect/3, on_client_authenticate/3, on_client_check_acl/5]).
 
 %%--------------------------------------------------------------------
 %% Client Lifecycle Hooks
 %%--------------------------------------------------------------------
 
--export([
-  on_client_connect/3
-  , on_client_authenticate/3
-  , on_client_check_acl/5
-]).
-
-%% Called when the plugin application start
+%% Called when the plugin application starts
 load(Env) ->
   emqx:hook('client.connect', {?MODULE, on_client_connect, [Env]}),
   emqx:hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
@@ -36,30 +26,59 @@ load(Env) ->
 %% Client Lifecycle Hooks Impl
 %%--------------------------------------------------------------------
 
-on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
-  logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
-    [ClientId, ConnInfo, Props, _Env]),
+execute_auth_hook(Hook) ->
+  HookResult = case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
+    enabled ->
+      Hook();
+    enabled_bypass_on_failure ->
+      case catch Hook() of
+        AuthNHookSuccess#{_, #{auth_result => success}} -> AuthNHookSuccess;
+        AuthZHookSuccess#{_, allow} -> AuthZHookSuccess;
+        _ -> ?AUTH_CHAIN_PASSTHROUGH
+      end;
+    bypass ->
+      ?AUTH_CHAIN_PASSTHROUGH
+  end,
 
-  PeerCertEncoded = encode_peer_cert(PeerCert),
-  %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
-  %% Putting the value in the erlang process's dictionary
-  put(cert_pem, PeerCertEncoded),
-  put(client_version, ClientVersion),
-  {ok, Props}.
+  case HookResult of
+    ?AUTH_CHAIN_PASSTHROUGH -> logger:debug("Skipping hook ~w", [Hook]);
+    _ -> ok
+  end,
+
+  HookResult.
+
+on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
+  execute_auth_hook(
+    fun() ->
+      logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
+        [ClientId, ConnInfo, Props, _Env]),
+
+      PeerCertEncoded = encode_peer_cert(PeerCert),
+      %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
+      %% Putting the value in the erlang process's dictionary
+      put(cert_pem, PeerCertEncoded),
+      put(client_version, ClientVersion),
+      {ok, Props}
+    end
+  ).
 
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
-  logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
-    [ClientId, ClientInfo, Result, _Env]),
-  PeerCertEncoded = get(cert_pem),
-  case authenticate_client_device(ClientId, PeerCertEncoded) of
-    ok -> 
-      AuthToken = get(cda_auth_token),
-      authorize_client_connect(ClientId, AuthToken, Result);
-    stop ->
-      {stop, Result#{auth_result => not_authorized}};
-    _ -> 
-      {stop, Result#{auth_result => not_authorized}}
-  end.
+  execute_auth_hook(
+    fun() ->
+      logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
+        [ClientId, ClientInfo, Result, _Env]),
+      PeerCertEncoded = get(cert_pem),
+      case authenticate_client_device(ClientId, PeerCertEncoded) of
+        ok ->
+          AuthToken = get(cda_auth_token),
+          authorize_client_connect(ClientId, AuthToken, Result);
+        stop ->
+          {stop, Result#{auth_result => not_authorized}};
+        _ ->
+          {stop, Result#{auth_result => not_authorized}}
+      end
+    end
+  ).
 
 authenticate_client_device(ClientId, CertPem) -> 
   case get_auth_token_for_client(ClientId, CertPem) of
@@ -77,7 +96,7 @@ authenticate_client_device(ClientId, CertPem) ->
       stop
   end.
 
-%% Retrives authToken from CDA if not stored in process dictionary
+%% Retrieves authToken from CDA if not stored in process dictionary
 get_auth_token_for_client(ClientId, CertPem) ->
   case get(cda_auth_token) of
     undefined -> port_driver_integration:get_auth_token(ClientId, CertPem);
@@ -94,20 +113,24 @@ authorize_client_connect(ClientId, AuthToken, Result) ->
   end.
 
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
-  logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
-    [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-  AuthToken = get(cda_auth_token),
-  case PubSub of
-    publish -> Action = "mqtt:publish",
-      TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
-    subscribe -> Action = "mqtt:subscribe",
-      TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
-  end,
-  case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
-    authorized -> {stop, allow};
-    unauthorized -> {stop, deny};
-    _ -> {stop, deny}
-  end.
+  execute_auth_hook(
+    fun() ->
+      logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
+        [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
+      AuthToken = get(cda_auth_token),
+      case PubSub of
+        publish -> Action = "mqtt:publish",
+          TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
+        subscribe -> Action = "mqtt:subscribe",
+          TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
+      end,
+      case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
+        authorized -> {stop, allow};
+        unauthorized -> {stop, deny};
+        _ -> {stop, deny}
+      end
+    end
+  ).
 
 check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
   case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action) of
@@ -163,7 +186,7 @@ encode_peer_cert(PeerCert) ->
   end.
 
 %%--------------------------------------------------------------------
-%% Called when the plugin application stop
+%% Called when the plugin application stops
 %%--------------------------------------------------------------------
 
 unload() ->
