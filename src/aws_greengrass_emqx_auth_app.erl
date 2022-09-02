@@ -9,9 +9,6 @@
 
 -emqx_plugin(?MODULE).
 
--import(port_driver_integration, [start/0, stop/0]).
--import(tls_custom_certificate_verification, [enable/0]).
-
 -export([start/2, stop/1]).
 
 start(_StartType, _StartArgs) ->
