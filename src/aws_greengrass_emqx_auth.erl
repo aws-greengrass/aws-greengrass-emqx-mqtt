@@ -27,25 +27,18 @@ load(Env) ->
 %%--------------------------------------------------------------------
 
 execute_auth_hook(Hook) ->
-  HookResult = case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
-                 enabled ->
-                   Hook();
-                 enabled_bypass_on_failure ->
-                   case catch Hook() of
-                     {_, #{auth_result := success}} = AuthNHookSuccess -> AuthNHookSuccess;
-                     {_, allow} = AuthZHookSuccess -> AuthZHookSuccess;
-                     _ -> ?AUTH_CHAIN_PASSTHROUGH
-                   end;
-                 bypass ->
-                   ?AUTH_CHAIN_PASSTHROUGH
-               end,
-
-  case HookResult of
-    ?AUTH_CHAIN_PASSTHROUGH -> logger:debug("Skipping hook ~w", [Hook]);
-    _ -> ok
-  end,
-
-  HookResult.
+  case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
+    enabled ->
+      Hook();
+    enabled_bypass_on_failure ->
+      case catch Hook() of
+        {_, #{auth_result := success}} = AuthNHookSuccess -> AuthNHookSuccess;
+        {_, allow} = AuthZHookSuccess -> AuthZHookSuccess;
+        _ -> ?AUTH_CHAIN_PASSTHROUGH
+      end;
+    bypass ->
+      ?AUTH_CHAIN_PASSTHROUGH
+  end.
 
 on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
   case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
