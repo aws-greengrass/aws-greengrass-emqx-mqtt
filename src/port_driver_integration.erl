@@ -56,10 +56,10 @@ start() ->
 
 stop() ->
   logger:info("Stopping port driver integration"),
-  process ! stop.
+  greengrass_port_driver ! stop.
 
 init(PortDriver, CallerPID) ->
-  register(process, self()),
+  register(greengrass_port_driver, self()),
   CallerPID ! port_driver_initialized,
   Port = open_port({spawn, PortDriver}, [binary]),
   loop(Port).
@@ -91,20 +91,20 @@ loop(Port, Inflight, Counter, FunMap) ->
               NewInflight = maps:put(RequestId, Caller, Inflight),
               loop(Port, NewInflight, Counter, FunMap);
             _OtherReturnCode ->
-              Caller ! {process, Data},
+              Caller ! {greengrass_port_driver, Data},
               loop(Port, Inflight, Counter, FunMap)
           end
       end;
     {Port, Id, {data, Data}} ->
       Caller = maps:get(Id, Inflight),
       NewInflight = maps:remove(Id, Inflight),
-      Caller ! {process, Data},
+      Caller ! {greengrass_port_driver, Data},
       loop(Port, NewInflight, Counter, FunMap);
     {call, Caller, Msg} ->
       Port ! {self(), {command, term_to_binary([Msg])}},
       receive
         {Port, {data, Data}} ->
-          Caller ! {process, Data}
+          Caller ! {greengrass_port_driver, Data}
       end,
       loop(Port, Inflight, Counter, FunMap);
     stop ->
@@ -131,11 +131,11 @@ request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
 
 register_fun(Atom, Fun) ->
-  process ! {register_fun, Atom, Fun}.
+  greengrass_port_driver ! {register_fun, Atom, Fun}.
 
 receive_back() ->
   receive
-    {process, Data} ->
+    {greengrass_port_driver, Data} ->
       logger:debug("Data received from port: ~p ~n", [Data]),
       [ReturnCode | Result] = Data,
       case ReturnCode of
@@ -147,9 +147,9 @@ receive_back() ->
   end.
 
 call_port(Msg, async) ->
-  process ! {call, self(), Msg, async},
+  greengrass_port_driver ! {call, self(), Msg, async},
   receive_back().
 
 call_port(Msg) ->
-  process ! {call, self(), Msg},
+  greengrass_port_driver ! {call, self(), Msg},
   receive_back().
