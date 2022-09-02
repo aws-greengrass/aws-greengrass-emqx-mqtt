@@ -3,10 +3,13 @@
 #include <array>
 #include <cda_integration.h>
 #include <fstream>
+#include <iostream>
 #include <memory>
 
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
 static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
+static const char *ORIGINAL_EMQX_DATA_DIR_ENV_VAR = "ORIG_EMQX_NODE__DATA_DIR";
+static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 
@@ -16,23 +19,30 @@ int copy_files(const std::filesystem::path &path) {
                                   std::filesystem::copy_options::overwrite_existing |
                                   std::filesystem::copy_options::skip_symlinks;
 
-    const char *original_etc_dir = std::getenv(EMQX_ETC_DIR_ENV_VAR);
+    const char *original_etc_dir = std::getenv(ORIGINAL_EMQX_ETC_DIR_ENV_VAR);
     if (original_etc_dir == nullptr || strlen(original_etc_dir) == 0) {
+        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", ORIGINAL_EMQX_ETC_DIR_ENV_VAR);
+        return 1;
+    }
+    const char *original_data_dir = std::getenv(ORIGINAL_EMQX_DATA_DIR_ENV_VAR);
+    if (original_data_dir == nullptr || strlen(original_data_dir) == 0) {
+        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", ORIGINAL_EMQX_DATA_DIR_ENV_VAR);
+        return 1;
+    }
+    const char *new_etc_path = std::getenv(EMQX_ETC_DIR_ENV_VAR);
+    if (new_etc_path == nullptr || strlen(new_etc_path) == 0) {
         LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_ETC_DIR_ENV_VAR);
         return 1;
     }
-    const char *original_data_dir = std::getenv(EMQX_DATA_DIR_ENV_VAR);
-    if (original_data_dir == nullptr || strlen(original_data_dir) == 0) {
+    const char *new_data_path = std::getenv(EMQX_DATA_DIR_ENV_VAR);
+    if (new_data_path == nullptr || strlen(new_data_path) == 0) {
         LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_DATA_DIR_ENV_VAR);
         return 1;
     }
 
-    auto new_etc_path = path / "etc";
+    // Copy from the original path to the new paths which we be loaded by EMQX
     std::filesystem::copy(original_etc_dir, new_etc_path, recursive_copy_options);
-    setenv(EMQX_ETC_DIR_ENV_VAR, new_etc_path.c_str(), 1);
-    auto new_data_path = path / "data";
     std::filesystem::copy(original_data_dir, new_data_path, recursive_copy_options);
-    setenv(EMQX_DATA_DIR_ENV_VAR, new_data_path.c_str(), 1);
     return 0;
 }
 
