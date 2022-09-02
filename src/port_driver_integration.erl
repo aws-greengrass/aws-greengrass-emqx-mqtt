@@ -49,11 +49,9 @@ start() ->
 
   spawn(?MODULE, init, [Port, self()]),
   receive
-    %% to prevent message sending race conditions,
-    %% ensure 'process' is registered and port is open
+    %% ensure process is registered so we can
+    %% safely send messages without race conditions
     port_driver_initialized -> logger:debug("Initialized port_driver")
-  after 5000 ->
-    exit({error, port_driver_initialization_timed_out})
   end.
 
 stop() ->
@@ -62,8 +60,8 @@ stop() ->
 
 init(PortDriver, CallerPID) ->
   register(process, self()),
-  Port = open_port({spawn, PortDriver}, [binary]),
   CallerPID ! port_driver_initialized,
+  Port = open_port({spawn, PortDriver}, [binary]),
   loop(Port).
 
 empty() -> ok.
