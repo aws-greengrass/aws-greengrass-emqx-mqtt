@@ -82,7 +82,7 @@ add_custom_command(TARGET ${PORT_DRIVER_TARGET_NAME}
 )
 
 set(CONFIG_WRITER_TARGET_NAME "config_writer")
-add_executable(${CONFIG_WRITER_TARGET_NAME} config_writer.cpp)
+add_executable(${CONFIG_WRITER_TARGET_NAME} config_writer/config_writer.cpp)
 set_target_properties(${CONFIG_WRITER_TARGET_NAME} PROPERTIES PREFIX "")
 set_property(TARGET ${CONFIG_WRITER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 target_link_libraries(${CONFIG_WRITER_TARGET_NAME} PUBLIC cda_integration)

@@ -44,6 +44,9 @@ find_package(aws-crt-cpp REQUIRED)
 find_package(GreengrassIpc-cpp REQUIRED)
 
 file(GLOB_RECURSE UNIT_TEST_SOURCES FOLLOW_SYMLINKS ${CMAKE_SOURCE_DIR}/*.cpp ${CMAKE_SOURCE_DIR}/*.hpp)
+# Remove config_writer from the test sources, otherwise it just tries to run the main()
+# method in there, which won't work
+list(FILTER UNIT_TEST_SOURCES EXCLUDE REGEX "config_writer/.*")
 add_executable(${UNIT_TEST_TARGET_NAME} ${UNIT_TEST_SOURCES})
 target_link_libraries(${UNIT_TEST_TARGET_NAME} gtest gtest_main gmock gmock_main AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp port_driver cda_integration)
 
