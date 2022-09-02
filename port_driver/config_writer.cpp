@@ -3,7 +3,6 @@
 #include <array>
 #include <cda_integration.h>
 #include <fstream>
-#include <iostream>
 #include <memory>
 
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
@@ -13,7 +12,7 @@ static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 
-int copy_files(const std::filesystem::path &path) {
+int copy_files() {
     // Copy all etc and data files from read-only into the writable location
     auto recursive_copy_options = std::filesystem::copy_options::recursive |
                                   std::filesystem::copy_options::overwrite_existing |
@@ -65,9 +64,7 @@ int main() {
     aws_logger_init_noalloc(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
 
-    // Write customer-provided values to CWD
-    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
-    if (copy_files(BASE_PATH) != 0) {
+    if (copy_files() != 0) {
         return 1;
     }
 
@@ -165,6 +162,8 @@ int main() {
         "etc/plugins/emqx_web_hook.conf",
     };
 
+    // Write customer-provided values to CWD
+    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
     for (const auto &item : configView.GetAllObjects()) {
         const auto key = item.first;
         const auto val = item.second;
