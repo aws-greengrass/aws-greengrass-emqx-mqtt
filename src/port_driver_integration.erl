@@ -51,7 +51,7 @@ start() ->
   receive
     %% ensure process is registered so we can
     %% safely send messages without race conditions
-    port_driver_initialized -> logger:debug("Initialized port_driver")
+    port_driver_initialized -> ok
   end.
 
 stop() ->
