@@ -114,8 +114,8 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     auto &client = ipc.getIPCClient();
     auto operation = client.NewGetConfiguration();
     GG::GetConfigurationRequest request;
-    // Read everything under the emqx namespace
-    request.SetKeyPath({"emqx"});
+    // Read everything under the configurationFiles namespace
+    request.SetKeyPath({"configurationFiles"});
     auto activate = operation->Activate(request).get();
     if (!activate) {
         LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT, GetConfigurationRequest,
@@ -179,7 +179,7 @@ int main() {
         return 0;
     }
     if (!config_view.IsObject()) {
-        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /emqx was not an object as expected");
+        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /configurationFiles was not an object");
         return 1;
     }
 
@@ -190,16 +190,14 @@ int main() {
     // For us to write the customer provided values into a config file, we must recognize the file path
     // from the JSON key as one of our supported paths in allowed_files. If the key is not in allowed_files
     // we will log that it is unknown, and then continue. This helps with security so that we are not writing
-    // arbitrary files. Additionally, it allows us to ignore the pre-existing keys under the emqx config namespace
-    // which enables backward compatibility. If the user's provided value is not a string, then we will log that fact,
-    // but we will keep going.
+    // arbitrary files. If the user's provided value is not a string, then we will log that fact, but we will keep going
     for (const auto &item : config_view.GetAllObjects()) {
         const auto possible_file_path = item.first;
         const auto customer_config_file_contents = item.second;
         if (customer_config_file_contents.IsString()) {
             if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
                 allowed_files.end()) {
-                LOG_I(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s", possible_file_path.c_str());
+                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s", possible_file_path.c_str());
                 continue;
             }
             auto strVal = customer_config_file_contents.AsString();
@@ -211,7 +209,7 @@ int main() {
             defer { out_path.close(); };
             out_path << strVal << std::endl;
         } else {
-            LOG_I(WRITE_CONFIG_SUBJECT, "Value of %s was not a string", possible_file_path.c_str());
+            LOG_W(WRITE_CONFIG_SUBJECT, "Value of %s was not a string", possible_file_path.c_str());
         }
     }
 }
