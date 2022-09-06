@@ -81,8 +81,8 @@ add_custom_command(TARGET ${PORT_DRIVER_TARGET_NAME}
     COMMAND ${CMAKE_COMMAND} -E copy ${DRIVER_GENERATED_DIR_PATH}/$<TARGET_FILE_NAME:${PORT_DRIVER_TARGET_NAME}> ${DRIVER_OUTPUT_DIR_PATH}/$<TARGET_FILE_NAME:${PORT_DRIVER_TARGET_NAME}>
 )
 
-set(CONFIG_WRITER_TARGET_NAME "config_writer")
-add_executable(${CONFIG_WRITER_TARGET_NAME} config_writer/config_writer.cpp common.cpp)
+set(CONFIG_WRITER_TARGET_NAME "write_config")
+add_executable(${CONFIG_WRITER_TARGET_NAME} write_config/write_config.cpp common.cpp)
 set_target_properties(${CONFIG_WRITER_TARGET_NAME} PROPERTIES PREFIX "")
 set_property(TARGET ${CONFIG_WRITER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 target_link_libraries(${CONFIG_WRITER_TARGET_NAME} PUBLIC cda_integration)

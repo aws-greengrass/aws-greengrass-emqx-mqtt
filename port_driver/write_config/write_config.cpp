@@ -57,7 +57,7 @@ static const std::array<std::string, 33> allowed_files = {
 
 static struct aws_logger our_logger {};
 
-int copy_files() {
+int copy_default_config() {
     // Copy all etc and data files from read-only into the writable location
     auto recursive_copy_options = std::filesystem::copy_options::recursive |
                                   std::filesystem::copy_options::overwrite_existing |
@@ -65,22 +65,22 @@ int copy_files() {
 
     const char *original_etc_dir = std::getenv(ORIGINAL_EMQX_ETC_DIR_ENV_VAR);
     if (original_etc_dir == nullptr || strlen(original_etc_dir) == 0) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", ORIGINAL_EMQX_ETC_DIR_ENV_VAR);
+        LOG_E(WRITE_CONFIG_SUBJECT, "%s not set", ORIGINAL_EMQX_ETC_DIR_ENV_VAR);
         return 1;
     }
     const char *original_data_dir = std::getenv(ORIGINAL_EMQX_DATA_DIR_ENV_VAR);
     if (original_data_dir == nullptr || strlen(original_data_dir) == 0) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", ORIGINAL_EMQX_DATA_DIR_ENV_VAR);
+        LOG_E(WRITE_CONFIG_SUBJECT, "%s not set", ORIGINAL_EMQX_DATA_DIR_ENV_VAR);
         return 1;
     }
     const char *new_etc_path = std::getenv(EMQX_ETC_DIR_ENV_VAR);
     if (new_etc_path == nullptr || strlen(new_etc_path) == 0) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_ETC_DIR_ENV_VAR);
+        LOG_E(WRITE_CONFIG_SUBJECT, "%s not set", EMQX_ETC_DIR_ENV_VAR);
         return 1;
     }
     const char *new_data_path = std::getenv(EMQX_DATA_DIR_ENV_VAR);
     if (new_data_path == nullptr || strlen(new_data_path) == 0) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "%s not set", EMQX_DATA_DIR_ENV_VAR);
+        LOG_E(WRITE_CONFIG_SUBJECT, "%s not set", EMQX_DATA_DIR_ENV_VAR);
         return 1;
     }
 
@@ -118,14 +118,14 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     request.SetKeyPath({"emqx"});
     auto activate = operation->Activate(request).get();
     if (!activate) {
-        LOG_E(CONFIG_WRITER_SUBJECT, ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT, GetConfigurationRequest,
+        LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT, GetConfigurationRequest,
               activate.StatusToString().c_str());
         return 1;
     }
 
     auto responseFuture = operation->GetOperationResult();
     if (responseFuture.wait_for(std::chrono::seconds(ipc.getTimeoutSeconds())) == std::future_status::timeout) {
-        LOG_E(CONFIG_WRITER_SUBJECT, ClientDeviceAuthIntegration::FAILED_TIMEOUT_ERROR_FMT, GetConfigurationRequest);
+        LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_TIMEOUT_ERROR_FMT, GetConfigurationRequest);
         return 1;
     }
     auto responseResult = GG::GetConfigurationResult(responseFuture.get());
@@ -139,7 +139,7 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     // We now have the configuration
     auto *response = responseResult.GetOperationResponse();
     if (response == nullptr || !response->GetValue().has_value()) {
-        LOG_I(CONFIG_WRITER_SUBJECT, "Configuration response was empty");
+        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration response was empty");
         return 0;
     }
 
@@ -149,7 +149,7 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
 int main() {
     setup_logger();
 
-    if (copy_files() != 0) {
+    if (copy_default_config() != 0) {
         return 1;
     }
 
@@ -162,7 +162,7 @@ int main() {
     try {
         ipc.connect();
     } catch (std::exception &e) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "failed to connect to AWS Greengrass due to %s", e.what());
+        LOG_E(WRITE_CONFIG_SUBJECT, "failed to connect to AWS Greengrass due to %s", e.what());
         return 1;
     }
 
@@ -175,11 +175,11 @@ int main() {
     auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
 
     if (config_view.IsNull()) {
-        LOG_I(CONFIG_WRITER_SUBJECT, "Configuration value was null");
+        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration value was null");
         return 0;
     }
     if (!config_view.IsObject()) {
-        LOG_E(CONFIG_WRITER_SUBJECT, "Configuration /emqx was not an object as expected");
+        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /emqx was not an object as expected");
         return 1;
     }
 
@@ -199,7 +199,7 @@ int main() {
         if (customer_config_file_contents.IsString()) {
             if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
                 allowed_files.end()) {
-                LOG_I(CONFIG_WRITER_SUBJECT, "Ignoring unknown key %s", possible_file_path.c_str());
+                LOG_I(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s", possible_file_path.c_str());
                 continue;
             }
             auto strVal = customer_config_file_contents.AsString();
@@ -211,7 +211,7 @@ int main() {
             defer { out_path.close(); };
             out_path << strVal << std::endl;
         } else {
-            LOG_I(CONFIG_WRITER_SUBJECT, "Value of %s was not a string", possible_file_path.c_str());
+            LOG_I(WRITE_CONFIG_SUBJECT, "Value of %s was not a string", possible_file_path.c_str());
         }
     }
 }

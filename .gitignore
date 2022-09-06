@@ -9,7 +9,7 @@ target/
 .idea/
 _build/
 _build_sdk/
-priv/config_writer
+priv/write_config
 emqx/
 __pycache__/
 .vscode
