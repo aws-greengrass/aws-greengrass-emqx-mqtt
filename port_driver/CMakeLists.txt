@@ -51,7 +51,7 @@ include_directories(SYSTEM ${ERL_INCLUDES})
 
 set(PORT_DRIVER_TARGET_NAME "${PROJECT_NAME}")
 link_directories("${ERL_LIBS}")
-add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp)
+add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp common.cpp)
 set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES PREFIX "")
 set_property(TARGET ${PORT_DRIVER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 
