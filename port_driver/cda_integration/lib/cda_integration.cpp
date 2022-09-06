@@ -33,6 +33,8 @@ void ClientDeviceAuthIntegration::connect() {
     greengrassIpcWrapper.setAsRunning();
 }
 
+GreengrassIPCWrapper &ClientDeviceAuthIntegration::getIPCWrapper() { return greengrassIpcWrapper; }
+
 CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
     std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {

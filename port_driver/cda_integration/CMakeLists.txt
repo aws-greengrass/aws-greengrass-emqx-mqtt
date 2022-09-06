@@ -9,4 +9,4 @@ include_directories(include)
 add_subdirectory(lib)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
-target_link_libraries(${PROJECT_NAME} PRIVATE AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC AWS::aws-crt-cpp AWS::EventstreamRpc-cpp AWS::GreengrassIpc-cpp)
