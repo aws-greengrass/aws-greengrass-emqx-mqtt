@@ -39,6 +39,8 @@ static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
 
+static struct aws_logger our_logger {};
+
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { // NOLINT(readability-non-const-parameter)
     const char *logLocation = std::getenv(EMQX_LOG_TO_ENV_VAR);
     if (logLocation == nullptr) {

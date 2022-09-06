@@ -7,7 +7,5 @@
 
 #include <logger.h>
 
-static struct aws_logger our_logger {};
-
 aws_log_level crtStringToLogLevel(const std::string &level);
 aws_log_level erlangStringToLogLevel(const std::string &level);
