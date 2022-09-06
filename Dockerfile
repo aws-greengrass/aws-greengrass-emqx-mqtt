@@ -51,9 +51,13 @@ RUN cd /build \
 
 FROM ${RUN_FROM}
 
+COPY --from=builder /build/patches/entrypoint.sh /usr/bin/
 COPY --from=builder /build/emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
 COPY --from=builder /build/build/emqx/ /opt/emqx
 
+# Backup the etc files so that we always have the defaults available to us
+RUN cp -r /opt/emqx/etc /opt/emqx/etcOrig
+RUN cp -r /opt/emqx/data /opt/emqx/dataOrig
 RUN ln -s /opt/emqx/bin/* /usr/local/bin/
 RUN apk add --no-cache curl ncurses-libs openssl libstdc++ bash
 
@@ -71,6 +75,9 @@ VOLUME ["/opt/emqx/log", "/opt/emqx/data"]
 # Set env variables for docker container
 ENV EMQX_LOG__DIR="/opt/emqx/log"
 ENV EMQX_NODE__DATA_DIR="/opt/emqx/data"
+ENV ORIG_EMQX_NODE__DATA_DIR="/opt/emqx/dataOrig"
+ENV EMQX_NODE__ETC_DIR="/opt/emqx/etc"
+ENV ORIG_EMQX_NODE__ETC_DIR="/opt/emqx/etcOrig"
 ENV EMQX_LISTENER__SSL__EXTERNAL__KEYFILE="/opt/emqx/data/key.pem"
 ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
 
@@ -78,6 +85,6 @@ ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
 # - 8883 port for MQTT(SSL)
 EXPOSE 8883
 
-ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/entrypoint"]
 
-CMD ["/opt/emqx/bin/emqx", "foreground"]
+CMD ["/usr/bin/docker-entrypoint.sh", "/opt/emqx/bin/emqx", "foreground"]
