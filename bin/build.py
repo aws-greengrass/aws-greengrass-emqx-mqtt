@@ -143,10 +143,12 @@ def main():
 
         print("Setting up EMQ X plugin checkout symlink")
         try:
-            os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
-                       target_is_directory=True)
-        except FileExistsError:
+            # Remove existing symlink (if any) before linking
+            os.remove(f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth")
+        except FileNotFoundError:
             pass
+        os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
+                   target_is_directory=True)
 
         os.chdir("emqx")
         print("Building EMQ X")
