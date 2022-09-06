@@ -206,7 +206,7 @@ int main() {
             auto file_path = BASE_PATH / possible_file_path.c_str();
             // try to create the directories as needed, ignoring errors
             std::filesystem::create_directories(file_path.parent_path());
-            // Open file for appending
+            // Open file for writing. Will create file if it doesn't exist. Will remove existing contents if any.
             auto out_path = std::ofstream(file_path);
             defer { out_path.close(); };
             out_path << strVal << std::endl;
