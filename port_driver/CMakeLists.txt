@@ -9,7 +9,7 @@ if (WIN32)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .dll
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 else()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/bin") # .exe
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .exe
 endif()
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/lib") # .so and .dylib
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$<0:>${CMAKE_BINARY_DIR}/liba") # .lib and .a
@@ -51,12 +51,12 @@ include_directories(SYSTEM ${ERL_INCLUDES})
 
 set(PORT_DRIVER_TARGET_NAME "${PROJECT_NAME}")
 link_directories("${ERL_LIBS}")
-add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp)
+add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp common.cpp)
 set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES PREFIX "")
 set_property(TARGET ${PORT_DRIVER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 
 find_package(aws-crt-cpp REQUIRED)
-target_link_libraries(${PORT_DRIVER_TARGET_NAME} PRIVATE AWS::aws-crt-cpp)
+target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC AWS::aws-crt-cpp)
 
 if (APPLE)
     # Erlang has .so hardcoded for Unix, so even on mac we need to use .so instead of .dylib
