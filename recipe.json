@@ -34,8 +34,7 @@
         "listener.ssl.external.max_connections": "1024000",
         "listener.ssl.external.rate_limit": "",
         "listener.ssl.external.handshake_timeout": "15s",
-        "listener.ssl.external.max_conn_rate": "500",
-        "emqx.conf": ""
+        "listener.ssl.external.max_conn_rate": "500"
       }
     }
   },
@@ -52,15 +51,20 @@
       },
       "Lifecycle": {
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\copy_config.cmd && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\lib\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
+        "EMQX_CONF": "{configuration:/configurationFiles}",
         "setEnv": {
-          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
           "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
+          "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\data",
+          "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
+          "EMQX_NODE__ETC_DIR": "{work:path}\\etc",
+          "EMQX_PLUGINS__LOADED_FILE": "{work:path}\\data\\loaded_plugins",
+          "EMQX_MODULES__LOADED_FILE": "{work:path}\\data\\loaded_modules",
           "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
           "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
@@ -83,58 +87,8 @@
           "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
-              "Read": "OWNER",
-              "Execute": "OWNER"
-          }
-        }
-      ]
-    },
-    {
-      "Platform": {
-        "os": "linux",
-        "architecture": "amd64"
-      },
-      "Lifecycle": {
-        "install": {
-          "script": "cp {artifacts:decompressedPath}/emqx/emqx/data/loaded_plugins {work:path}/data"
-        },
-        "Startup": {
-          "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx foreground",
-          "RequiresPrivilege": true,
-          "Timeout": "{configuration:/startupTimeoutSeconds}"
-        },
-        "setEnv": {
-          "EMQX_CONF": "{configuration:/emqx/emqx.conf}",
-          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
-          "EMQX_LOG__DIR": "{work:path}\\logs",
-          "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
-          "EMQX_NODE__DATA_DIR": "{work:path}\\data",
-          "EMQX_PLUGINS__EXPAND_PLUGINS_DIR": "{work:path}\\plugin-data",
-          "EMQX_PLUGINS__LOADED_FILE": "{work:path}/data/loaded_plugins",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "EMQX_LISTENER__SSL__EXTERNAL__KEYFILE": "{work:path}\\data\\key.pem",
-          "EMQX_LISTENER__SSL__EXTERNAL__CERTFILE": "{work:path}\\data\\cert.pem",
-          "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
-          "EMQX_LISTENER__SSL__EXTERNAL": "{configuration:/emqx/listener.ssl.external}",
-          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.external.max_connections}",
-          "EMQX_LISTENER__SSL__EXTERNAL__RATE_LIMIT": "{configuration:/emqx/listener.ssl.external.rate_limit}",
-          "EMQX_LISTENER__SSL__EXTERNAL__HANDSHAKE_TIMEOUT": "{configuration:/emqx/listener.ssl.external.handshake_timeout}",
-          "EMQX_LISTENER__SSL__EXTERNAL__MAX_CONN_RATE": "{configuration:/emqx/listener.ssl.external.max_conn_rate}",
-          "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
-        },
-        "Shutdown": {
-          "Script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop",
-          "RequiresPrivilege": true
-        }
-      },
-      "Artifacts": [
-        {
-          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
-          "Unarchive": "ZIP",
-          "Permission": {
-              "Read": "OWNER",
-              "Execute": "OWNER"
+            "Read": "OWNER",
+            "Execute": "OWNER"
           }
         }
       ]
