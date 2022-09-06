@@ -21,7 +21,7 @@ start(_StartType, _StartArgs) ->
 
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
-    bypass -> skip;
+    bypass -> ok;
     _ ->
       case tls_custom_certificate_verification:enable() of
         ok -> ok;
