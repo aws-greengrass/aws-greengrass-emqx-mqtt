@@ -5,9 +5,12 @@ target/
 *.so
 *.dll
 *.iml
+*.exe
 .idea/
 _build/
 _build_sdk/
+priv/config_writer
 emqx/
 __pycache__/
 .vscode
+.DS_STORE
