@@ -41,4 +41,6 @@ class GreengrassIPCWrapper {
     GG::GreengrassCoreIpcClient &getIPCClient();
 
     void setAsRunning();
+
+    int getTimeoutSeconds() { return timeoutSeconds; };
 };
