@@ -1,21 +1,11 @@
---- emqx	2022-04-29 16:02:24.000000000 -0400
-+++ emqx	2022-05-23 17:09:52.000000000 -0400
-@@ -22,6 +22,9 @@
- # Make sure log directory exists
- mkdir -p "$RUNNER_LOG_DIR"
+--- emqx	2022-08-31 07:20:47.000000000 -0400
++++ emqx	2022-09-06 19:04:45.000000000 -0400
+@@ -379,7 +379,7 @@
  
-+if [ -n "$EMQX_NODE__DATA_DIR" ]; then
-+  RUNNER_DATA_DIR="$EMQX_NODE__DATA_DIR"
-+fi
- # Make sure data directory exists
- mkdir -p "$RUNNER_DATA_DIR"
- 
-@@ -271,7 +274,7 @@
-         ## Merge cuttlefish generated *.args into the vm.args
-         CUTTLE_GEN_ARG_FILE=$(echo "$CONFIG_ARGS" | sed -n 's/^.*\(vm_args[[:space:]]\)//p' | awk '{print $1}')
-         TMP_ARG_FILE="$RUNNER_DATA_DIR/configs/vm.args.tmp"
--        cp "$RUNNER_ETC_DIR/vm.args" "$TMP_ARG_FILE"
-+        cat "$RUNNER_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
-         echo "" >> "$TMP_ARG_FILE"
-         echo "-pa ${REL_DIR}/consolidated" >> "$TMP_ARG_FILE"
-         sed '/^#/d' "$CUTTLE_GEN_ARG_FILE" | sed '/^$/d' | while IFS='' read -r ARG_LINE || [ -n "$ARG_LINE" ]; do
+     ## Merge cuttlefish generated *.args into the vm.args
+     TMP_ARG_FILE="$RUNNER_DATA_DIR/configs/vm.args.tmp"
+-    cp "$RUNNER_ETC_DIR/vm.args" "$TMP_ARG_FILE"
++    cat "$RUNNER_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
+     echo "" >> "$TMP_ARG_FILE"
+     echo "-pa \"${REL_DIR}/consolidated\"" >> "$TMP_ARG_FILE"
+     sed '/^#/d' "$CUTTLE_GEN_ARG_FILE" | sed '/^$/d' | while IFS='' read -r ARG_LINE || [ -n "$ARG_LINE" ]; do

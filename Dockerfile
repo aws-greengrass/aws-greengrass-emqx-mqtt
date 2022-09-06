@@ -85,6 +85,6 @@ ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
 # - 8883 port for MQTT(SSL)
 EXPOSE 8883
 
-ENTRYPOINT ["/usr/bin/entrypoint"]
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]
 
 CMD ["/usr/bin/docker-entrypoint.sh", "/opt/emqx/bin/emqx", "foreground"]
