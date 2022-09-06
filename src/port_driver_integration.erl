@@ -5,7 +5,7 @@
 
 -module(port_driver_integration).
 
--export([start/0, stop/0, init/1]).
+-export([start/0, stop/0, init/2]).
 -export([get_auth_token/2
   , on_client_check_acl/4
   , verify_client_certificate/1
@@ -46,14 +46,21 @@ start() ->
     _ -> exit({error, could_not_load_driver})
   end,
   logger:debug("Loaded port_driver"),
-  spawn(?MODULE, init, [Port]).
+
+  spawn(?MODULE, init, [Port, self()]),
+  receive
+    %% ensure process is registered so we can
+    %% safely send messages without race conditions
+    port_driver_initialized -> ok
+  end.
 
 stop() ->
   logger:info("Stopping port driver integration"),
   process ! stop.
 
-init(PortDriver) ->
+init(PortDriver, CallerPID) ->
   register(process, self()),
+  CallerPID ! port_driver_initialized,
   Port = open_port({spawn, PortDriver}, [binary]),
   loop(Port).
 
