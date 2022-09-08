@@ -1,6 +1,6 @@
---- emqx.cmd	2022-08-29 12:13:05.000000000 -0400
-+++ emqx.cmd	2022-08-29 12:31:26.442952600 -0400
-@@ -35,13 +35,24 @@
+--- emqx.cmd	2022-08-31 07:20:47.000000000 -0400
++++ emqx.cmd	2022-09-01 13:52:36.000000000 -0400
+@@ -35,12 +35,23 @@
  @for %%A in ("%script_dir%\..") do @(
    set rel_root_dir=%%~fA
  )
@@ -10,23 +10,22 @@
  @set rel_dir=%rel_root_dir%\releases\%rel_vsn%
  @set RUNNER_ROOT_DIR=%rel_root_dir%
  
- @set etc_dir=%rel_root_dir%\etc
+-@set etc_dir=%rel_root_dir%\etc
++@if defined EMQX_NODE__ETC_DIR (
++  set etc_dir=%EMQX_NODE__ETC_DIR%
++) else (
++  @set etc_dir=%rel_root_dir%\etc
++)
  @set lib_dir=%rel_root_dir%\lib
 -@set data_dir=%rel_root_dir%\data
--@set emqx_conf=%etc_dir%\emqx.conf
 +@if defined EMQX_NODE__DATA_DIR (
 +  set data_dir=%EMQX_NODE__DATA_DIR%
 +) else (
 +  @set data_dir=%rel_root_dir%\data
 +)
-+@if defined EMQX_NODE__EMQX_CONF (
-+  set emqx_conf=%EMQX_NODE__EMQX_CONF%
-+) else (
-+  @set emqx_conf=%etc_dir%\emqx.conf
-+)
+ @set emqx_conf=%etc_dir%\emqx.conf
  
  @call :find_erts_dir
- @call :find_vm_args
 @@ -72,7 +83,7 @@
  )
  
