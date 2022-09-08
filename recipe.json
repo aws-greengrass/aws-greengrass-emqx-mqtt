@@ -92,6 +92,38 @@
           }
         }
       ]
+    },
+    {
+      "Platform": {
+        "os": "linux"
+      },
+      "Lifecycle": {
+        "install": {
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "script": "docker rmi aws-greengrass-emqx:amd64\ndocker load --input {artifacts:path}/aws-greengrass-emqx.amd64.tar.gz"
+        },
+        "EMQX_CONF": "{configuration:/configurationFiles}",
+        "startup": {
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "timeout": "{configuration:/startupTimeoutSeconds}",
+          "script": "docker run --rm --name emqx -p {configuration:/emqx/listener.ssl.external}:{configuration:/emqx/listener.ssl.external} -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e SVCUID -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e EMQX_LOG__TO -e EMQX_LOG__LEVEL -e CRT_LOG_LEVEL -e IPC_TIMEOUT_SECONDS aws-greengrass-emqx:amd64",
+          "setEnv": {
+            "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
+            "EMQX_LOG__LEVEL": "{configuration:/emqx/log.level}",
+            "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}",
+            "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          }
+        },
+        "shutdown": {
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "script": "docker stop emqx"
+        }
+      },
+      "Artifacts": [
+        {
+          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/aws-greengrass-emqx.amd64.tar.gz"
+        }
+      ]
     }
   ]
 }
