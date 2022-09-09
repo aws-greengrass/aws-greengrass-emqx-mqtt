@@ -55,6 +55,8 @@ COPY --from=builder /build/patches/entrypoint.sh /usr/bin/
 COPY --from=builder /build/emqx/deploy/docker/docker-entrypoint.sh /usr/bin/
 COPY --from=builder /build/build/emqx/ /opt/emqx
 
+# Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
+RUN rm -rf /opt/emqx/etc/certs
 # Backup the etc files so that we always have the defaults available to us
 RUN cp -r /opt/emqx/etc /opt/emqx/etcOrig
 RUN cp -r /opt/emqx/data /opt/emqx/dataOrig
