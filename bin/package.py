@@ -42,26 +42,21 @@ def patch(original, patch_file):
     return out.getvalue().decode()
 
 
-def do_patch(zip_path, erts_version="11.0", add=None):
-    # ini file is only for windows, but we'll just throw it in no matter what. Use \r\n for windows line endings
-    with open("build/erl.ini", "w") as erl_ini:
-        erl_ini.writelines(["[erlang]\r\n",
-                            f"Bindir=.\\\\erts-{erts_version}\\\\bin\r\n",
-                            "Progname=erl\r\n",
-                            "Rootdir=.\\\\\r\n"
-                            ])
-    
+def do_patch(zip_path, add=None):
     if add is None:
         add = {}
-    add[f"emqx/erts-{erts_version}/bin/erl.ini"] = "build/erl.ini"
     add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
     add["emqx/THIRD-PARTY-LICENSES"] = "THIRD-PARTY-LICENSES"
 
-    update_zip(zipname=zip_path, updates={
-        "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
-        "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
-        "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
-    }, add=add)
+    update_zip(
+        zipname=zip_path,
+        updates={
+            "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
+            "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
+            "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
+        },
+        add=add
+    )
 
 
 if __name__ == "__main__":

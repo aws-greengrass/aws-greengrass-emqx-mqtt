@@ -178,6 +178,27 @@ def main():
             subprocess.check_call(f"make -j", shell=True,
                                   env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
 
+        erts_version = None
+        with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as f:
+            for line in f.readlines():
+                if line.startswith('ERTS_VSN'):
+                    erts_version = line.split('ERTS_VSN=')[1].strip().strip("\"")
+        if erts_version is None:
+            raise ValueError("Didn't find ERTS version")
+        print(f'ERTS version {erts_version}')
+
+        # Remove erl.ini. This, paired with not cd-ing in emqx.cmd,
+        # will allow erlang to use the greengrass work dir as its
+        # working directory.  We want this because in Windows,
+        # we moved the etc and data dirs to the work dir.
+        #
+        # Ideally this removal should happen during do_patch,
+        # but ZipFile doesn't support the removal of files.
+        try:
+            os.remove(f'_build/emqx/rel/emqx/erts-{erts_version}/bin/erl.ini')
+        except FileNotFoundError:
+            pass
+
         os.chdir(current_abs_path)
         pathlib.Path("build").mkdir(parents=True, exist_ok=True)
         try:
@@ -188,15 +209,6 @@ def main():
         shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
         print("Patching EMQ X")
-        erts_version = None
-        with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
-            for l in file.readlines():
-                if l.startswith("ERTS_VSN"):
-                    erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
-        if erts_version is None:
-            raise ValueError("Didn't find ERTS version")
-        print("ERTS version", erts_version)
-
         add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf",
                "emqx/etc/acl.conf": "patches/acl.conf",
                "emqx/etc/emqx.conf": "patches/emqx.conf"}
@@ -207,7 +219,7 @@ def main():
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
             add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
-        do_patch("build/emqx.zip", erts_version=erts_version, add=add)
+        do_patch("build/emqx.zip", add=add)
 
     os.chdir(current_abs_path)
     if quick_mode:
