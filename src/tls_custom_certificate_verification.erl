@@ -26,7 +26,7 @@ enable() ->
   end.
 
 %% Restart the provided listener and log the result
--spec(restart_updated_listener(emqx_listeners:listener()) -> ok).
+-spec(restart_updated_listener(emqx_listeners:listener()) -> ok | {error, term()}).
 restart_updated_listener(Listener) ->
   Name = maps:get(name, Listener),
   Proto = maps:get(proto, Listener),
@@ -35,9 +35,7 @@ restart_updated_listener(Listener) ->
     ok ->
       logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
         [Name, Proto, ListenOn]);
-    {error, Reason} ->
-      logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
-        [Name, Proto, ListenOn, Reason])
+    {error, Reason} -> {error, Reason}
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
