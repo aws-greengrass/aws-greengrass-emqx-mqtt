@@ -198,6 +198,8 @@ def main():
             os.remove(f'_build/emqx/rel/emqx/erts-{erts_version}/bin/erl.ini')
         except FileNotFoundError:
             pass
+        # Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
+        shutil.rmtree("_build/emqx/rel/emqx/etc/certs")
 
         os.chdir(current_abs_path)
         pathlib.Path("build").mkdir(parents=True, exist_ok=True)
