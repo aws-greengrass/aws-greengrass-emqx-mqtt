@@ -1,5 +1,5 @@
 --- emqx.cmd	(revision 2af895e5796695f9d0e1538b73401d11531909d4)
-+++ emqx.cmd	(date 1662698710131)
++++ emqx.cmd	(date 1662754006660)
 @@ -38,9 +38,17 @@
  @set rel_dir=%rel_root_dir%\releases\%rel_vsn%
  @set RUNNER_ROOT_DIR=%rel_root_dir%
@@ -20,7 +20,17 @@
  @set emqx_conf=%etc_dir%\emqx.conf
 
  @call :find_erts_dir
-@@ -72,7 +80,7 @@
+@@ -65,6 +73,9 @@
+ @for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.name "%emqx_conf%"`) do @(
+   @call :set_trim node_name %%I
+ )
++@if "%node_name%" == "" (
++  set node_name="emqx@127.0.0.1"
++)
+
+ :: Extract node cookie from emqx.conf
+ @for /f "usebackq delims=\= tokens=2" %%I in (`findstr /b node\.cookie "%emqx_conf%"`) do @(
+@@ -72,7 +83,7 @@
  )
 
  :: Write the erl.ini file to set up paths relative to this script
@@ -29,7 +39,7 @@
 
  :: If a start.boot file is not present, copy one from the named .boot file
  @if not exist "%rel_dir%\start.boot" (
-@@ -149,7 +157,7 @@
+@@ -149,7 +160,7 @@
  @goto :eof
 
  :generate_app_config
@@ -38,7 +48,7 @@
  @for /f "delims=" %%A in ('%%gen_config_cmd%%') do @(
    set generated_config_args=%%A
  )
-@@ -224,6 +232,15 @@
+@@ -224,6 +235,15 @@
  :: window service?
  :: @%erlsrv% stop %service_name%
  @%escript% %nodetool% %node_type% %node_name% -setcookie %node_cookie% stop
@@ -54,7 +64,7 @@
  @goto :eof
 
  :: Relup and reldown
-@@ -243,11 +260,9 @@
+@@ -243,11 +263,9 @@
  @call :create_mnesia_dir
  @call :generate_app_config
  @set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
