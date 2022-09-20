@@ -1,5 +1,5 @@
 ** aws-iot-device-sdk-cpp-v2; version 1.18.2 -- https://github.com/aws/aws-iot-device-sdk-cpp-v2/
-** EMQ X; version 4.4.3 -- https://emqx.io/
+** EMQX; version 4.4.9 -- https://emqx.io/
 ** Erlang OTP; version 24.0 -- https://www.erlang.org/
 
 Apache License
@@ -187,7 +187,7 @@ limitations under the License.
 
 * For aws-iot-device-sdk-cpp-v2 see also this required NOTICE:
     Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-* For EMQ X see also this required NOTICE:
+* For EMQX see also this required NOTICE:
 
     EMQX, a highly scalable, highly available distributed MQTT messaging broker
 for IoT.
