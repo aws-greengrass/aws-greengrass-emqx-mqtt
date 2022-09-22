@@ -38,7 +38,7 @@ GreengrassIPCWrapper &ClientDeviceAuthIntegration::getIPCWrapper() { return gree
 CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
     std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
-    CertSubscribeUpdateStatus certSubscribeStatus =
+    const CertSubscribeUpdateStatus certSubscribeStatus =
         certificateUpdater.subscribeToUpdates(std::move(basePath), std::move(subscription));
     if (certSubscribeStatus != CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS) {
         LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to cert updates with status %d", (int)certSubscribeStatus);
@@ -51,8 +51,8 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,
                                                                                        const char *pem) {
     LOG_D(CDA_INTEG_SUBJECT, "get_client_device_auth_token called with clientId: %s", clientId);
-    Aws::Crt::String clientIdStr(clientId);
-    Aws::Crt::String pemStr(pem);
+    const Aws::Crt::String clientIdStr(clientId);
+    const Aws::Crt::String pemStr(pem);
 
     GG::MQTTCredential mqttCredential;
     mqttCredential.SetClientId(clientIdStr);
@@ -104,9 +104,9 @@ AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *client
     LOG_D(CDA_INTEG_SUBJECT, "on_check_acl called with clientId: %s, token: %s, resource: %s, operation: %s", clientId,
           token, resource, operation);
 
-    Aws::Crt::String tokenStr(token);
-    Aws::Crt::String resourceStr(resource);
-    Aws::Crt::String operationStr(operation);
+    const Aws::Crt::String tokenStr(token);
+    const Aws::Crt::String resourceStr(resource);
+    const Aws::Crt::String operationStr(operation);
 
     GG::AuthorizeClientDeviceActionRequest request;
     request.SetClientDeviceAuthToken(tokenStr);
@@ -154,7 +154,7 @@ AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *client
 
 bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem) {
     LOG_D(CDA_INTEG_SUBJECT, "verify_client_certificate called");
-    Aws::Crt::String certPemStr(certPem);
+    const Aws::Crt::String certPemStr(certPem);
 
     GG::ClientDeviceCredential clientDeviceCredential;
     clientDeviceCredential.SetClientDeviceCertificate(certPemStr);
