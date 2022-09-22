@@ -19,10 +19,14 @@ static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
 
+static const char *RAW_CONFIG_NAMESPACE = "rawConfigurationFiles";
+static const char *MERGE_CONFIG_NAMESPACE = "mergeConfigurationFiles";
+
+static const char *EMQX_CONF_FILE = "etc/emqx.conf";
 static const std::array<std::string, 33> allowed_files = {
     "data/loaded_plugins",
     "data/loaded_modules",
-    "etc/emqx.conf",
+    EMQX_CONF_FILE,
     "etc/acl.conf",
     "etc/psk.txt",
     "etc/ssl_dist.conf",
@@ -110,12 +114,11 @@ void setup_logger() {
     aws_logger_set(&our_logger);
 }
 
-std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrapper &ipc) {
+std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrapper &ipc, const char *config_key) {
     auto &client = ipc.getIPCClient();
     auto operation = client.NewGetConfiguration();
     GG::GetConfigurationRequest request;
-    // Read everything under the configurationFiles namespace
-    request.SetKeyPath({"configurationFiles"});
+    request.SetKeyPath({config_key});
     auto activate = operation->Activate(request).get();
     if (!activate) {
         LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT, GetConfigurationRequest,
@@ -151,6 +154,78 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     return response->GetValue().value();
 }
 
+int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_namespace) {
+    auto config_value = get_emqx_configuration(ipc, config_namespace);
+    // If we couldn't get the configuration due to an error and need to exit, then exit with the
+    // exit code from get_emqx_configuration.
+    if (holds_alternative<int>(config_value)) {
+        return get<int>(config_value);
+    }
+    auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
+
+    if (config_view.IsNull()) {
+        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration value /%s was null", config_namespace);
+        return 0;
+    }
+    if (!config_view.IsObject()) {
+        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /%s was present, but not an object", config_namespace);
+        return 1;
+    }
+
+    const bool shouldAppend = config_namespace == MERGE_CONFIG_NAMESPACE;
+
+    // Write customer-provided values to CWD
+    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
+    // Configuration is in the form of
+    // {"file/path": "file contents\n another line of file contents"}
+    // For us to write the customer provided values into a config file, we must recognize the file path
+    // from the JSON key as one of our supported paths in allowed_files. If the key is not in allowed_files
+    // we will log that it is unknown, and then continue. This helps with security so that we are not writing
+    // arbitrary files. If the user's provided value is not a string, then we will log that fact, but we will keep
+    // going
+    for (const auto &item : config_view.GetAllObjects()) {
+        const auto possible_file_path = item.first;
+        const auto customer_config_file_contents = item.second;
+        if (customer_config_file_contents.IsString()) {
+            if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
+                allowed_files.end()) {
+                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s/%s", config_namespace, possible_file_path.c_str());
+                continue;
+            }
+
+            // Raw config namespace does not allow etc/emqx.conf. Fail if it is provided here.
+            if (!shouldAppend && possible_file_path == EMQX_CONF_FILE) {
+                LOG_E(WRITE_CONFIG_SUBJECT, "%s is not allowed in %s", possible_file_path.c_str(), config_namespace);
+                return 1;
+            }
+
+            auto strVal = customer_config_file_contents.AsString();
+            auto file_path = BASE_PATH / possible_file_path.c_str();
+            // try to create the directories as needed, ignoring errors
+            std::filesystem::create_directories(file_path.parent_path());
+
+            std::ofstream::openmode open_mode = std::ofstream::out;
+            if (shouldAppend) {
+                // enable append mode
+                open_mode |= std::ofstream::app;
+            }
+            // Open file for writing. Will create file if it doesn't exist.
+            auto out_path = std::ofstream(file_path, open_mode);
+            defer { out_path.close(); };
+            if (shouldAppend) {
+                // Immediately add a new line so that user's contents definitely come in a line after the existing
+                // values
+                out_path << std::endl;
+            }
+            out_path << strVal << std::endl;
+        } else {
+            LOG_W(WRITE_CONFIG_SUBJECT, "Value of %s/%s was not a string", config_namespace,
+                  possible_file_path.c_str());
+        }
+    }
+    return 0;
+}
+
 int main() {
     setup_logger();
 
@@ -171,50 +246,13 @@ int main() {
         return 1;
     }
 
-    auto config_value = get_emqx_configuration(ipc);
-    // If we couldn't get the configuration due to an error and need to exit, then exit with the
-    // exit code from get_emqx_configuration.
-    if (holds_alternative<int>(config_value)) {
-        return get<int>(config_value);
-    }
-    auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
-
-    if (config_view.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration value was null");
-        return 0;
-    }
-    if (!config_view.IsObject()) {
-        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /configurationFiles was not an object");
-        return 1;
-    }
-
-    // Write customer-provided values to CWD
-    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
-    // Configuration is in the form of
-    // {"file/path": "file contents\n another line of file contents"}
-    // For us to write the customer provided values into a config file, we must recognize the file path
-    // from the JSON key as one of our supported paths in allowed_files. If the key is not in allowed_files
-    // we will log that it is unknown, and then continue. This helps with security so that we are not writing
-    // arbitrary files. If the user's provided value is not a string, then we will log that fact, but we will keep going
-    for (const auto &item : config_view.GetAllObjects()) {
-        const auto possible_file_path = item.first;
-        const auto customer_config_file_contents = item.second;
-        if (customer_config_file_contents.IsString()) {
-            if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
-                allowed_files.end()) {
-                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s", possible_file_path.c_str());
-                continue;
-            }
-            auto strVal = customer_config_file_contents.AsString();
-            auto file_path = BASE_PATH / possible_file_path.c_str();
-            // try to create the directories as needed, ignoring errors
-            std::filesystem::create_directories(file_path.parent_path());
-            // Open file for writing. Will create file if it doesn't exist. Will remove existing contents if any.
-            auto out_path = std::ofstream(file_path);
-            defer { out_path.close(); };
-            out_path << strVal << std::endl;
-        } else {
-            LOG_W(WRITE_CONFIG_SUBJECT, "Value of %s was not a string", possible_file_path.c_str());
+    // Get user config for the raw and then merge. Merge will be applied on top of raw if
+    // the same file is specified in both sections for some reason.
+    for (const char *config_namespace : {RAW_CONFIG_NAMESPACE, MERGE_CONFIG_NAMESPACE}) {
+        const int ret = read_config_and_update_files(ipc, config_namespace);
+        if (ret != 0) {
+            return ret;
         }
     }
+    return 0;
 }
