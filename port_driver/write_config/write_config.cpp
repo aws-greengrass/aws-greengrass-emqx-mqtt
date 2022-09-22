@@ -88,6 +88,8 @@ int copy_default_config() {
         return 1;
     }
 
+    LOG_I(WRITE_CONFIG_SUBJECT, "Copying default EMQX configuration");
+
     // Copy from the original path to the new paths which we be loaded by EMQX
     std::filesystem::copy(original_etc_dir, new_etc_path, recursive_copy_options);
     std::filesystem::copy(original_data_dir, new_data_path, recursive_copy_options);
@@ -135,7 +137,10 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     auto responseType = responseResult.GetResultType();
     if (responseResult.GetOperationError() != nullptr &&
         responseResult.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
-        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration value was not present");
+        LOG_I(
+            WRITE_CONFIG_SUBJECT,
+            "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
+            config_key, config_key);
         return 0;
     }
     if (responseType != OPERATION_RESPONSE) {
@@ -147,7 +152,9 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     // We now have the configuration
     auto *response = responseResult.GetOperationResponse();
     if (response == nullptr || !response->GetValue().has_value()) {
-        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration response was empty");
+        LOG_I(WRITE_CONFIG_SUBJECT,
+              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
+              config_key, config_key);
         return 0;
     }
 
@@ -164,14 +171,17 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
     auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
 
     if (config_view.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration value /%s was null", config_namespace);
+        LOG_I(WRITE_CONFIG_SUBJECT,
+              "Configuration value /%s was null. This is not a problem, but no configuration changes in /%s will apply",
+              config_namespace, config_namespace);
         return 0;
     }
     if (!config_view.IsObject()) {
         LOG_E(WRITE_CONFIG_SUBJECT,
-              "Configuration /%s was present, but not an object. Fix this by updating the deployment with "
+              "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
+              "by updating the deployment with "
               "\"RESET\":[\"/%s\"]",
-              config_namespace, config_namespace);
+              config_namespace, config_namespace, config_namespace);
         return 1;
     }
 
@@ -192,16 +202,16 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
         if (customer_config_file_contents.IsString()) {
             if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
                 allowed_files.end()) {
-                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key /%s/%s", config_namespace,
-                      possible_file_path.c_str());
+                LOG_W(WRITE_CONFIG_SUBJECT, "Unknown file %s. Configuration from /%s/%s will not be applied",
+                      possible_file_path.c_str(), config_namespace, possible_file_path.c_str());
                 continue;
             }
 
             // Raw config namespace does not allow etc/emqx.conf. Fail if it is provided here.
             if (!shouldAppend && possible_file_path == EMQX_CONF_FILE) {
-                LOG_E(WRITE_CONFIG_SUBJECT,
-                      "%s is not allowed in /%s. Fix this by updating the deployment with \"RESET\":[\"/%s/%s\"]",
-                      possible_file_path.c_str(), config_namespace, config_namespace, possible_file_path.c_str());
+                LOG_E(WRITE_CONFIG_SUBJECT, "Unable to replace %s. Please specify %s value overrides in %s and not %s",
+                      possible_file_path.c_str(), possible_file_path.c_str(), MERGE_CONFIG_NAMESPACE,
+                      RAW_CONFIG_NAMESPACE);
                 return 1;
             }
 
@@ -214,6 +224,9 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
             if (shouldAppend) {
                 // enable append mode
                 open_mode |= std::ofstream::app;
+                LOG_I(WRITE_CONFIG_SUBJECT, "Applying configuration value overrides to %s", possible_file_path.c_str());
+            } else {
+                LOG_W(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", possible_file_path.c_str());
             }
             // Open file for writing. Will create file if it doesn't exist.
             auto out_path = std::ofstream(file_path, open_mode);
@@ -229,8 +242,10 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
                   possible_file_path.c_str());
         } else {
             LOG_E(WRITE_CONFIG_SUBJECT,
-                  "Value of /%s/%s was not a string. Fix this by updating the deployment with \"RESET\":[\"/%s/%s\"]",
-                  config_namespace, possible_file_path.c_str(), config_namespace, possible_file_path.c_str());
+                  "Value of /%s/%s was not a string. Configuration from /%s/%s will not be applied. Fix this by "
+                  "updating the deployment with \"RESET\":[\"/%s/%s\"]",
+                  config_namespace, possible_file_path.c_str(), config_namespace, possible_file_path.c_str(),
+                  config_namespace, possible_file_path.c_str());
             return 1;
         }
     }
