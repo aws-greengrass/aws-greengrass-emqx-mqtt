@@ -5,17 +5,17 @@
 
 -module(aws_greengrass_emqx_conf).
 
--export([greengrass_authorization_mode/0, greengrass_broker_server_certificate_mode/0]).
+-export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
--type(greengrass_authorization_mode() :: enabled | enabled_bypass_on_failure | bypass).
--type(greengrass_broker_server_certificate_mode() :: enabled | disabled).
+-type(auth_mode() :: enabled | bypass_on_failure | bypass).
+-type(use_greengrass_managed_certificates() :: true | false).
 
--export_type([greengrass_authorization_mode/0, greengrass_broker_server_certificate_mode/0]).
+-export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
--spec(greengrass_authorization_mode() -> greengrass_authorization_mode()).
-greengrass_authorization_mode() ->
-  application:get_env(aws_greengrass_emqx_auth, greengrass_authorization_mode, enabled).
+-spec(auth_mode() -> auth_mode()).
+auth_mode() ->
+  application:get_env(aws_greengrass_emqx_auth, auth_mode, enabled).
 
--spec(greengrass_broker_server_certificate_mode() -> greengrass_broker_server_certificate_mode()).
-greengrass_broker_server_certificate_mode() ->
-  application:get_env(aws_greengrass_emqx_auth, greengrass_broker_server_certificate_mode, enabled).
+-spec(use_greengrass_managed_certificates() -> use_greengrass_managed_certificates()).
+use_greengrass_managed_certificates() ->
+  application:get_env(aws_greengrass_emqx_auth, use_greengrass_managed_certificates, true).

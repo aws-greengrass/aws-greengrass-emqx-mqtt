@@ -27,10 +27,10 @@ load(Env) ->
 %%--------------------------------------------------------------------
 
 execute_auth_hook(Hook) ->
-  case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
+  case aws_greengrass_emqx_conf:auth_mode() of
     enabled ->
       Hook();
-    enabled_bypass_on_failure ->
+    bypass_on_failure ->
       case catch Hook() of
         {_, #{auth_result := success}} = AuthNHookSuccess -> AuthNHookSuccess;
         {_, allow} = AuthZHookSuccess -> AuthZHookSuccess;
@@ -41,7 +41,7 @@ execute_auth_hook(Hook) ->
   end.
 
 on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
-  case aws_greengrass_emqx_conf:greengrass_authorization_mode() of
+  case aws_greengrass_emqx_conf:auth_mode() of
     bypass ->
       {ok, Props};
     _ ->
