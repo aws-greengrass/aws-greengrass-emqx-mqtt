@@ -168,7 +168,10 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
         return 0;
     }
     if (!config_view.IsObject()) {
-        LOG_E(WRITE_CONFIG_SUBJECT, "Configuration /%s was present, but not an object", config_namespace);
+        LOG_E(WRITE_CONFIG_SUBJECT,
+              "Configuration /%s was present, but not an object. Fix this by updating the deployment with "
+              "\"RESET\":[\"/%s\"]",
+              config_namespace, config_namespace);
         return 1;
     }
 
@@ -189,13 +192,16 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
         if (customer_config_file_contents.IsString()) {
             if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
                 allowed_files.end()) {
-                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key %s/%s", config_namespace, possible_file_path.c_str());
+                LOG_W(WRITE_CONFIG_SUBJECT, "Ignoring unknown key /%s/%s", config_namespace,
+                      possible_file_path.c_str());
                 continue;
             }
 
             // Raw config namespace does not allow etc/emqx.conf. Fail if it is provided here.
             if (!shouldAppend && possible_file_path == EMQX_CONF_FILE) {
-                LOG_E(WRITE_CONFIG_SUBJECT, "%s is not allowed in %s", possible_file_path.c_str(), config_namespace);
+                LOG_E(WRITE_CONFIG_SUBJECT,
+                      "%s is not allowed in /%s. Fix this by updating the deployment with \"RESET\":[\"/%s/%s\"]",
+                      possible_file_path.c_str(), config_namespace, config_namespace, possible_file_path.c_str());
                 return 1;
             }
 
@@ -218,9 +224,14 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
                 out_path << std::endl;
             }
             out_path << strVal << std::endl;
-        } else {
-            LOG_W(WRITE_CONFIG_SUBJECT, "Value of %s/%s was not a string", config_namespace,
+        } else if (customer_config_file_contents.IsNull()) {
+            LOG_I(WRITE_CONFIG_SUBJECT, "Value of /%s/%s was null. The file will not be modified", config_namespace,
                   possible_file_path.c_str());
+        } else {
+            LOG_E(WRITE_CONFIG_SUBJECT,
+                  "Value of /%s/%s was not a string. Fix this by updating the deployment with \"RESET\":[\"/%s/%s\"]",
+                  config_namespace, possible_file_path.c_str(), config_namespace, possible_file_path.c_str());
+            return 1;
         }
     }
     return 0;
