@@ -81,7 +81,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         return;
     }
 
-    CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value());
+    const CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value());
     if (writeStatus != CertWriteStatus::WRITE_SUCCESS) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int)writeStatus);
         return;

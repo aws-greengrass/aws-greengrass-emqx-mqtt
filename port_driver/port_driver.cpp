@@ -354,7 +354,7 @@ static void check_acl(void *buf) {
           "action %s",
           pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
 
-    AuthorizationStatus authorized = pack->context->cda_integration->on_check_acl(
+    const AuthorizationStatus authorized = pack->context->cda_integration->on_check_acl(
         pack->client_id.get(), pack->auth_token.get(), pack->resource.get(), pack->operation.get());
     switch (authorized) {
     case AuthorizationStatus::AUTHORIZED:
@@ -420,7 +420,7 @@ static void verify_client_certificate(void *buf) {
 
     LOG_D(PORT_DRIVER_SUBJECT, "Handling verify_client_certificate request");
 
-    bool result = pack->context->cda_integration->verify_client_certificate(pack->pem.get());
+    const bool result = pack->context->cda_integration->verify_client_certificate(pack->pem.get());
 
     pack->result = result ? ATOMS.valid : ATOMS.invalid;
     pack->returnCode = RETURN_CODE_SUCCESS;
@@ -465,7 +465,7 @@ void handle_certificate_update_subscription(DriverContext *context) {
         [context]([[maybe_unused]] Aws::Greengrass::CertificateUpdateEvent *event) {
             send_event_to_port(context, ATOMS.certificate_update);
         });
-    CertSubscribeUpdateStatus result =
+    const CertSubscribeUpdateStatus result =
         context->cda_integration->subscribeToCertUpdates(std::move(baseDirPath), std::move(callback));
     result_atom = result == CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS ? ATOMS.valid : ATOMS.invalid;
     return_code = RETURN_CODE_SUCCESS;
