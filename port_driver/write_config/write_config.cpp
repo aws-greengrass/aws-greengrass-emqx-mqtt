@@ -19,7 +19,7 @@ static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
 
-static const char *RAW_CONFIG_NAMESPACE = "rawConfigurationFiles";
+static const char *REPLACE_CONFIG_NAMESPACE = "replaceConfigurationFiles";
 static const char *MERGE_CONFIG_NAMESPACE = "mergeConfigurationFiles";
 
 static const char *EMQX_CONF_FILE = "etc/emqx.conf";
@@ -207,11 +207,11 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
                 continue;
             }
 
-            // Raw config namespace does not allow etc/emqx.conf. Fail if it is provided here.
+            // replace config namespace does not allow etc/emqx.conf. Fail if it is provided here.
             if (!shouldAppend && possible_file_path == EMQX_CONF_FILE) {
                 LOG_E(WRITE_CONFIG_SUBJECT, "Unable to replace %s. Please specify %s value overrides in %s and not %s",
                       possible_file_path.c_str(), possible_file_path.c_str(), MERGE_CONFIG_NAMESPACE,
-                      RAW_CONFIG_NAMESPACE);
+                      REPLACE_CONFIG_NAMESPACE);
                 return 1;
             }
 
@@ -272,9 +272,9 @@ int main() {
         return 1;
     }
 
-    // Get user config for the raw and then merge. Merge will be applied on top of raw if
+    // Get user config for the replace and then merge. Merge will be applied on top of replace if
     // the same file is specified in both sections for some reason.
-    for (const char *config_namespace : {RAW_CONFIG_NAMESPACE, MERGE_CONFIG_NAMESPACE}) {
+    for (const char *config_namespace : {REPLACE_CONFIG_NAMESPACE, MERGE_CONFIG_NAMESPACE}) {
         const int ret = read_config_and_update_files(ipc, config_namespace);
         if (ret != 0) {
             return ret;
