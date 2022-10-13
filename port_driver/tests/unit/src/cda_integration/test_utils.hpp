@@ -7,6 +7,7 @@
 
 #include <logger.h>
 #include <string>
+#include <fstream>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
 namespace GG = Aws::Greengrass;
@@ -16,7 +17,10 @@ static const std::string privateKeyFilePath = filePath + "/key.pem";
 static const std::string certFilePath = filePath + "/cert.pem";
 static const std::string testPrivateKey = "testPrivateKey";
 static const std::string testCert = "testCert";
-static const std::string testCACert = "testCACert";
+static const std::vector<std::string> testCACerts = {
+        "intermediate",
+        "root"
+};
 
 [[maybe_unused]]
 static struct aws_logger our_logger {};
@@ -25,6 +29,17 @@ static struct aws_logger_standard_options logger_options = {
         .level = AWS_LL_WARN,
         .file = stderr,
 };
+
+[[maybe_unused]]
+static std::vector<std::string> readLines(std::string filename) {
+    std::ifstream file(filename);
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) {
+        lines.push_back(line);
+    }
+    return lines;
+}
 
 static const void delete_file(std::string fileName) {
     if (!std::filesystem::remove(fileName)) {

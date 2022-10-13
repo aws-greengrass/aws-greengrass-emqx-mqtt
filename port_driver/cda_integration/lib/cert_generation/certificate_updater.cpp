@@ -16,7 +16,8 @@ static const std::filesystem::path EMQX_KEY_PATH = std::filesystem::path{"key.pe
 static const std::filesystem::path EMQX_PEM_PATH = std::filesystem::path{"cert.pem"};
 
 CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(const Aws::Crt::String &privateKeyValue,
-                                                             const Aws::Crt::String &certValue) {
+                                                             const Aws::Crt::String &certValue,
+                                                             const Aws::Crt::Vector<Aws::Crt::String> &caCerts) {
 
     if (!basePath) {
         return CertWriteStatus::WRITE_ERROR_BASE_PATH;
@@ -37,8 +38,12 @@ CertWriteStatus CertificateUpdatesHandler::writeCertsToFiles(const Aws::Crt::Str
         out_key_path << privateKeyValue.c_str();
         out_key_path.close();
 
+        // write the entire cert chain as a pem file
         auto out_pem_path = std::ofstream(path / EMQX_PEM_PATH);
         out_pem_path << certValue.c_str();
+        for (const auto &caCert : caCerts) {
+            out_pem_path << std::endl << caCert.c_str();
+        }
         out_pem_path.close();
     } catch (std::exception &e) {
         // TODO: unit test for this branch
@@ -81,7 +86,7 @@ void CertificateUpdatesHandler::OnStreamEvent(GG::CertificateUpdateEvent *respon
         return;
     }
 
-    const CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value());
+    const CertWriteStatus writeStatus = writeCertsToFiles(privateKey.value(), cert.value(), allCAs.value());
     if (writeStatus != CertWriteStatus::WRITE_SUCCESS) {
         LOG_E(CERT_UPDATER_SUBJECT, "Failed to write certificates to files with code %d", (int)writeStatus);
         return;
