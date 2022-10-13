@@ -21,15 +21,6 @@ static const std::vector<std::string> testCACerts = {
         "intermediate",
         "root"
 };
-[[maybe_unused]]
-static Aws::Crt::Vector<Aws::Crt::String> convertCACertsToCrt() {
-    auto certCACerts = Aws::Crt::Vector<Aws::Crt::String>();
-    for (const auto &cert : testCACerts) {
-        Aws::Crt::String crtCACert(cert);
-        certCACerts.emplace_back(crtCACert);
-    }
-    return certCACerts;
-}
 
 [[maybe_unused]]
 static struct aws_logger our_logger {};

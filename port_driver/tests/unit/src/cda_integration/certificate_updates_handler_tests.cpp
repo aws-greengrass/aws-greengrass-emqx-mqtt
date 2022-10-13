@@ -37,7 +37,7 @@ void CertificateUpdatesHandlerTester::SetUp() {
     testCertUpdate = CertificateUpdate();
     optionalTestCertUpdate = Optional<CertificateUpdate>(testCertUpdate);
     testResponse = new CertificateUpdateEvent();
-    caCerts = convertCACertsToCrt();
+    caCerts = Aws::Crt::Vector<Aws::Crt::String>(testCACerts.begin(), testCACerts.end());
 }
 
 void CertificateUpdatesHandlerTester::TearDown() {
