@@ -29,7 +29,7 @@ class CertificateUpdatesHandlerTester : public ::testing::Test {
     CertificateUpdate testCertUpdate;
     Optional<CertificateUpdate> optionalTestCertUpdate;
     CertificateUpdateEvent *testResponse;
-    Aws::Crt::Vector<Aws::Crt::String> caCerts;
+    Vector<String> caCerts;
 };
 
 void CertificateUpdatesHandlerTester::SetUp() {
@@ -37,7 +37,7 @@ void CertificateUpdatesHandlerTester::SetUp() {
     testCertUpdate = CertificateUpdate();
     optionalTestCertUpdate = Optional<CertificateUpdate>(testCertUpdate);
     testResponse = new CertificateUpdateEvent();
-    caCerts = Aws::Crt::Vector<Aws::Crt::String>(testCACerts.begin(), testCACerts.end());
+    caCerts = Vector<String>(testCACerts.begin(), testCACerts.end());
 }
 
 void CertificateUpdatesHandlerTester::TearDown() {
