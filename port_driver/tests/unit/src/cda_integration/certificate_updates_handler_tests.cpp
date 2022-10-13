@@ -76,13 +76,13 @@ TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestValidResponse) {
     handler = new CertificateUpdatesHandler(std::move(testPath), std::move(subscription_callback));
     handler->OnStreamEvent(testResponse);
     EXPECT_TRUE(std::filesystem::exists(privateKeyFilePath));
-    EXPECT_EQ(readFile(privateKeyFilePath).front(), testPrivateKey);
+    EXPECT_EQ(readLines(privateKeyFilePath).front(), testPrivateKey);
 
     auto expectedCertChain = std::vector<std::string>(testCACerts);
     expectedCertChain.insert(expectedCertChain.begin(), testCert);
 
     EXPECT_TRUE(std::filesystem::exists(certFilePath));
-    EXPECT_EQ(readFile(certFilePath), expectedCertChain);
+    EXPECT_EQ(readLines(certFilePath), expectedCertChain);
 }
 
 TEST_F(CertificateUpdatesHandlerTester, OnStreamEventTestNoPrivateKey) {

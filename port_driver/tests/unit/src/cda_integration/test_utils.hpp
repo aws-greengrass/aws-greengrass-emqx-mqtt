@@ -40,7 +40,7 @@ static struct aws_logger_standard_options logger_options = {
 };
 
 [[maybe_unused]]
-static std::vector<std::string> readFile(std::string filename) {
+static std::vector<std::string> readLines(std::string filename) {
     std::ifstream file(filename);
     std::vector<std::string> lines;
     std::string line;
