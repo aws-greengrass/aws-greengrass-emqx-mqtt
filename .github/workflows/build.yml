@@ -16,6 +16,13 @@ jobs:
         otp: [ '24.0' ]
 
     steps:
+      - name: Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update && sudo apt install -y  llvm-symbolizer
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang-14 120 --slave /usr/bin/g++ g++ /usr/bin/clang-14
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-14 120
+          g++ --version
       - uses: actions/checkout@v3
         with:
           submodules: recursive
@@ -32,12 +39,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-add-repository "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" && sudo apt update && sudo apt install -y clang-tidy-14
-          # Add llvm-14 binaries into the path early on
-          echo "/usr/lib/llvm-14/bin" >> $GITHUB_PATH
       - name: Build
         run: |
           python3 -m pip install -r bin/requirements.txt
