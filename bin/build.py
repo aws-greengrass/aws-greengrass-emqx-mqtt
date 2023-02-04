@@ -70,13 +70,13 @@ def main():
         print("Enabling unit tests")
         enable_unit_test_flag = "-DBUILD_TESTS=ON"
         # install lcov on non-windows for coverage
-        zip_name = "lcov-master.zip"
-        dir_name = "lcov-master"
+        zip_name = "lcov-1.16.zip"
+        dir_name = "lcov-1.16"
         if os.path.isfile(zip_name):
             os.remove(zip_name)
         if os.path.isdir(dir_name):
             shutil.rmtree(dir_name)
-        wget.download("https://github.com/linux-test-project/lcov/archive/master.zip")
+        wget.download("https://github.com/linux-test-project/lcov/archive/refs/tags/v1.16.zip")
         shutil.unpack_archive(zip_name, ".")
         os.chdir(dir_name)
         change_dir_permissions_recursive("bin", 0o777)
