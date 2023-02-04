@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-2019 ]  # windows-latest does not have visual studio 2017
+        os: [ ubuntu-20.04, windows-2019 ]  # windows-latest does not have visual studio 2017
         otp: [ '24.0' ]
 
     steps:
@@ -24,7 +24,7 @@ jobs:
         with:
           otp-version: ${{matrix.otp}}
       - uses: wagoid/commitlint-github-action@v4
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
       - uses: actions/setup-python@v3
         with:
           python-version: '3.x'
@@ -33,7 +33,7 @@ jobs:
         with:
           java-version: 1.8
       - name: Dependencies
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-20.04'
         run: |
           sudo apt-add-repository "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" && sudo apt update && sudo apt install -y clang-tidy-14
           # Add llvm-14 binaries into the path early on
