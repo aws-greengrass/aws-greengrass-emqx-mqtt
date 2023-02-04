@@ -29,11 +29,14 @@ execute_process(
 )
 message("Erlang libs directory found: ${ERL_LIBS}")
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include_directories("include")
 add_subdirectory(cda_integration)
 
 if (CLANG_TIDY)
-    set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+    set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-extra-arg=-std=c++2b")
 endif()
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=gnu99 -Wc++-compat -fPIC")
@@ -53,7 +56,6 @@ set(PORT_DRIVER_TARGET_NAME "${PROJECT_NAME}")
 link_directories("${ERL_LIBS}")
 add_library(${PORT_DRIVER_TARGET_NAME} SHARED port_driver.cpp common.cpp)
 set_target_properties(${PORT_DRIVER_TARGET_NAME} PROPERTIES PREFIX "")
-set_property(TARGET ${PORT_DRIVER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 
 find_package(aws-crt-cpp REQUIRED)
 target_link_libraries(${PORT_DRIVER_TARGET_NAME} PUBLIC AWS::aws-crt-cpp)
@@ -84,7 +86,6 @@ add_custom_command(TARGET ${PORT_DRIVER_TARGET_NAME}
 set(CONFIG_WRITER_TARGET_NAME "write_config")
 add_executable(${CONFIG_WRITER_TARGET_NAME} write_config/write_config.cpp common.cpp)
 set_target_properties(${CONFIG_WRITER_TARGET_NAME} PROPERTIES PREFIX "")
-set_property(TARGET ${CONFIG_WRITER_TARGET_NAME} PROPERTY CXX_STANDARD 23)
 target_link_libraries(${CONFIG_WRITER_TARGET_NAME} PUBLIC cda_integration)
 
 add_custom_command(TARGET ${CONFIG_WRITER_TARGET_NAME}
