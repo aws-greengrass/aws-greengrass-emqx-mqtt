@@ -1,9 +1,9 @@
---- emqx.cmd	(revision 8010e148d6dd88bfb8dc120b766476c6781b7e11)
-+++ emqx.cmd	(date 1675472348728)
-@@ -33,11 +33,23 @@
+--- emqx.cmd	2023-02-14 09:08:36.000000000 -0500
++++ emqx.cmd	2023-02-14 09:13:49.000000000 -0500
+@@ -38,11 +38,23 @@
  @set rel_dir=%rel_root_dir%\releases\%rel_vsn%
  @set RUNNER_ROOT_DIR=%rel_root_dir%
-
+ 
 -@set etc_dir=%rel_root_dir%\etc
 +@if defined EMQX_NODE__ETC_DIR (
 +  set etc_dir=%EMQX_NODE__ETC_DIR%
@@ -18,7 +18,7 @@
 +  @set data_dir=%rel_root_dir%\data
 +)
  @set emqx_conf=%etc_dir%\emqx.conf
-
+ 
 +:: Ensure erlang has the right dlls
 +@set greengrass_auth_plugin_bin_dir=%rel_root_dir%\lib\aws_greengrass_emqx_auth-1.0.0\priv
 +@set PATH=%greengrass_auth_plugin_bin_dir%;%PATH%
@@ -26,25 +26,25 @@
  @call :find_erts_dir
  @call :find_vm_args
  @call :find_sys_config
-@@ -67,7 +79,7 @@
+@@ -72,7 +84,7 @@
  )
-
+ 
  :: Write the erl.ini file to set up paths relative to this script
 -@call :write_ini
 +:: @call :write_ini
-
+ 
  :: If a start.boot file is not present, copy one from the named .boot file
  @if not exist "%rel_dir%\start.boot" (
-@@ -142,7 +154,7 @@
+@@ -149,7 +161,7 @@
  @goto :eof
-
+ 
  :generate_app_config
 -@set gen_config_cmd=%escript% %cuttlefish% -i %rel_dir%\emqx.schema -c %etc_dir%\emqx.conf -d %data_dir%\configs generate
 +@set gen_config_cmd=%escript% %cuttlefish% -i %rel_dir%\emqx.schema -c %emqx_conf% -d %data_dir%\configs generate
  @for /f "delims=" %%A in ('%%gen_config_cmd%%') do @(
    set generated_config_args=%%A
  )
-@@ -217,6 +229,15 @@
+@@ -224,6 +236,15 @@
  :: window service?
  :: @%erlsrv% stop %service_name%
  @%escript% %nodetool% %node_type% %node_name% -setcookie %node_cookie% stop
@@ -58,9 +58,9 @@
 +)
 +@%epmd% -kill
  @goto :eof
-
+ 
  :: Relup and reldown
-@@ -236,11 +257,9 @@
+@@ -243,11 +264,9 @@
  @call :create_mnesia_dir
  @call :generate_app_config
  @set args=%sys_config% %generated_config_args% -mnesia dir '%mnesia_dir%'
