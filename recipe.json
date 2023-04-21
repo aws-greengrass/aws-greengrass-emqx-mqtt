@@ -52,7 +52,7 @@
           "script": "robocopy {artifacts:decompressedPath}\\\\emqx\\\\emqx\\\\plugins {work:path}\\\\plugins aws_greengrass_emqx_auth-1.0.0.tar.gz"
         },
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\lib\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\lib\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd start",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "EMQX_CONF": "{configuration:/configurationFiles}",
