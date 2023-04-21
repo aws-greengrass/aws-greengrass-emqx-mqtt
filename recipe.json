@@ -55,7 +55,8 @@
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\lib\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd start",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
-        "EMQX_CONF": "{configuration:/configurationFiles}",
+        "EMQX_CONF1": "{configuration:/replaceConfigurationFiles}",
+        "EMQX_CONF2": "{configuration:/mergeConfigurationFiles}",
         "setEnv": {
           "EMQX_PLUGINS__INSTALL_DIR": "{work:path}\\plugins",
           "EMQX_PLUGINS__STATES__1__NAME_VSN": "aws_greengrass_emqx_auth-1.0.0",
