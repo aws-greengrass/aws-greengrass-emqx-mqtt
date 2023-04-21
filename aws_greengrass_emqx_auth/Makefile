@@ -13,7 +13,7 @@ all: compile
 get-rebar3:
 	@$(CURDIR)/get-rebar3 $(REBAR_VERSION)
 
-$(REBAR): get-rebar3
+$(REBAR):
 
 .PHONY: compile
 compile: $(REBAR)

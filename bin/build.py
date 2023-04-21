@@ -176,7 +176,6 @@ def main():
         os.symlink(current_abs_path, f"{current_abs_path}/emqx/apps/aws_greengrass_emqx_auth",
                    target_is_directory=True)
 
-        os.chdir("emqx")
         print("Building EMQ X")
         emqx_build_cmd = 'make -j'
         emqx_build_env = dict(os.environ)
@@ -198,7 +197,7 @@ def main():
 
     erts_version = None
     emqx_version = None
-    with open('emqx/_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
+    with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
         for l in file.readlines():
             if l.startswith("ERTS_VSN"):
                 erts_version = l.split("ERTS_VSN=")[1].strip().strip("\"")
