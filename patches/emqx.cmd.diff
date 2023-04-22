@@ -40,7 +40,7 @@
  @set "boot_file_name=%rel_dir%\start"
  @set "service_name=%rel_name%_%rel_vsn%"
  @set "bindir=%erts_dir%\bin"
-@@ -67,27 +87,42 @@
+@@ -67,27 +87,41 @@
  @set EMQX_NODE__DB_BACKEND=mnesia
  @set EMQX_NODE__DB_ROLE=core
  
@@ -76,7 +76,6 @@
    if "%%a"=="node.name" set node_name=%%b
    if "%%a"=="node.cookie" set node_cookie=%%b
 -  if "%%a"=="node.data_dir" set data_dir=%%b
-+  :: if "%%a"=="node.data_dir" set data_dir=%%b
  )
 +:: [greengrass patch end]
  
