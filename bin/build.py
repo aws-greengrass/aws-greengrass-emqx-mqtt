@@ -3,12 +3,10 @@
 
 import argparse
 import datetime
-import io
 import json
 import pathlib
 import shutil
 import subprocess
-import tarfile
 
 import os
 import sys
