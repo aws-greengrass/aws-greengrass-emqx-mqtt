@@ -22,10 +22,10 @@ AUTH_PLUGIN_VERSION = '1.0.0'  # TODO get this dynamically
 
 def change_dir_permissions_recursive(path, mode):
     for root, dirs, files in os.walk(path, topdown=False):
-        for dir in [os.path.join(root,d) for d in dirs]:
+        for dir in [os.path.join(root, d) for d in dirs]:
             os.chmod(dir, mode)
-    for file in [os.path.join(root, f) for f in files]:
-        os.chmod(file, mode)
+        for file in [os.path.join(root, f) for f in files]:
+            os.chmod(file, mode)
 
 
 def find_vcvars_path() -> Tuple[str, str]:
