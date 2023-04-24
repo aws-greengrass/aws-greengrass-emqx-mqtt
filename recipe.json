@@ -49,7 +49,7 @@
       },
       "Lifecycle": {
         "install": {
-          "script": "robocopy {artifacts:decompressedPath}\\\\emqx\\\\emqx\\\\plugins {work:path}\\\\plugins aws_greengrass_emqx_auth-1.0.0.tar.gz"
+          "script": "robocopy {artifacts:decompressedPath}\\\\emqx\\\\emqx\\\\plugins {work:path}\\\\plugins /E"
         },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd start",
