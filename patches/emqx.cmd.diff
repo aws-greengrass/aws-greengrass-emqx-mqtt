@@ -133,7 +133,7 @@
  cd /d %rel_root_dir%
  @echo on
 -%erl_exe% -mode embedded -boot "%boot_file_name%" %args%
-+%erl_exe% -noshell -mode embedded -boot "%boot_file_name%" %args%
++%erl_exe% -noshell -mode embedded -boot "%boot_file_name%" %args% || exit /b
  @goto :eof
  
  :: Ping the running node

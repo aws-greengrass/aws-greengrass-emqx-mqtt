@@ -52,7 +52,7 @@
           "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\plugins {work:path}\\plugins /E"
         },
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd start",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "EMQX_CONF1": "{configuration:/replaceConfigurationFiles}",
@@ -71,8 +71,6 @@
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.console.enabled}",
-          "EMQX_LOG__FILE_HANDLERS__DEFAULT__ENABLE" : "true",
-          "EMQX_LOG__FILE_HANDLERS__DEFAULT__FILE": "{work:path}\\log\\emqx.log",
           "EMQX_LOG__CONSOLE_HANDLER__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
           "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
