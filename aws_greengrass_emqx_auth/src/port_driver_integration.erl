@@ -49,7 +49,8 @@ start() ->
   receive
     %% ensure process is registered so we can
     %% safely send messages without race conditions
-    port_driver_initialized -> ok
+    port_driver_initialized -> ok;
+    Err -> exit({error, Err})
   end.
 
 stop() ->
@@ -59,8 +60,13 @@ stop() ->
 init(PortDriver, CallerPID) ->
   register(greengrass_port_driver, self()),
   CallerPID ! port_driver_initialized,
-  Port = open_port({spawn, PortDriver}, [binary]),
-  loop(Port).
+  logger:debug("Opening port: ~p", [PortDriver]),
+  try open_port({spawn_driver, PortDriver}, [binary]) of
+    Port -> loop(Port)
+  catch Err ->
+    logger:error("Unable to open port: ~p", [Err]),
+    CallerPID ! failed_to_open_port
+  end.
 
 empty() -> ok.
 
