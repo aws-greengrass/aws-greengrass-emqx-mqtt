@@ -60,15 +60,18 @@ stop() ->
   greengrass_port_driver ! stop.
 
 init(PortDriver, CallerPID) ->
+  % register port driver loop process to atom
   try register(greengrass_port_driver, self())
   catch Err ->
     CallerPID ! unable_to_register_process
   end,
   logger:debug("Registered port driver loop process. all registered processes: ~p", [registered()]),
-  CallerPID ! port_driver_initialized,
+  % open erlang port
   logger:debug("Opening port: ~p", [PortDriver]),
   try open_port({spawn_driver, PortDriver}, [binary]) of
-    Port -> loop(Port)
+    Port ->
+      CallerPID ! port_driver_initialized,
+      loop(Port)
   catch Err ->
     CallerPID ! failed_to_open_port
   end.
