@@ -62,7 +62,7 @@ stop() ->
 init(PortDriver, CallerPID) ->
   % register port driver loop process to atom
   try register(greengrass_port_driver, self())
-  catch Err ->
+  catch _ ->
     CallerPID ! unable_to_register_process
   end,
   logger:debug("Registered port driver loop process. all registered processes: ~p", [registered()]),
@@ -72,7 +72,7 @@ init(PortDriver, CallerPID) ->
     Port ->
       CallerPID ! port_driver_initialized,
       loop(Port)
-  catch Err ->
+  catch _ ->
     CallerPID ! failed_to_open_port
   end.
 
