@@ -67,7 +67,7 @@ init(PortDriver, CallerPID) ->
   end,
   % open erlang port
   logger:debug("Opening port: ~p", [PortDriver]),
-  try open_port({spawn_driver, PortDriver}, [binary]) of
+  try open_port({spawn, PortDriver}, [binary]) of
     Port when is_port(Port) ->
       logger:debug("Port ~p opened", [PortDriver]),
       CallerPID ! port_driver_initialized,
