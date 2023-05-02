@@ -50,8 +50,8 @@ start() ->
     %% ensure process is registered so we can
     %% safely send messages without race conditions
     port_driver_initialized -> ok;
-    {ErrType, Err, Reason} ->
-      logger:error("Port driver initialization failed: ~p ~p:~p", [ErrType, Err, Reason]),
+    {ErrType, Err, Reason, StackTrace} ->
+      logger:error("Port driver initialization failed: ~p ~p:~p. Stacktrace: ~p", [ErrType, Err, Reason, StackTrace]),
       exit({error, {ErrType, io:format("~p:~p", [Err, Reason])}})
   end.
 
@@ -62,8 +62,8 @@ stop() ->
 init(PortDriver, CallerPID) ->
   % register port driver loop process to atom
   try register(greengrass_port_driver, self())
-  catch RegisterErr:RegisterReason ->
-    CallerPID ! {unable_to_register_process, RegisterErr, RegisterReason}
+  catch RegisterErr:RegisterReason:RegisterStackTrace ->
+    CallerPID ! {unable_to_register_process, RegisterErr, RegisterReason, RegisterStackTrace}
   end,
   % open erlang port
   logger:debug("Opening port: ~p", [PortDriver]),
@@ -72,8 +72,8 @@ init(PortDriver, CallerPID) ->
       logger:debug("Port ~p opened", [PortDriver]),
       CallerPID ! port_driver_initialized,
       loop(Port)
-  catch PortErr:PortReason ->
-    CallerPID ! {failed_to_open_port, PortErr, PortReason}
+  catch PortErr:PortReason:PortStackTrace ->
+    CallerPID ! {failed_to_open_port, PortErr, PortReason, PortStackTrace}
   end.
 
 empty() -> ok.
