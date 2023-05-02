@@ -58,6 +58,8 @@
         "EMQX_CONF1": "{configuration:/replaceConfigurationFiles}",
         "EMQX_CONF2": "{configuration:/mergeConfigurationFiles}",
         "setEnv": {
+          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
+          "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_PLUGINS__INSTALL_DIR": "{work:path}\\plugins",
           "EMQX_PLUGINS__STATES__1__NAME_VSN": "aws_greengrass_emqx_auth-1.0.0",
           "EMQX_PLUGINS__STATES__1__ENABLE": "true",
