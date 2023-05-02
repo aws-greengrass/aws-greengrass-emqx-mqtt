@@ -70,6 +70,7 @@ init(PortDriver, CallerPID) ->
   logger:debug("Opening port: ~p", [PortDriver]),
   try open_port({spawn_driver, PortDriver}, [binary]) of
     Port ->
+      logger:debug("Port ~p opened", [PortDriver]),
       CallerPID ! port_driver_initialized,
       loop(Port)
   catch _ ->
