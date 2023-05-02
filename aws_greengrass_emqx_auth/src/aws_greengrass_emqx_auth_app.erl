@@ -21,10 +21,14 @@ start(_StartType, _StartArgs) ->
 
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:auth_mode() of
-    bypass -> ok;
+    bypass ->
+      logger:info("Skipping custom cert verification"),
+      ok;
     _ ->
       case tls_custom_certificate_verification:enable() of
-        ok -> ok;
+        ok ->
+          logger:info("Custom cert verification enabled"),
+          ok;
         nossl ->
           ErrorString = "Could not find active SSL listener",
           throw({error, ErrorString});

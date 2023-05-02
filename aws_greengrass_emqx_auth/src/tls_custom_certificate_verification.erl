@@ -24,7 +24,9 @@ enable() ->
 
 -spec(update_ssl_listener_options() -> emqx_listeners:listener() | nossl).
 update_ssl_listener_options() ->
-  case find_ssl_listener(emqx_listeners:list()) of
+  Listeners = emqx_listeners:list(),
+  logger:debug("emqx listeners: ~p", [Listeners]),
+  case find_ssl_listener(Listeners) of
     nossl -> nossl;
     {ListenerId, ListenerOptions} ->
       {ListenerId, add_custom_verify_to_ssl_options(ListenerOptions)}
