@@ -69,7 +69,6 @@
           "EMQX_NODE__ETC_DIR": "{work:path}\\etc",
           "EMQX_LISTENERS__SSL__MTLS__BIND": "{configuration:/emqx/listener.ssl.mtls.bind}",
           "EMQX_LISTENERS__SSL__MTLS__MAX_CONNECTIONS": "{configuration:/emqx/listener.ssl.mtls.max_connections}",
-          "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CACERTFILE": "{work:path}\\data\\cacert.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.console.enabled}",
