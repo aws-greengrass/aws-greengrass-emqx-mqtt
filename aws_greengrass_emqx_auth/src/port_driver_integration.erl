@@ -50,7 +50,9 @@ start() ->
     %% ensure process is registered so we can
     %% safely send messages without race conditions
     port_driver_initialized -> ok;
-    Err -> exit({error, Err})
+    Err ->
+      logger:error("Port driver initialization failed: ~p", [Err]),
+      exit({error, Err})
   end.
 
 stop() ->
@@ -58,13 +60,16 @@ stop() ->
   greengrass_port_driver ! stop.
 
 init(PortDriver, CallerPID) ->
-  register(greengrass_port_driver, self()),
+  try register(greengrass_port_driver, self())
+  catch Err ->
+    CallerPID ! unable_to_register_process
+  end,
+  logger:debug("Registered port driver loop process. all registered processes: ~p", [registered()]),
   CallerPID ! port_driver_initialized,
   logger:debug("Opening port: ~p", [PortDriver]),
   try open_port({spawn_driver, PortDriver}, [binary]) of
     Port -> loop(Port)
   catch Err ->
-    logger:error("Unable to open port: ~p", [Err]),
     CallerPID ! failed_to_open_port
   end.
 
