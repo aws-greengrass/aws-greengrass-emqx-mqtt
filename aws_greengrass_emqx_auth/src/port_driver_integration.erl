@@ -66,7 +66,6 @@ init(PortDriver, CallerPID) ->
     logger:error("Failed to register port_driver process: ~p", [RegisterReason]),
     CallerPID ! unable_to_register_process
   end,
-  logger:debug("Registered port driver loop process. all registered processes: ~p", [registered()]),
   % open erlang port
   logger:debug("Opening port: ~p", [PortDriver]),
   try open_port({spawn_driver, PortDriver}, [binary]) of
