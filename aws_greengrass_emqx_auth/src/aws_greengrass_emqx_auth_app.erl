@@ -22,19 +22,13 @@ start(_StartType, _StartArgs) ->
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:auth_mode() of
     bypass ->
-      logger:info("Skipping custom cert verification"),
-      ok;
+      logger:info("Skipping custom cert verification");
     _ ->
-      case tls_custom_certificate_verification:enable() of
+      case tls_custom_certificate_verification:enable("mlts") of
         ok ->
-          logger:info("Custom cert verification enabled"),
-          ok;
-        nossl ->
-          ErrorString = "Could not find active SSL listener",
-          throw({error, ErrorString});
+          logger:info("Custom cert verification enabled");
         {error, Reason} ->
-          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s",
-            [Reason]),
+          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s", [Reason]),
           throw({error, ErrorString})
       end
   end.

@@ -8,37 +8,26 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("public_key/include/public_key.hrl").
 
--import(emqx_listeners, [restart_listener/3, parse_listener_id/1]).
--import(port_driver_integration, [verify_client_certificate/1]).
-
--export([enable/0]).
+-export([enable/1]).
 
 %% Enables custom certificate verification
 %% by restarting ssl listener with custom certificate verification
--spec(enable() -> ok | {error, any()} | nossl).
-enable() ->
-  case update_ssl_listener_options() of
-    nossl -> nossl;
-    UpdatedSslListener -> update_ssl_listener_env(UpdatedSslListener)
-  end.
-
--spec(update_ssl_listener_options() -> emqx_listeners:listener() | nossl).
-update_ssl_listener_options() ->
-  Listeners = emqx_listeners:list(),
-  logger:debug("emqx listeners: ~p", [Listeners]),
-  case find_ssl_listener(Listeners) of
-    nossl -> nossl;
-    {ListenerId, ListenerOptions} ->
-      {ListenerId, add_custom_verify_to_ssl_options(ListenerOptions)}
-  end.
-
--spec(add_custom_verify_to_ssl_options(Options :: map()) -> map()).
-add_custom_verify_to_ssl_options(Options) ->
-  case maps:get(ssl_options, Options, undefined) of
-    undefined -> Options;
-    SslOpts ->
-      %% Store verify_fun in the ssl_options, then return the modified options
-      maps:put(ssl_options, maps:put(verify_fun, fun custom_verify/3, SslOpts), Options)
+-spec(enable(string) -> ok | {error, any()}).
+enable(ListenerName) ->
+  case aws_greengrass_emqx_listeners:find_listener(ssl, ListenerName) of
+    listener_not_found -> {error, listener_not_found};
+    Listener ->
+      NewListener = aws_greengrass_emqx_listeners:set_verify_fun(Listener, fun custom_verify/3),
+      case aws_greengrass_emqx_listeners:restart_listener(NewListener) of
+        ok ->
+          logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
+            [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener)]),
+          ok;
+        {error, Reason} ->
+          logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
+          [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener), Reason]),
+          {error, Reason}
+      end
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
@@ -85,13 +74,3 @@ verify_client_certificate(OtpCert, UserState) ->
 otpcert_to_pem(OtpCert) ->
   Cert = public_key:pkix_encode('OTPCertificate', OtpCert, otp),
   base64:encode_to_string(Cert).
-
--spec(find_ssl_listener(Listeners :: list()) -> emqx_listeners:listener() | nossl).
-find_ssl_listener([]) -> nossl;
-find_ssl_listener([{'ssl:mtls', _} = L | _]) -> L;
-find_ssl_listener([_ | Rest]) -> find_ssl_listener(Rest).
-
--spec(update_ssl_listener_env(emqx_listeners:listener()) -> ok).
-update_ssl_listener_env({ListenerId, Conf}) ->
-  {ok, #{type := Type, name := Name}} = emqx_listeners:parse_listener_id(ListenerId),
-  emqx_listeners:restart_listener(Type, Name, {Conf, Conf}).
