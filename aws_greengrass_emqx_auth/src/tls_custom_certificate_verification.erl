@@ -16,18 +16,21 @@
 enable(ListenerName) ->
   case aws_greengrass_emqx_listeners:find_listener(ssl, ListenerName) of
     listener_not_found -> {error, listener_not_found};
-    Listener ->
-      NewListener = aws_greengrass_emqx_listeners:set_verify_fun(Listener, fun custom_verify/3),
-      case aws_greengrass_emqx_listeners:restart_listener(NewListener) of
-        ok ->
-          logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
-            [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener)]),
-          ok;
-        {error, Reason} ->
-          logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
-          [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener), Reason]),
-          {error, Reason}
-      end
+    Listener -> set_verify_fun(Listener)
+  end.
+
+-spec(set_verify_fun(emqx_listeners:listener()) -> ok | {error, any()}).
+set_verify_fun(Listener) ->
+  NewListener = aws_greengrass_emqx_listeners:set_verify_fun(Listener, fun custom_verify/3),
+  case aws_greengrass_emqx_listeners:restart_listener(NewListener) of
+    ok ->
+      logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
+        [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener)]),
+      ok;
+    {error, Reason} ->
+      logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
+        [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener), Reason]),
+      {error, Reason}
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
