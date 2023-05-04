@@ -33,14 +33,14 @@ set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun) ->
 
 replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
 
--spec(find_listener(Listeners :: list(), string, string) -> emqx_listeners:listener() | listener_not_found).
+-spec(find_listener(Listeners :: list(), atom, string) -> emqx_listeners:listener() | listener_not_found).
 find_listener([], _, _) -> listener_not_found;
 find_listener([#{name := ListenerName, proto := ProtoName} = L | _], Proto, Name)
   when Name =:= ListenerName, Proto =:= ProtoName -> L;
 find_listener([_ | Rest], Proto, Name) -> find_listener(Rest, Proto, Name).
 -spec(find_listener(atom, string) -> emqx_listeners:listener() | listener_not_found).
 find_listener(Proto, Name) ->
-  find_listener(emqx:get_env(listeners, []), Proto, Name).
+  find_listener(application:get_env(emqx, listeners, []), Proto, Name).
 
 -spec(restart_listener(emqx_listeners:listener()) -> ok | {error, any()}).
 restart_listener(Listener) ->
