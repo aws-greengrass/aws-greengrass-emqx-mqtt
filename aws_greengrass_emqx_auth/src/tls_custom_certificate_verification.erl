@@ -14,6 +14,7 @@
 %% by restarting ssl listener with custom certificate verification
 -spec(enable(string) -> ok | {error, any()}).
 enable(ListenerName) ->
+  aws_greengrass_emqx_listeners:debug_listeners(),
   case aws_greengrass_emqx_listeners:find_listener(ssl, ListenerName) of
     listener_not_found -> {error, listener_not_found};
     Listener -> set_verify_fun(Listener)

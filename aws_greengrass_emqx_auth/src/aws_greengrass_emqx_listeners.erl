@@ -5,7 +5,7 @@
 
 -module(aws_greengrass_emqx_listeners).
 
--export([find_listener/2, set_verify_fun/2, restart_listener/1]).
+-export([find_listener/2, set_verify_fun/2, restart_listener/1, debug_listeners/0]).
 
 
 -spec(set_verify_fun(emqx_listeners:listener(), function()) -> emqx_listeners:listener()).
@@ -41,6 +41,11 @@ find_listener([_ | Rest], Proto, Name) -> find_listener(Rest, Proto, Name).
 -spec(find_listener(atom, string) -> emqx_listeners:listener() | listener_not_found).
 find_listener(Proto, Name) ->
   find_listener(application:get_env(emqx, listeners, []), Proto, Name).
+
+debug_listeners() ->
+  logger:info("listeners from env: ~p", [application:get_env(emqx, listeners, [])]),
+  logger:info("listeners from env list: ~p", [maps:to_list(emqx:get_config([listeners], #{}))]),
+  logger:info("listeners from api: ~p", [emqx_listeners:list()]).
 
 -spec(restart_listener(emqx_listeners:listener()) -> ok | {error, any()}).
 restart_listener(Listener) ->
