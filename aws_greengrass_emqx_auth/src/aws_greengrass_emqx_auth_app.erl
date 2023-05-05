@@ -24,7 +24,7 @@ enable_cert_verification() ->
     bypass ->
       logger:info("Skipping custom cert verification");
     _ ->
-      case tls_custom_certificate_verification:enable("mlts") of
+      case tls_custom_certificate_verification:enable("mtls") of
         ok ->
           logger:info("Custom cert verification enabled");
         {error, Reason} ->
