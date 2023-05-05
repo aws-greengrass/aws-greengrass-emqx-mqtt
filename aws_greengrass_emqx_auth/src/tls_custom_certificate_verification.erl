@@ -27,7 +27,9 @@ enable(ListenerName) ->
 verify_fun_is_set(ListenerName) ->
   case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
     listener_not_found -> false;
-    Conf -> aws_greengrass_emqx_listeners:has_verify_fun(Conf)
+    Conf ->
+      logger:debug("~p listener conf: ~p", [ListenerName, Conf]),
+      aws_greengrass_emqx_listeners:has_verify_fun(Conf)
   end.
 
 -spec(restart_listener(atom, atom, any()) -> ok | {error, any()}).
