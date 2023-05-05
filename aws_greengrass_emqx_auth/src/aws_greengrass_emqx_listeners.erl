@@ -26,7 +26,9 @@ replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
 -spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
   case catch maps:get(Name, Listeners) of
-    {'EXIT', _} -> listener_not_found;
+    {'EXIT', _} ->
+      logger:debug("listener ~p not found. listeners=~p", [Name, maps:keys(Listeners)]),
+      listener_not_found;
     Conf -> Conf
   end;
 get_listener_config(_, _, _) -> listener_not_found.
