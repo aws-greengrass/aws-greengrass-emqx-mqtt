@@ -24,8 +24,12 @@ set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun) ->
 replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
 
 -spec(get_listener_config(list(), atom, string) -> #{} | listener_not_found).
-get_listener_config([{ProtoName, #{ListenerName := Listener}}| _], Proto, Name)
-  when Name =:= ListenerName, Proto =:= ProtoName -> Listener;
+get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
+  case maps:get(Name, Listeners) of
+    {badkey, _} -> listener_not_found;
+    {badmap, _} -> listener_not_found;
+    Conf -> Conf
+  end;
 get_listener_config(_, _, _) -> listener_not_found.
 
 -spec(get_listener_config(atom, string) -> #{} | listener_not_found).
