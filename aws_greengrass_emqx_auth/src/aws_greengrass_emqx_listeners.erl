@@ -22,8 +22,12 @@ do_put_verify_fun(SslOpts, CustomVerifyFun) ->
 
 -spec(has_verify_fun(#{}) -> boolean()).
 has_verify_fun(ListenerConf) ->
-  case maps:find(verify_fun, ListenerConf) of
-    {ok, Fun} when is_function(Fun) -> true;
+  case maps:find(ssl_options, ListenerConf) of
+    {ok, SslOpts} ->
+      case maps:find(verify_fun, SslOpts) of
+        {ok, Fun} when is_function(Fun) -> true;
+        _ -> false
+      end;
     _ -> false
   end.
 
