@@ -17,7 +17,7 @@ enable(ListenerName) ->
   case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
     listener_not_found -> {error, listener_not_found};
     Conf ->
-      NewConf = aws_greengrass_emqx_listeners:set_verify_fun(Conf, fun custom_verify/3),
+      NewConf = aws_greengrass_emqx_listeners:put_verify_fun(Conf, fun custom_verify/3),
       restart_listener(ssl, ListenerName, NewConf)
   end.
 

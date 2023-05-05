@@ -5,28 +5,25 @@
 
 -module(aws_greengrass_emqx_listeners).
 
--export([get_listener_config/2, set_verify_fun/2, restart_listener/3]).
+-export([get_listener_config/2, put_verify_fun/2, restart_listener/3]).
 
-
--spec(set_verify_fun(#{}, function()) -> #{}).
-set_verify_fun(ListenerConf, CustomVerifyFun) ->
-  SslOpts = proplists:get_value(ssl_options, ListenerConf),
-  NewSslOpts = set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun),
-  NewListenerConf = replace(ListenerConf, ssl_options, NewSslOpts),
+-spec(put_verify_fun(#{}, function()) -> #{}).
+put_verify_fun(ListenerConf, CustomVerifyFun) ->
+  SslOpts = map_get(ssl_options, ListenerConf),
+  NewSslOpts = do_put_verify_fun(SslOpts, CustomVerifyFun),
+  NewListenerConf = maps:put(ssl_options, NewSslOpts, ListenerConf),
   NewListenerConf.
 
--spec(set_verify_fun_on_ssl_opts(SslOpts :: list() | undefined, CustomVerifyFun :: function()) -> list()).
-set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun) when SslOpts =:= undefined ->
-  set_verify_fun_on_ssl_opts([], CustomVerifyFun);
-set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun) ->
-  lists:append(SslOpts, [{verify_fun, {CustomVerifyFun, []}}]).
-
-replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
+-spec(do_put_verify_fun(SslOpts :: #{} | undefined, CustomVerifyFun :: function()) -> list()).
+do_put_verify_fun(SslOpts, CustomVerifyFun) when SslOpts =:= undefined ->
+  do_put_verify_fun([], CustomVerifyFun);
+do_put_verify_fun(SslOpts, CustomVerifyFun) ->
+  maps:put(verify_fun, {CustomVerifyFun, []}, SslOpts).
 
 -spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
-  case catch maps:get(Name, Listeners) of
-    {'EXIT', _} ->
+  case map_get(Name, Listeners) of
+    undefined ->
       logger:debug("listener ~p not found. listeners=~p", [Name, maps:keys(Listeners)]),
       listener_not_found;
     Conf -> Conf
@@ -40,3 +37,10 @@ get_listener_config(Proto, Name) ->
 -spec(restart_listener(atom, atom, #{}) -> ok | {error, any()}).
 restart_listener(Proto, Name, Config) ->
   emqx_listeners:restart_listener(Proto, Name, Config).
+
+-spec(map_get(atom, #{}) -> undefined | any()).
+map_get(K, Map) ->
+  case catch maps:get(K, Map) of
+    {'EXIT', _} -> undefined;
+    V -> V
+  end.
