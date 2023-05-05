@@ -10,43 +10,16 @@
 
 -export([enable/1]).
 
-%% Enables custom certificate verification
-%% by restarting ssl listener with custom certificate verification.
-%% NOTE: emqx may eventually support setting verify_fun without needing
-%%       listener restart. see https://github.com/emqx/emqx/discussions/7695#discussioncomment-2618206
+%% Enable CDA verification of client certificates as part of the TLS handshake,
+%% by overriding the ssl verification function for the provided emqx listener.
+%%
+%% NOTE: this will require a restart of the emqx listener.
 -spec(enable(atom) -> ok | {error, any()}).
 enable(ListenerName) ->
-  case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
-    listener_not_found -> {error, listener_not_found};
-    Conf ->
-      NewConf = aws_greengrass_emqx_listeners:put_verify_fun(Conf, fun custom_verify/3),
-      restart_listener(ssl, ListenerName, NewConf)
-  end.
-
--spec(verify_fun_is_set(atom) -> boolean()).
-verify_fun_is_set(ListenerName) ->
-  case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
-    listener_not_found -> false;
-    Conf ->
-      logger:debug("~p listener conf: ~p", [ListenerName, Conf]),
-      aws_greengrass_emqx_listeners:has_verify_fun(Conf)
-  end.
-
--spec(restart_listener(atom, atom, any()) -> ok | {error, any()}).
-restart_listener(Proto, Name, NewConfig) ->
-  case aws_greengrass_emqx_listeners:restart_listener(Proto, Name, NewConfig) of
+  case aws_greengrass_emqx_listeners:put_verify_fun(ssl, ListenerName, fun custom_verify/3) of
     ok ->
-      % sanity check
-      case verify_fun_is_set(Name) of
-        true ->
-          logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
-            [Name, Proto, maps:get(bind, NewConfig)]);
-        false -> {error, custom_verify_fun_not_set}
-      end;
-    {error, Reason} ->
-      logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
-        [Name, Proto, maps:get(bind, NewConfig), Reason]),
-      {error, Reason}
+      logger:info("Custom certificate verification enabled on listener ~p:~p", [ssl, ListenerName]);
+    {error, Err} -> {error, Err}
   end.
 
 -spec(custom_verify(OtpCert :: #'OTPCertificate'{}, Event :: {bad_cert, Reason :: atom() |
