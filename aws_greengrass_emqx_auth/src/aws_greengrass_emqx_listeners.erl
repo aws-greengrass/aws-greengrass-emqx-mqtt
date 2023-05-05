@@ -5,7 +5,7 @@
 
 -module(aws_greengrass_emqx_listeners).
 
--export([get_listener_config/2, put_verify_fun/2, restart_listener/3]).
+-export([get_listener_config/2, put_verify_fun/2, has_verify_fun/1, restart_listener/3]).
 
 -spec(put_verify_fun(#{}, function()) -> #{}).
 put_verify_fun(ListenerConf, CustomVerifyFun) ->
@@ -19,6 +19,13 @@ do_put_verify_fun(SslOpts, CustomVerifyFun) when SslOpts =:= undefined ->
   do_put_verify_fun([], CustomVerifyFun);
 do_put_verify_fun(SslOpts, CustomVerifyFun) ->
   maps:put(verify_fun, {CustomVerifyFun, []}, SslOpts).
+
+-spec(has_verify_fun(#{}) -> boolean()).
+has_verify_fun(ListenerConf) ->
+  case maps:find(verify_fun, ListenerConf) of
+    {ok, Fun} when is_function(Fun) -> true;
+    _ -> false
+  end.
 
 -spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
