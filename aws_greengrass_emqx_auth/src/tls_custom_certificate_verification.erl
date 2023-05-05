@@ -14,23 +14,23 @@
 %% by restarting ssl listener with custom certificate verification
 -spec(enable(string) -> ok | {error, any()}).
 enable(ListenerName) ->
-  aws_greengrass_emqx_listeners:debug_listeners(),
-  case aws_greengrass_emqx_listeners:find_listener(ssl, ListenerName) of
+  case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
     listener_not_found -> {error, listener_not_found};
-    Listener -> set_verify_fun(Listener)
+    Conf ->
+      NewConf = aws_greengrass_emqx_listeners:set_verify_fun(Conf, fun custom_verify/3),
+      restart_listener(ssl, ListenerName, NewConf)
   end.
 
--spec(set_verify_fun(emqx_listeners:listener()) -> ok | {error, any()}).
-set_verify_fun(Listener) ->
-  NewListener = aws_greengrass_emqx_listeners:set_verify_fun(Listener, fun custom_verify/3),
-  case aws_greengrass_emqx_listeners:restart_listener(NewListener) of
+-spec(restart_listener(atom, string, any()) -> ok | {error, any()}).
+restart_listener(Proto, Name, NewConfig) ->
+  case aws_greengrass_emqx_listeners:restart_listener(Proto, Name, NewConfig) of
     ok ->
       logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
-        [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener)]),
+        [Name, Proto, maps:get(listen_on, NewConfig)]),
       ok;
     {error, Reason} ->
       logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
-        [maps:get(name, NewListener), maps:get(proto, NewListener), maps:get(listen_on, NewListener), Reason]),
+        [Name, Proto, maps:get(listen_on, NewConfig), Reason]),
       {error, Reason}
   end.
 
