@@ -41,7 +41,7 @@ restart_listener(Proto, Name, NewConfig) ->
         true ->
           logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
             [Name, Proto, maps:get(bind, NewConfig)]);
-        false -> {error, customer_verify_fun_not_set}
+        false -> {error, custom_verify_fun_not_set}
       end;
     {error, Reason} ->
       logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
