@@ -60,21 +60,26 @@ stop() ->
   greengrass_port_driver ! stop.
 
 init(PortDriver, CallerPID) ->
-  try register(greengrass_port_driver, self()) of
-    _ -> open_portdriver_port(PortDriver, CallerPID)
+  try register(greengrass_port_driver, self()) of _ ->
+    case open_portdriver_port(PortDriver) of
+      {Err, Reason, StackTrace} ->
+        CallerPID ! {failed_to_open_port, Err, Reason, StackTrace};
+      Port ->
+        CallerPID ! port_driver_initialized,
+        loop(Port)
+    end
   catch Err:Reason:StackTrace ->
     CallerPID ! {unable_to_register_process, Err, Reason, StackTrace}
   end.
 
-open_portdriver_port(PortDriver, CallerPID) ->
+open_portdriver_port(PortDriver) ->
   logger:debug("Opening port: ~p", [PortDriver]),
   try open_port({spawn_driver, PortDriver}, [binary]) of
     Port when is_port(Port) ->
       logger:debug("Port ~p opened", [PortDriver]),
-      CallerPID ! port_driver_initialized,
-      loop(Port)
+      Port
   catch Err:Reason:StackTrace ->
-    CallerPID ! {failed_to_open_port, Err, Reason, StackTrace}
+    {Err, Reason, StackTrace}
   end.
 
 empty() -> ok.
