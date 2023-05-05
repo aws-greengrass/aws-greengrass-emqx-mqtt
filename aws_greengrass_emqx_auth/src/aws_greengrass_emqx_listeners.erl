@@ -21,28 +21,11 @@ put_verify_fun(Proto, Name, VerifyFun) ->
 
 -spec(put_verify_fun(#{}, atom, atom, function()) -> ok | {error, any()}).
 put_verify_fun(#{ssl_options := SslOpts} = Conf, Proto, Name, VerifyFun) ->
-  case conf_update_listener_verify_fun(Proto, Name, VerifyFun) of
-    error -> {error, unable_to_update_config};
-    ok ->
-      NewSslOpts = maps:put(verify_fun, {VerifyFun, []}, SslOpts),
-      NewListenerConf = maps:put(ssl_options, NewSslOpts, Conf),
-      emqx_listeners:restart_listener(Proto, Name, NewListenerConf)
-  end;
+  NewSslOpts = maps:put(verify_fun, {VerifyFun, []}, SslOpts),
+  NewListenerConf = maps:put(ssl_options, NewSslOpts, Conf),
+  emqx_listeners:restart_listener(Proto, Name, NewListenerConf);
 put_verify_fun(_, _, _, _) ->
   listener_missing_ssl_options.
-
--spec(conf_update_listener_verify_fun(atom, atom, function()) -> ok | error).
-conf_update_listener_verify_fun(Proto, Name, VerifyFun) ->
-  case emqx_conf:update(
-    [listeners, Proto, Name, ssl_options, verify_fun],
-    {VerifyFun, []},
-    #{rawconf_with_defaults => true, override_to => cluster}
-  ) of
-    {ok, _} -> ok;
-    {error, Err} ->
-      logger:debug("Unable to update ~p:~p listener emqx conf with verify_fun: ~p", [Proto, Name, Err]),
-      error
-  end.
 
 -spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
