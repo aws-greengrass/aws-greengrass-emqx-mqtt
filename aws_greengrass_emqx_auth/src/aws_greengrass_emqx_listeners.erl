@@ -23,7 +23,7 @@ set_verify_fun_on_ssl_opts(SslOpts, CustomVerifyFun) ->
 
 replace(Opts, Key, Value) -> [{Key, Value} | proplists:delete(Key, Opts)].
 
--spec(get_listener_config(list(), atom, string) -> #{} | listener_not_found).
+-spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
   case catch maps:get(Name, Listeners) of
     {'EXIT', _} -> listener_not_found;
@@ -31,10 +31,10 @@ get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= Pro
   end;
 get_listener_config(_, _, _) -> listener_not_found.
 
--spec(get_listener_config(atom, string) -> #{} | listener_not_found).
+-spec(get_listener_config(atom, atom) -> #{} | listener_not_found).
 get_listener_config(Proto, Name) ->
   get_listener_config(maps:to_list(emqx:get_config([listeners], #{})), Proto, Name).
 
--spec(restart_listener(atom, string, #{}) -> ok | {error, any()}).
+-spec(restart_listener(atom, atom, #{}) -> ok | {error, any()}).
 restart_listener(Proto, Name, Config) ->
   emqx_listeners:restart_listener(Proto, Name, Config).

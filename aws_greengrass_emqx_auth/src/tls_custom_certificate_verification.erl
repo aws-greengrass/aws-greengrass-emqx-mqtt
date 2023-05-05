@@ -12,7 +12,7 @@
 
 %% Enables custom certificate verification
 %% by restarting ssl listener with custom certificate verification
--spec(enable(string) -> ok | {error, any()}).
+-spec(enable(atom) -> ok | {error, any()}).
 enable(ListenerName) ->
   case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
     listener_not_found -> {error, listener_not_found};
@@ -21,7 +21,7 @@ enable(ListenerName) ->
       restart_listener(ssl, ListenerName, NewConf)
   end.
 
--spec(restart_listener(atom, string, any()) -> ok | {error, any()}).
+-spec(restart_listener(atom, atom, any()) -> ok | {error, any()}).
 restart_listener(Proto, Name, NewConfig) ->
   case aws_greengrass_emqx_listeners:restart_listener(Proto, Name, NewConfig) of
     ok ->
