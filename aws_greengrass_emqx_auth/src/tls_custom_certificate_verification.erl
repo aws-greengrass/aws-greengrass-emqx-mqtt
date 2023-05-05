@@ -11,7 +11,9 @@
 -export([enable/1]).
 
 %% Enables custom certificate verification
-%% by restarting ssl listener with custom certificate verification
+%% by restarting ssl listener with custom certificate verification.
+%% NOTE: emqx may eventually support setting verify_fun without needing
+%%       listener restart. see https://github.com/emqx/emqx/discussions/7695#discussioncomment-2618206
 -spec(enable(atom) -> ok | {error, any()}).
 enable(ListenerName) ->
   case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
