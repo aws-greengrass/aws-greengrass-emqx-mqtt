@@ -26,11 +26,11 @@ restart_listener(Proto, Name, NewConfig) ->
   case aws_greengrass_emqx_listeners:restart_listener(Proto, Name, NewConfig) of
     ok ->
       logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
-        [Name, Proto, maps:get(listen_on, NewConfig)]),
+        [Name, Proto, maps:get(bind, NewConfig)]),
       ok;
     {error, Reason} ->
       logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
-        [Name, Proto, maps:get(listen_on, NewConfig), Reason]),
+        [Name, Proto, maps:get(bind, NewConfig), Reason]),
       {error, Reason}
   end.
 
