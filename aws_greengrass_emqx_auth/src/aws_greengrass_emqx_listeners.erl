@@ -23,6 +23,7 @@ put_verify_fun(Proto, Name, VerifyFun) ->
 put_verify_fun(#{ssl_options := SslOpts} = Conf, Proto, Name, VerifyFun) ->
   NewSslOpts = maps:put(verify_fun, {VerifyFun, []}, SslOpts),
   NewListenerConf = maps:put(ssl_options, NewSslOpts, Conf),
+  logger:debug("restarting listener with conf: ~p", [NewListenerConf]),
   emqx_listeners:restart_listener(Proto, Name, NewListenerConf);
 put_verify_fun(_, _, _, _) ->
   listener_missing_ssl_options.
