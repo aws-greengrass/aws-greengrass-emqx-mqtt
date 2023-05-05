@@ -18,14 +18,10 @@ enable(ListenerName) ->
     listener_not_found -> {error, listener_not_found};
     Conf ->
       NewConf = aws_greengrass_emqx_listeners:put_verify_fun(Conf, fun custom_verify/3),
-      restart_listener(ssl, ListenerName, NewConf),
-      % sanity check
-      case verify_fun_is_set(ListenerName) of
-        true -> ok;
-        false -> {error, customer_verify_fun_not_set}
-      end
+      restart_listener(ssl, ListenerName, NewConf)
   end.
 
+-spec(verify_fun_is_set(atom) -> boolean()).
 verify_fun_is_set(ListenerName) ->
   case aws_greengrass_emqx_listeners:get_listener_config(ssl, ListenerName) of
     listener_not_found -> false;
@@ -36,9 +32,13 @@ verify_fun_is_set(ListenerName) ->
 restart_listener(Proto, Name, NewConfig) ->
   case aws_greengrass_emqx_listeners:restart_listener(Proto, Name, NewConfig) of
     ok ->
-      logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
-        [Name, Proto, maps:get(bind, NewConfig)]),
-      ok;
+      % sanity check
+      case verify_fun_is_set(Name) of
+        true ->
+          logger:info("Restarted ~p ~w listener on port ~w with custom certificate verification",
+            [Name, Proto, maps:get(bind, NewConfig)]);
+        false -> {error, customer_verify_fun_not_set}
+      end;
     {error, Reason} ->
       logger:error("Failed to restart ~p ~w listener on port ~w with custom certificate verification: ~p",
         [Name, Proto, maps:get(bind, NewConfig), Reason]),
