@@ -9,6 +9,9 @@
 -include_lib("emqx/include/emqx_hooks.hrl").
 
 -define(AUTH_CHAIN_PASSTHROUGH, ok).
+-define(PEER_ENCODED_CERT, cert_pem).
+-define(CLIENT_MQTT_VERSION, client_version).
+-define(AUTH_TOKEN, cda_auth_token).
 
 -export([load/1, unload/0]).
 -export([on_client_connect/3, on_client_authenticate/3, on_client_check_acl/5]).
@@ -17,172 +20,10 @@
 %% Client Lifecycle Hooks
 %%--------------------------------------------------------------------
 
-%% Called when the plugin application starts
 load(Env) ->
   hook('client.connect', {?MODULE, on_client_connect, [Env]}),
   hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
   hook('client.check_acl', {?MODULE, on_client_check_acl, [Env]}).
-
-%%--------------------------------------------------------------------
-%% Client Lifecycle Hooks Impl
-%%--------------------------------------------------------------------
-
-execute_auth_hook(Hook) ->
-  case aws_greengrass_emqx_conf:auth_mode() of
-    enabled ->
-      Hook();
-    bypass_on_failure ->
-      case catch Hook() of
-        {_, #{auth_result := success}} = AuthNHookSuccess -> AuthNHookSuccess;
-        {_, allow} = AuthZHookSuccess -> AuthZHookSuccess;
-        _ -> ?AUTH_CHAIN_PASSTHROUGH
-      end;
-    bypass ->
-      ?AUTH_CHAIN_PASSTHROUGH
-  end.
-
-on_client_connect(ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
-  case aws_greengrass_emqx_conf:auth_mode() of
-    bypass ->
-      {ok, Props};
-    _ ->
-      logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n",
-        [ClientId, ConnInfo, Props, _Env]),
-
-      PeerCertEncoded = encode_peer_cert(PeerCert),
-      %% Client cert and version are not available when we get subsequent callbacks (on_client_authenticate, on_client_check_acl)
-      %% Putting the value in the erlang process's dictionary
-      put(cert_pem, PeerCertEncoded),
-      put(client_version, ClientVersion),
-      {ok, Props}
-  end.
-
-on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
-  execute_auth_hook(
-    fun() ->
-      logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
-        [ClientId, ClientInfo, Result, _Env]),
-      PeerCertEncoded = get(cert_pem),
-      case authenticate_client_device(ClientId, PeerCertEncoded) of
-        ok ->
-          AuthToken = get(cda_auth_token),
-          authorize_client_connect(ClientId, AuthToken);
-        stop ->
-          {stop, #{auth_result => not_authorized}};
-        _ ->
-          {stop, #{auth_result => not_authorized}}
-      end
-    end
-  ).
-
-authenticate_client_device(ClientId, CertPem) -> 
-  case get_auth_token_for_client(ClientId, CertPem) of
-    {ok, AuthToken} ->
-      logger:info("Client(~s) is valid", [ClientId]),
-      %% puts authToken in the process dictionary
-      %% to be retrieved during authorization check
-      put(cda_auth_token, AuthToken),
-      ok;
-    {error, Error} ->
-      logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Error]),
-      stop;
-    Other ->
-      logger:error("Unknown response for get authToken: ~p", [Other]),
-      stop
-  end.
-
-%% Retrieves authToken from CDA if not stored in process dictionary
-get_auth_token_for_client(ClientId, CertPem) ->
-  case get(cda_auth_token) of
-    undefined -> port_driver_integration:get_auth_token(ClientId, CertPem);
-    AuthToken -> {ok, AuthToken}
-  end.
-
-authorize_client_connect(ClientId, AuthToken) ->
-  ConnectResource = "mqtt:clientId:" ++ binary_to_list(ClientId),
-  ConnectAction = "mqtt:connect",
-  case check_authorization(ClientId, AuthToken, ConnectResource, ConnectAction) of
-    authorized -> {ok, #{auth_result => success}};
-    unauthorized -> {stop, #{auth_result => not_authorized}};
-    _ -> {stop, #{auth_result => not_authorized}}
-  end.
-
-on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
-  execute_auth_hook(
-    fun() ->
-      logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
-        [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-      AuthToken = get(cda_auth_token),
-      case PubSub of
-        publish -> Action = "mqtt:publish",
-          TransformedTopic = "mqtt:topic:" ++ binary_to_list(Topic);
-        subscribe -> Action = "mqtt:subscribe",
-          TransformedTopic = "mqtt:topicfilter:" ++ binary_to_list(Topic)
-      end,
-      case check_authorization(ClientId, AuthToken, TransformedTopic, Action) of
-        authorized -> {stop, allow};
-        unauthorized -> {stop, deny};
-        _ -> {stop, deny}
-      end
-    end
-  ).
-
-check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
-  case port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action) of
-    {ok, authorized} ->
-      logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-      authorized;
-    {ok, unauthorized} ->
-      logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-      unauthorized;
-    {ok, bad_token} when IsRetry == false ->
-      logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
-
-      %% Remove the auth token from the process dictionary before getting a new token.
-      erase(cda_auth_token),
-      logger:info("Attempting to get new auth token."),
-      case authenticate_client_device(ClientId, get(cert_pem)) of
-        ok -> check_authorization(ClientId, get(cda_auth_token), Resource, Action, true);
-        stop ->
-          logger:info("Could not get a new auth token"),
-          unauthorized
-      end;
-    {ok, bad_token} when IsRetry == true ->
-      logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.",
-        [ClientId, Action, Resource]),
-      ClientVersion = get(client_version),
-      if
-      %% Version 3 and 4 are considered v3.
-        ClientVersion < 5 ->
-          logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]),
-          emqx_mgmt:kickout_client(ClientId);
-        ClientVersion /= 5 ->
-          logger:info("Client(~s) has an unknown MQTT version ~p. Disconnecting client", [ClientId, ClientVersion]),
-          emqx_mgmt:kickout_client(ClientId)
-      end,
-      unauthorized;
-    {error, Error} ->
-      logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p",
-        [ClientId, Action, Resource, Error]),
-      unauthorized
-  end.
-
-check_authorization(ClientId, AuthToken, Resource, Action) ->
-  check_authorization(ClientId, AuthToken, Resource, Action, false).
-
-encode_peer_cert(PeerCert) ->
-  case PeerCert of
-    nossl ->
-      <<"">>;
-    undefined ->
-      <<"">>;
-    _ ->
-      base64:encode(PeerCert)
-  end.
-
-%%--------------------------------------------------------------------
-%% Called when the plugin application stops
-%%--------------------------------------------------------------------
 
 unload() ->
   unhook('client.connect', {?MODULE, on_client_connect}),
@@ -196,3 +37,178 @@ hook(HookPoint, MFA) ->
 
 unhook(HookPoint, MFA) ->
   emqx_hooks:del(HookPoint, MFA).
+
+execute_auth_hook(Hook) ->
+  execute_auth_hook(aws_greengrass_emqx_conf:auth_mode(), Hook).
+
+execute_auth_hook(enabled, Hook) ->
+  Hook();
+execute_auth_hook(bypass, _) ->
+  ?AUTH_CHAIN_PASSTHROUGH;
+execute_auth_hook(bypass_on_failure, Hook) ->
+  case catch Hook() of
+    {_, success} = AuthNPass -> AuthNPass;
+    {_, allow} = AuthZPass -> AuthZPass;
+    _ -> ?AUTH_CHAIN_PASSTHROUGH
+  end.
+
+%%--------------------------------------------------------------------
+%% Connect Hook
+%%--------------------------------------------------------------------
+
+on_client_connect(ConnInfo, Props, _Env) ->
+  handle_connect(ConnInfo, Props, _Env).
+
+handle_connect(ConnInfo, Props, _Env) ->
+  handle_connect(aws_greengrass_emqx_conf:auth_mode(), ConnInfo, Props, _Env).
+
+handle_connect(bypass, _, Props, _) ->
+  {ok, Props};
+handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
+  logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n", [ClientId, ConnInfo, Props, _Env]),
+  %% Use erlang process dictionary so data is available between callbacks
+  put(?PEER_ENCODED_CERT, encode_peer_cert(PeerCert)),
+  put(?CLIENT_MQTT_VERSION, ClientVersion),
+  {ok, Props}.
+
+%%--------------------------------------------------------------------
+%% AuthN Hook
+%%--------------------------------------------------------------------
+
+on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
+  execute_auth_hook(
+    fun() ->
+      logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n", [ClientId, ClientInfo, Result, _Env]),
+      authenticate(ClientId)
+    end
+  ).
+
+-spec(authenticate(ClientId :: any()) -> {ok, any()} | {error, any()}).
+authenticate(ClientId) ->
+  authenticate(get(?AUTH_TOKEN), ClientId, get(?PEER_ENCODED_CERT)).
+
+-spec(authenticate(AuthToken :: any() | {error, _}, ClientId :: any(), CertPem :: any()) -> {ok, any()} | {error, any()}).
+authenticate(undefined, ClientId, CertPem) ->
+  authenticate(port_driver_integration:get_auth_token(ClientId, CertPem), ClientId, CertPem);
+authenticate({error, Err}, ClientId, _) ->
+  logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Err]),
+  {error, not_authorized};
+authenticate({ok, AuthToken}, ClientId, CertPem) ->
+  authenticate(AuthToken, ClientId, CertPem);
+authenticate(AuthToken, ClientId, _) ->
+  logger:info("Client(~s) is valid", [ClientId]),
+  %% store for authZ
+  put(?AUTH_TOKEN, AuthToken),
+  case is_connect_authorized(ClientId) of
+    true -> {ok, success};
+    false -> {stop, not_authorized}
+  end.
+
+reauthenticate(ClientId) ->
+  %% clear auth token before getting a new one
+  erase(?AUTH_TOKEN),
+  logger:info("Attempting to get new auth token."),
+  authenticate(ClientId).
+
+%%--------------------------------------------------------------------
+%% AuthZ Hook
+%%--------------------------------------------------------------------
+
+on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
+  execute_auth_hook(
+    fun() ->
+      logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
+        [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
+      case is_pubsub_authorized(PubSub, ClientId, Topic) of
+        true -> {stop, allow};
+        false -> {stop, deny}
+      end
+    end
+  ).
+
+is_pubsub_authorized(publish, ClientId, Topic) ->
+  is_publish_authorized(ClientId, Topic);
+is_pubsub_authorized(subscribe, ClientId, Topic) ->
+  is_subscribe_authorized(ClientId, Topic).
+
+is_connect_authorized(ClientId) ->
+  Resource = "mqtt:clientId:" ++ binary_to_list(ClientId),
+  Action = "mqtt:connect",
+  case is_authorized(ClientId, Resource, Action) of
+    authorized -> true;
+    _ -> false
+  end.
+
+is_publish_authorized(ClientId, Topic) ->
+  Resource = "mqtt:topic:" ++ binary_to_list(Topic),
+  Action = "mqtt:publish",
+  case is_authorized(ClientId, Resource, Action) of
+    authorized -> true;
+    _ -> false
+  end.
+
+is_subscribe_authorized(ClientId, Topic) ->
+  Resource = "mqtt:topicfilter:" ++ binary_to_list(Topic),
+  Action = "mqtt:subscribe",
+  case is_authorized(ClientId, Resource, Action) of
+    authorized -> true;
+    _ -> false
+  end.
+
+
+-spec(is_authorized(ClientId :: any(), Resource :: string, Action :: string) -> authorized | unauthorized).
+is_authorized(ClientId, Resource, Action) ->
+  is_authorized(0, ClientId, Resource, Action).
+
+is_authorized(Retries, ClientId, Resource, Action) ->
+  %% Use auth token from AuthN hook
+  is_authorized(Retries, get(?AUTH_TOKEN), ClientId, Resource, Action).
+
+is_authorized(Retries, AuthToken, ClientId, Resource, Action) ->
+  is_authorized(port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action), Retries, AuthToken, ClientId, Resource, Action).
+
+is_authorized({ok, authorized}, _, _, ClientId, Resource, Action) ->
+  logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+  authorized;
+is_authorized({ok, unauthorized}, _, _, ClientId, Resource, Action) ->
+  logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+  unauthorized;
+is_authorized({error, Error}, _, _, ClientId, Resource, Action) ->
+  logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p", [ClientId, Action, Resource, Error]),
+  unauthorized;
+is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries == 0 ->
+  logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
+  case reauthenticate(ClientId) of
+    {_, success} -> is_authorized(Retries + 1, ClientId, Resource, Action);
+    _ ->
+      logger:info("Could not get a new auth token"),
+      unauthorized
+  end;
+is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
+  logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.", [ClientId, Action, Resource]),
+  kick_non_v5_client(ClientId),
+  unauthorized.
+
+
+%%--------------------------------------------------------------------
+%% Utils
+%%--------------------------------------------------------------------
+
+kick_non_v5_client(ClientId) ->
+  kick_non_v5_client(get(?CLIENT_MQTT_VERSION), ClientId).
+
+kick_non_v5_client(Version, ClientId) when Version < 5 ->
+  logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]),
+  emqx_mgmt:kickout_client(ClientId);
+kick_non_v5_client(Version, ClientId) when Version /= 5 ->
+  logger:info("Client(~s) has an unknown MQTT version ~p. Disconnecting client", [ClientId, Version]),
+  emqx_mgmt:kickout_client(ClientId);
+kick_non_v5_client(_, _) ->
+  ok.
+
+encode_peer_cert(nossl) ->
+  <<"">>;
+encode_peer_cert(undefined) ->
+  <<"">>;
+encode_peer_cert(PeerCert) ->
+  base64:encode(PeerCert).

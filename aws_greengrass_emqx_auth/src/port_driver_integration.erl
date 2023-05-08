@@ -136,6 +136,7 @@ loop(Port, Inflight, Counter, FunMap) ->
       exit(port_terminated)
   end.
 
+-spec(get_auth_token(string, string) -> {ok, any()} | {error, atom()}).
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).
 
@@ -151,6 +152,7 @@ request_certificates() ->
 register_fun(Atom, Fun) ->
   greengrass_port_driver ! {register_fun, Atom, Fun}.
 
+-spec(receive_back() -> {ok, any()} | {error, atom()}).
 receive_back() ->
   receive
     {greengrass_port_driver, Data} ->
@@ -164,10 +166,12 @@ receive_back() ->
       end
   end.
 
+-spec(call_port(#{}, async) -> {ok, any()} | {error, atom()}).
 call_port(Msg, async) ->
   greengrass_port_driver ! {call, self(), Msg, async},
   receive_back().
 
+-spec(call_port(#{}) -> {ok, any()} | {error, atom()}).
 call_port(Msg) ->
   greengrass_port_driver ! {call, self(), Msg},
   receive_back().
