@@ -174,6 +174,12 @@ def main():
         os.symlink(current_abs_path, f"{current_abs_path}/emqx/apps/aws_greengrass_emqx_auth",
                    target_is_directory=True)
 
+        # Since 5.0.22, peercert was removed from EMQX plugin hooks.
+        # Until we find a workaround or it's added back, we'll simply
+        # revert the change.
+        # https://github.com/emqx/emqx/pull/10243/commits/07ac2cd57aaba0f2e1776ad36ddbed85475a753a
+        subprocess.check_call(f'git revert --no-commit 07ac2cd57aaba0f2e1776ad36ddbed85475a753a', shell=True)
+
         print("Building EMQ X")
         emqx_build_cmd = 'make -j'
         emqx_build_env = dict(os.environ)
