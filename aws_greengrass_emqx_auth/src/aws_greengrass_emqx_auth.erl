@@ -66,11 +66,11 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
       case authenticate_client_device(ClientId, PeerCertEncoded) of
         ok ->
           AuthToken = get(cda_auth_token),
-          authorize_client_connect(ClientId, AuthToken, Result);
+          authorize_client_connect(ClientId, AuthToken);
         stop ->
-          {stop, Result#{auth_result => not_authorized}};
+          {stop, #{auth_result => not_authorized}};
         _ ->
-          {stop, Result#{auth_result => not_authorized}}
+          {stop, #{auth_result => not_authorized}}
       end
     end
   ).
@@ -98,13 +98,13 @@ get_auth_token_for_client(ClientId, CertPem) ->
     AuthToken -> {ok, AuthToken}
   end.
 
-authorize_client_connect(ClientId, AuthToken, Result) ->
+authorize_client_connect(ClientId, AuthToken) ->
   ConnectResource = "mqtt:clientId:" ++ binary_to_list(ClientId),
   ConnectAction = "mqtt:connect",
   case check_authorization(ClientId, AuthToken, ConnectResource, ConnectAction) of
-    authorized -> {ok, Result#{auth_result => success}};
-    unauthorized -> {stop, Result#{auth_result => not_authorized}};
-    _ -> {stop, Result#{auth_result => not_authorized}}
+    authorized -> {ok, #{auth_result => success}};
+    unauthorized -> {stop, #{auth_result => not_authorized}};
+    _ -> {stop, #{auth_result => not_authorized}}
   end.
 
 on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
