@@ -5,7 +5,6 @@
 
 -module(aws_greengrass_emqx_listeners).
 
--compile({no_auto_import,[map_get/2]}).
 -export([put_verify_fun/3]).
 
 %% Set verify_fun erlang ssl option on a listener.
@@ -30,7 +29,7 @@ put_verify_fun(_, _, _, _) ->
 
 -spec(get_listener_config(list(), atom, atom) -> #{} | listener_not_found).
 get_listener_config([{ProtoName, Listeners}| _], Proto, Name) when Proto =:= ProtoName ->
-  case map_get(Name, Listeners) of
+  case maps:get(Name, Listeners, undefined) of
     undefined ->
       logger:debug("listener ~p not found. listeners=~p", [Name, maps:keys(Listeners)]),
       listener_not_found;
@@ -41,10 +40,3 @@ get_listener_config(_, _, _) -> listener_not_found.
 -spec(get_listener_config(atom, atom) -> #{} | listener_not_found).
 get_listener_config(Proto, Name) ->
   get_listener_config(maps:to_list(emqx:get_config([listeners], #{})), Proto, Name).
-
--spec(map_get(atom, #{}) -> undefined | any()).
-map_get(K, Map) ->
-  case catch maps:get(K, Map) of
-    {'EXIT', _} -> undefined;
-    V -> V
-  end.
