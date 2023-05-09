@@ -189,8 +189,6 @@ def main():
             # when building on Windows
             vcvars_path, arch = find_vcvars_path()
             emqx_build_cmd = f'call "{vcvars_path}" {arch} && {emqx_build_cmd}'
-            # https://github.com/emqx/emqx/issues/8477
-            emqx_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
 
         # build emqx
         subprocess.check_call(
@@ -258,7 +256,6 @@ def main():
     if os.name == 'nt':
         vcvars_path, arch = find_vcvars_path()
         plugin_build_cmd = f'call "{vcvars_path}" {arch} && {plugin_build_cmd}'
-        plugin_build_env['BUILD_WITHOUT_ROCKSDB'] = 'true'
 
     subprocess.check_call(
         plugin_build_cmd,
