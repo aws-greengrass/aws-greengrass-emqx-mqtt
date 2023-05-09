@@ -113,7 +113,7 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
     end
   ).
 
--spec(authenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, #{result := ?AUTHN_FAILURE}}).
+-spec(authenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, ?AUTHN_FAILURE}).
 authenticate(ClientId) ->
   authenticate(get(?AUTH_TOKEN), ClientId, get(?PEER_ENCODED_CERT)).
 
@@ -122,19 +122,18 @@ authenticate(undefined, ClientId, CertPem) ->
   authenticate(port_driver_integration:get_auth_token(ClientId, CertPem), ClientId, CertPem);
 authenticate({error, Err}, ClientId, _) ->
   logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Err]),
-  {error, #{result => ?AUTHN_FAILURE}};
+  {error, ?AUTHN_FAILURE};
 authenticate({ok, AuthToken}, ClientId, CertPem) ->
   authenticate(AuthToken, ClientId, CertPem);
 authenticate(AuthToken, ClientId, _) ->
-  logger:info("Client(~s) is valid", [ClientId]),
   %% store for authZ
   put(?AUTH_TOKEN, AuthToken),
   case is_connect_authorized(ClientId) of
     true -> {ok, #{result => ?AUTHN_SUCCESS}};
-    false -> {error, #{result => ?AUTHN_FAILURE}}
+    false -> {error, ?AUTHN_FAILURE}
   end.
 
--spec(reauthenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, #{result := ?AUTHN_FAILURE}}).
+-spec(reauthenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, ?AUTHN_FAILURE}).
 reauthenticate(ClientId) ->
   %% clear auth token before getting a new one
   erase(?AUTH_TOKEN),
@@ -204,25 +203,23 @@ is_authorized(Retries, ClientId, Resource, Action) ->
 is_authorized(Retries, AuthToken, ClientId, Resource, Action) ->
   is_authorized(port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action), Retries, AuthToken, ClientId, Resource, Action).
 
-is_authorized({ok, authorized}, _, _, ClientId, Resource, Action) ->
-  logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+is_authorized({ok, authorized}, _, _, _, _, _) ->
   ?AUTHORIZED;
-is_authorized({ok, unauthorized}, _, _, ClientId, Resource, Action) ->
-  logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
+is_authorized({ok, unauthorized}, _, _, _, _, _) ->
   ?UNAUTHORIZED;
 is_authorized({error, Error}, _, _, ClientId, Resource, Action) ->
-  logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p", [ClientId, Action, Resource, Error]),
+  logger:debug("Client(~s) not authorized to perform ~p on resource ~p. Error:~p", [ClientId, Action, Resource, Error]),
   ?UNAUTHORIZED;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries == 0 ->
-  logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
+  logger:debug("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
   case reauthenticate(ClientId) of
-    {_, ?AUTHN_SUCCESS} -> is_authorized(Retries + 1, ClientId, Resource, Action);
+    {ok, _} -> is_authorized(Retries + 1, ClientId, Resource, Action);
     _ ->
-      logger:info("Could not get a new auth token"),
+      logger:debug("Could not get a new auth token"),
       ?UNAUTHORIZED
   end;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
-  logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.", [ClientId, Action, Resource]),
+  logger:debug("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.", [ClientId, Action, Resource]),
   kick_non_v5_client(ClientId),
   ?UNAUTHORIZED.
 
