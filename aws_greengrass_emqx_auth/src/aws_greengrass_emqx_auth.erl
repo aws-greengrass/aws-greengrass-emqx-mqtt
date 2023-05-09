@@ -97,7 +97,9 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
     fun() ->
       logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n", [ClientId, ClientInfo, Result, _Env]),
-      authenticate(ClientId)
+      Result = authenticate(ClientId),
+      %% terminate the auth chain with our result
+      {stop, Result}
     end
   ).
 
@@ -139,10 +141,12 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     fun() ->
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-      case is_pubsub_authorized(PubSub, ClientId, Topic) of
+      Result = case is_pubsub_authorized(PubSub, ClientId, Topic) of
         true -> #{result => ?AUTHZ_ALLOW};
         false -> #{result => ?AUTHZ_DENY}
-      end
+      end,
+      %% terminate the auth chain with our result
+      {stop, Result}
     end
   ).
 
