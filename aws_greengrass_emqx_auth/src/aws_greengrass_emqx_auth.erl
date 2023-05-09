@@ -14,7 +14,8 @@
 -define(CLIENT_MQTT_VERSION, client_version).
 -define(AUTH_TOKEN, cda_auth_token).
 
--define(AUTH_CHAIN_PASSTHROUGH, ok).
+-define(CONTINUE_HOOK_CHAIN, ok).
+-define(STOP_HOOK_CHAIN, stop).
 
 %% part of return value in authN hook
 -define(AUTHN_SUCCESS, success).
@@ -43,7 +44,7 @@ load(Env) ->
 unload() ->
   unhook('client.connect', {?MODULE, on_client_connect}),
   unhook('client.authenticate', {?MODULE, on_client_authenticate}),
-  unhook('client.check_acl', {?MODULE, on_client_authorize}).
+  unhook('client.authorize', {?MODULE, on_client_authorize}).
 
 hook(HookPoint, MFA) ->
   %% use highest hook priority so this module's callbacks
@@ -53,19 +54,30 @@ hook(HookPoint, MFA) ->
 unhook(HookPoint, MFA) ->
   emqx_hooks:del(HookPoint, MFA).
 
+-spec(execute_auth_hook(function()) -> ?CONTINUE_HOOK_CHAIN | {?STOP_HOOK_CHAIN, {error, any()} | #{result => ?AUTHZ_DENY}}).
 execute_auth_hook(Hook) ->
-  execute_auth_hook(aws_greengrass_emqx_conf:auth_mode(), Hook).
-
-execute_auth_hook(enabled, Hook) ->
-  Hook();
-execute_auth_hook(bypass, _) ->
-  ?AUTH_CHAIN_PASSTHROUGH;
-execute_auth_hook(bypass_on_failure, Hook) ->
   case catch Hook() of
-    {_, ?AUTHN_SUCCESS} = AuthNPass -> AuthNPass;
-    {_, ?AUTHZ_ALLOW} = AuthZPass -> AuthZPass;
-    _ -> ?AUTH_CHAIN_PASSTHROUGH
+    Result -> handle_auth_hook_result(aws_greengrass_emqx_conf:auth_mode(), Result)
   end.
+
+handle_auth_hook_result(_, {ok, _} = AuthNSuccess) ->
+  %% no need to evaluate rest of auth chain when we deem success
+  {?STOP_HOOK_CHAIN, AuthNSuccess};
+handle_auth_hook_result(_, #{result => ?AUTHZ_ALLOW} = AuthZSuccess) ->
+  %% no need to evaluate rest of auth chain when we deem success
+  {?STOP_HOOK_CHAIN, AuthZSuccess};
+handle_auth_hook_result(AuthMode, _) when AuthMode =:= bypass; AuthMode =:= bypass_on_failure ->
+  %% in bypass mode, ignore auth results/errors and move on to next step in auth chain
+  ?CONTINUE_HOOK_CHAIN;
+handle_auth_hook_result(_, #{result => ?AUTHZ_DENY} = AuthZDeny) ->
+  %% stop auth chain and report authZ deny
+  {?STOP_HOOK_CHAIN, AuthZDeny};
+handle_auth_hook_result(_, {error, _} = Error) ->
+  %% stop auth chain and report error
+  {?STOP_HOOK_CHAIN, Error};
+handle_auth_hook_result(_, Error) ->
+  %% stop auth chain and report error
+  {?STOP_HOOK_CHAIN, {error, Error}}.
 
 %%--------------------------------------------------------------------
 %% Connect Hook
@@ -78,14 +90,14 @@ handle_connect(ConnInfo, Props, _Env) ->
   handle_connect(aws_greengrass_emqx_conf:auth_mode(), ConnInfo, Props, _Env).
 
 handle_connect(bypass, _, Props, _) ->
-  {ok, Props};
+  {?CONTINUE_HOOK_CHAIN, Props};
 handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
   logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n", [ClientId, ConnInfo, Props, _Env]),
   %% required for authN
   put(?PEER_ENCODED_CERT, encode_peer_cert(PeerCert)),
   %% used for informational purposes
   put(?CLIENT_MQTT_VERSION, ClientVersion),
-  {ok, Props}.
+  {?CONTINUE_HOOK_CHAIN, Props}.
 
 %%--------------------------------------------------------------------
 %% AuthN Hook
@@ -97,13 +109,11 @@ on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
     fun() ->
       logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n", [ClientId, ClientInfo, Result, _Env]),
-      AuthResult = authenticate(ClientId),
-      %% terminate the auth chain with our result
-      {stop, AuthResult}
+      authenticate(ClientId)
     end
   ).
 
--spec(authenticate(ClientId :: any()) -> {ok, any()} | {error, any()}).
+-spec(authenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, #{result := ?AUTHN_FAILURE}}).
 authenticate(ClientId) ->
   authenticate(get(?AUTH_TOKEN), ClientId, get(?PEER_ENCODED_CERT)).
 
@@ -112,7 +122,7 @@ authenticate(undefined, ClientId, CertPem) ->
   authenticate(port_driver_integration:get_auth_token(ClientId, CertPem), ClientId, CertPem);
 authenticate({error, Err}, ClientId, _) ->
   logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Err]),
-  {error, ?AUTHN_FAILURE};
+  {error, #{result => ?AUTHN_FAILURE}};
 authenticate({ok, AuthToken}, ClientId, CertPem) ->
   authenticate(AuthToken, ClientId, CertPem);
 authenticate(AuthToken, ClientId, _) ->
@@ -124,6 +134,7 @@ authenticate(AuthToken, ClientId, _) ->
     false -> {error, #{result => ?AUTHN_FAILURE}}
   end.
 
+-spec(reauthenticate(ClientId :: any()) -> {ok, #{result := ?AUTHN_SUCCESS}} | {error, #{result := ?AUTHN_FAILURE}}).
 reauthenticate(ClientId) ->
   %% clear auth token before getting a new one
   erase(?AUTH_TOKEN),
@@ -141,12 +152,10 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     fun() ->
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-      AuthResult = case is_pubsub_authorized(PubSub, ClientId, Topic) of
+      case is_pubsub_authorized(PubSub, ClientId, Topic) of
         true -> #{result => ?AUTHZ_ALLOW};
         false -> #{result => ?AUTHZ_DENY}
-      end,
-      %% terminate the auth chain with our result
-      {stop, AuthResult}
+      end
     end
   ).
 
