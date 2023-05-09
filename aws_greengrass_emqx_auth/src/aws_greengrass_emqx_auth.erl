@@ -8,13 +8,28 @@
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_hooks.hrl").
 
--define(AUTH_CHAIN_PASSTHROUGH, ok).
+
+%% keys for data stored in process dict
 -define(PEER_ENCODED_CERT, cert_pem).
 -define(CLIENT_MQTT_VERSION, client_version).
 -define(AUTH_TOKEN, cda_auth_token).
 
+-define(AUTH_CHAIN_PASSTHROUGH, ok).
+
+%% part of return value in authN hook
+-define(AUTHN_SUCCESS, success).
+-define(AUTHN_FAILURE, not_authorized).
+
+%% internal auth success/failure
+-define(AUTHORIZED, authorized).
+-define(UNAUTHORIZED, unauthorized).
+
+%% part of return value in authZ hook
+-define(AUTHZ_ALLOW, allow).
+-define(AUTHZ_DENY, deny).
+
 -export([load/1, unload/0]).
--export([on_client_connect/3, on_client_authenticate/3, on_client_check_acl/5]).
+-export([on_client_connect/3, on_client_authenticate/3, on_client_authorize/5]).
 
 %%--------------------------------------------------------------------
 %% Client Lifecycle Hooks
@@ -23,12 +38,12 @@
 load(Env) ->
   hook('client.connect', {?MODULE, on_client_connect, [Env]}),
   hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
-  hook('client.check_acl', {?MODULE, on_client_check_acl, [Env]}).
+  hook('client.authorize', {?MODULE, on_client_authorize, [Env]}).
 
 unload() ->
   unhook('client.connect', {?MODULE, on_client_connect}),
   unhook('client.authenticate', {?MODULE, on_client_authenticate}),
-  unhook('client.check_acl', {?MODULE, on_client_check_acl}).
+  unhook('client.check_acl', {?MODULE, on_client_authorize}).
 
 hook(HookPoint, MFA) ->
   %% use highest hook priority so this module's callbacks
@@ -47,8 +62,8 @@ execute_auth_hook(bypass, _) ->
   ?AUTH_CHAIN_PASSTHROUGH;
 execute_auth_hook(bypass_on_failure, Hook) ->
   case catch Hook() of
-    {_, success} = AuthNPass -> AuthNPass;
-    {_, allow} = AuthZPass -> AuthZPass;
+    {_, ?AUTHN_SUCCESS} = AuthNPass -> AuthNPass;
+    {_, ?AUTHZ_ALLOW} = AuthZPass -> AuthZPass;
     _ -> ?AUTH_CHAIN_PASSTHROUGH
   end.
 
@@ -66,8 +81,9 @@ handle_connect(bypass, _, Props, _) ->
   {ok, Props};
 handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto_ver := ClientVersion}, Props, _Env) ->
   logger:debug("Client(~s) connect, ConnInfo: ~n~p~n, Props: ~n~p~n, Env:~n~p~n", [ClientId, ConnInfo, Props, _Env]),
-  %% Use erlang process dictionary so data is available between callbacks
+  %% required for authN
   put(?PEER_ENCODED_CERT, encode_peer_cert(PeerCert)),
+  %% used for informational purposes
   put(?CLIENT_MQTT_VERSION, ClientVersion),
   {ok, Props}.
 
@@ -75,6 +91,8 @@ handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto
 %% AuthN Hook
 %%--------------------------------------------------------------------
 
+%% Interface derived from
+%% https://github.com/emqx/emqx/blob/270059f0c2694342fc72338760dbb968b78b7918/apps/emqx/src/emqx_access_control.erl#L53-L68
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
     fun() ->
@@ -92,7 +110,7 @@ authenticate(undefined, ClientId, CertPem) ->
   authenticate(port_driver_integration:get_auth_token(ClientId, CertPem), ClientId, CertPem);
 authenticate({error, Err}, ClientId, _) ->
   logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Err]),
-  {error, not_authorized};
+  {error, ?AUTHN_FAILURE};
 authenticate({ok, AuthToken}, ClientId, CertPem) ->
   authenticate(AuthToken, ClientId, CertPem);
 authenticate(AuthToken, ClientId, _) ->
@@ -100,8 +118,8 @@ authenticate(AuthToken, ClientId, _) ->
   %% store for authZ
   put(?AUTH_TOKEN, AuthToken),
   case is_connect_authorized(ClientId) of
-    true -> {ok, success};
-    false -> {stop, not_authorized}
+    true -> {ok, ?AUTHN_SUCCESS};
+    false -> {error, ?AUTHN_FAILURE}
   end.
 
 reauthenticate(ClientId) ->
@@ -114,44 +132,50 @@ reauthenticate(ClientId) ->
 %% AuthZ Hook
 %%--------------------------------------------------------------------
 
-on_client_check_acl(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
+%% Interface derived from
+%% https://github.com/emqx/emqx/blob/270059f0c2694342fc72338760dbb968b78b7918/apps/emqx/src/emqx_access_control.erl#L121-L127
+on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
   execute_auth_hook(
     fun() ->
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
       case is_pubsub_authorized(PubSub, ClientId, Topic) of
-        true -> {stop, allow};
-        false -> {stop, deny}
+        true -> #{result, ?AUTHZ_ALLOW};
+        false -> #{result, ?AUTHZ_DENY}
       end
     end
   ).
 
+-spec(is_pubsub_authorized(PubSub :: atom(), ClientId :: any(), Topic :: any()) -> boolean()).
 is_pubsub_authorized(publish, ClientId, Topic) ->
   is_publish_authorized(ClientId, Topic);
 is_pubsub_authorized(subscribe, ClientId, Topic) ->
   is_subscribe_authorized(ClientId, Topic).
 
+-spec(is_connect_authorized(ClientId :: any()) -> boolean()).
 is_connect_authorized(ClientId) ->
   Resource = "mqtt:clientId:" ++ binary_to_list(ClientId),
   Action = "mqtt:connect",
   case is_authorized(ClientId, Resource, Action) of
-    authorized -> true;
+    ?AUTHORIZED -> true;
     _ -> false
   end.
 
+-spec(is_publish_authorized(ClientId :: any(), Topic :: any()) -> boolean()).
 is_publish_authorized(ClientId, Topic) ->
   Resource = "mqtt:topic:" ++ binary_to_list(Topic),
   Action = "mqtt:publish",
   case is_authorized(ClientId, Resource, Action) of
-    authorized -> true;
+    ?AUTHORIZED -> true;
     _ -> false
   end.
 
+-spec(is_subscribe_authorized(ClientId :: any(), Topic :: any()) -> boolean()).
 is_subscribe_authorized(ClientId, Topic) ->
   Resource = "mqtt:topicfilter:" ++ binary_to_list(Topic),
   Action = "mqtt:subscribe",
   case is_authorized(ClientId, Resource, Action) of
-    authorized -> true;
+    ?AUTHORIZED -> true;
     _ -> false
   end.
 
@@ -169,25 +193,25 @@ is_authorized(Retries, AuthToken, ClientId, Resource, Action) ->
 
 is_authorized({ok, authorized}, _, _, ClientId, Resource, Action) ->
   logger:info("Client(~s) authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-  authorized;
+  ?AUTHORIZED;
 is_authorized({ok, unauthorized}, _, _, ClientId, Resource, Action) ->
   logger:warning("Client(~s) not authorized to perform ~p on resource ~p", [ClientId, Action, Resource]),
-  unauthorized;
+  ?UNAUTHORIZED;
 is_authorized({error, Error}, _, _, ClientId, Resource, Action) ->
   logger:error("Client(~s) not authorized to perform ~p on resource ~p. Error:~p", [ClientId, Action, Resource, Error]),
-  unauthorized;
+  ?UNAUTHORIZED;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries == 0 ->
   logger:warning("Client(~s) has a bad auth token. EMQX will try to get a new auth token from client device auth component.", [ClientId]),
   case reauthenticate(ClientId) of
-    {_, success} -> is_authorized(Retries + 1, ClientId, Resource, Action);
+    {_, ?AUTHN_SUCCESS} -> is_authorized(Retries + 1, ClientId, Resource, Action);
     _ ->
       logger:info("Could not get a new auth token"),
-      unauthorized
+      ?UNAUTHORIZED
   end;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
   logger:error("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.", [ClientId, Action, Resource]),
   kick_non_v5_client(ClientId),
-  unauthorized.
+  ?UNAUTHORIZED.
 
 
 %%--------------------------------------------------------------------
