@@ -120,8 +120,8 @@ authenticate(AuthToken, ClientId, _) ->
   %% store for authZ
   put(?AUTH_TOKEN, AuthToken),
   case is_connect_authorized(ClientId) of
-    true -> {ok, ?AUTHN_SUCCESS};
-    false -> {error, ?AUTHN_FAILURE}
+    true -> {ok, #{result => ?AUTHN_SUCCESS}};
+    false -> {error, #{result => ?AUTHN_FAILURE}}
   end.
 
 reauthenticate(ClientId) ->
