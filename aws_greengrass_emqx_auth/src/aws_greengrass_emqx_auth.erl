@@ -140,8 +140,8 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
       case is_pubsub_authorized(PubSub, ClientId, Topic) of
-        true -> #{result, ?AUTHZ_ALLOW};
-        false -> #{result, ?AUTHZ_DENY}
+        true -> #{result => ?AUTHZ_ALLOW};
+        false -> #{result => ?AUTHZ_DENY}
       end
     end
   ).
