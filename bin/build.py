@@ -320,16 +320,15 @@ def main():
                            'release.json'), "w") as w:
         json.dump(release_info, w, indent=4)
 
-    if not quick_mode:
-        print("Zipping EMQ X")
-        shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
+    print("Zipping EMQ X")
+    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
 
-        print("Patching EMQ X")
-        add = {
-            "emqx/etc/acl.conf": "patches/acl.conf",
-            "emqx/etc/emqx.conf": "patches/emqx.conf"
-        }
-        # On Windows, bundle in msvc runtime 120
-        if os.name == 'nt':
-            add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
-        do_patch("build/emqx.zip", add=add)
+    print("Patching EMQ X")
+    add = {
+        "emqx/etc/acl.conf": "patches/acl.conf",
+        "emqx/etc/emqx.conf": "patches/emqx.conf"
+    }
+    # On Windows, bundle in msvc runtime 120
+    if os.name == 'nt':
+        add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+    do_patch("build/emqx.zip", add=add)
