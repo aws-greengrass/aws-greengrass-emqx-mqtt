@@ -196,7 +196,9 @@ def main():
             env=emqx_build_env,
             shell=True
         )
+        os.chdir(current_abs_path)
 
+    os.chdir("emqx")
     erts_version = None
     emqx_version = None
     with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as file:
@@ -224,7 +226,7 @@ def main():
     except FileNotFoundError:
         pass
     # Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
-    shutil.rmtree("_build/emqx/rel/emqx/etc/certs")
+    shutil.rmtree("_build/emqx/rel/emqx/etc/certs", ignore_errors=quick_mode)
 
     os.chdir(current_abs_path)
     pathlib.Path("build").mkdir(parents=True, exist_ok=True)
