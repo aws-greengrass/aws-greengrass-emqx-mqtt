@@ -63,13 +63,13 @@ execute_auth_hook(Hook) ->
 handle_auth_hook_result(_, {ok, _} = AuthNSuccess) ->
   %% no need to evaluate rest of auth chain when we deem success
   {?STOP_HOOK_CHAIN, AuthNSuccess};
-handle_auth_hook_result(_, #{result => ?AUTHZ_ALLOW} = AuthZSuccess) ->
+handle_auth_hook_result(_, #{result := ?AUTHZ_ALLOW} = AuthZSuccess) ->
   %% no need to evaluate rest of auth chain when we deem success
   {?STOP_HOOK_CHAIN, AuthZSuccess};
 handle_auth_hook_result(AuthMode, _) when AuthMode =:= bypass; AuthMode =:= bypass_on_failure ->
   %% in bypass mode, ignore auth results/errors and move on to next step in auth chain
   ?CONTINUE_HOOK_CHAIN;
-handle_auth_hook_result(_, #{result => ?AUTHZ_DENY} = AuthZDeny) ->
+handle_auth_hook_result(_, #{result := ?AUTHZ_DENY} = AuthZDeny) ->
   %% stop auth chain and report authZ deny
   {?STOP_HOOK_CHAIN, AuthZDeny};
 handle_auth_hook_result(_, {error, _} = Error) ->
