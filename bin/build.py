@@ -283,7 +283,7 @@ def main():
         "functionality": [
             "AuthN", "AuthZ"
         ],
-        "git_ref": subprocess.check_output('git rev-parse HEAD').decode('utf-8').strip(),
+        "git_ref": subprocess.check_output('git rev-parse HEAD', shell=True).decode('utf-8').strip(),
         "metadata_vsn": "0.1.0",
         "name": AUTH_PLUGIN_NAME,
         "rel_apps": [
