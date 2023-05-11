@@ -182,7 +182,7 @@ def main():
 
         print("Building EMQ X")
         emqx_build_cmd = 'make -j'
-        emqx_build_env = dict(os.environ)
+        emqx_build_env = dict(os.environ, BUILD_WITHOUT_ROCKSDB="true")
 
         if os.name == 'nt':
             # ensure visual studio environment is set properly
