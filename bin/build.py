@@ -253,7 +253,7 @@ def main():
             shutil.copy(lib, 'priv')
 
     plugin_build_cmd = 'make release'
-    plugin_build_env = dict(os.environ)
+    plugin_build_env = dict(os.environ, BUILD_WITHOUT_ROCKSDB="true")
 
     if os.name == 'nt':
         vcvars_path, arch = find_vcvars_path()
