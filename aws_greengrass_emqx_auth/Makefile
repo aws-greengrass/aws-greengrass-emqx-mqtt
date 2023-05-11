@@ -3,36 +3,29 @@
 BUILD_WITHOUT_QUIC ?= true
 export BUILD_WITHOUT_QUIC
 
-REBAR = $(CURDIR)/rebar3
-REBAR_VERSION = 3.18.0-emqx-1
+REBAR = rebar3
 
 .PHONY: all
 all: compile
 
-.PHONY: get-rebar3
-get-rebar3:
-	@$(CURDIR)/get-rebar3 $(REBAR_VERSION)
-
-$(REBAR):
-
 .PHONY: compile
-compile: $(REBAR)
+compile:
 	$(REBAR) compile
 
 .PHONY: ct
-ct: $(REBAR)
+ct:
 	$(REBAR) as test ct -v
 
 .PHONY: eunit
-eunit: $(REBAR)
+eunit:
 	$(REBAR) as test eunit
 
 .PHONY: xref
-xref: $(REBAR)
+xref:
 	$(REBAR) xref
 
 .PHONY: cover
-cover: $(REBAR)
+cover:
 	$(REBAR) cover
 
 .PHONY: clean
@@ -44,5 +37,5 @@ distclean:
 	@rm -f data/app.*.config data/vm.*.args rebar.lock
 
 .PHONY: release
-release: $(REBAR)
+release:
 	$(REBAR) release
