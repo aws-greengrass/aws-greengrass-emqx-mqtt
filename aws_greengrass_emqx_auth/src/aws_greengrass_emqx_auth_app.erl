@@ -13,11 +13,20 @@
 
 start(_StartType, _StartArgs) ->
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
+  load_config(),
   port_driver_integration:start(),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
+
+load_config() ->
+  case aws_greengrass_emqx_conf:load() of
+    {error, _} = Err ->
+      logger:error("Failed to load plugin configuration: ~p", [Err]),
+      exit(Err);
+    Ok -> Ok
+  end.
 
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:auth_mode() of
