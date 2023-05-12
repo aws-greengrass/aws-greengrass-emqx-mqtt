@@ -3,7 +3,7 @@
 @@ -775,6 +775,6 @@
  
      ## Merge hocon generated *.args into the vm.args
-     TTMP_ARG_FILE="$CONFIGS_DIR/vm.args.tmp"
+     TMP_ARG_FILE="$CONFIGS_DIR/vm.args.tmp"
 -    cp "$EMQX_ETC_DIR/vm.args" "$TMP_ARG_FILE"
 +    cat "$EMQX_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
      echo "" >> "$TMP_ARG_FILE"
