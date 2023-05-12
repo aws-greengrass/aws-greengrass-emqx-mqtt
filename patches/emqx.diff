@@ -14,7 +14,7 @@
      local log_to=${EMQX_LOG__TO:-undefined}
      # unset because it's unknown to 5.0
 -    unset EMQX_LOG__TO
-+    # unset EMQX_LOG__TO
++    echo "skipping unset EMQX_LOG__TO"
      case "${log_to}" in
          console)
              export EMQX_LOG__CONSOLE_HANDLER__ENABLE='true'
@@ -23,7 +23,7 @@
      if [ "${EMQX_LOG__TO:-}" = 'default' ]; then
          # want to use config file defaults, do nothing
 -        unset EMQX_LOG__TO
-+        # unset EMQX_LOG__TO
++        echo "skipping unset EMQX_LOG__TO"
      else
          tr_log_to_env
          # ensure defaults
