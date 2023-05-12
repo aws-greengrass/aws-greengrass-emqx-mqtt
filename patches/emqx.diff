@@ -8,6 +8,9 @@
 +    cat "$EMQX_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
      echo "" >> "$TMP_ARG_FILE"
      echo "-pa \"${REL_DIR}/consolidated\"" >> "$TMP_ARG_FILE"
-@@ -875,1 +875,1 @@
+@@ -868,1 +868,1 @@
+-    unset EMQX_LOG__TO
++    # unset EMQX_LOG__TO
+@@ -897,1 +897,1 @@
 -    unset EMQX_LOG__TO
 +    # unset EMQX_LOG__TO
