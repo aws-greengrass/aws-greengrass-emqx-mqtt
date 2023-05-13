@@ -31,7 +31,6 @@ RUN apk add --no-cache \
     openssl-dev \
     py3-pip \
     python3 \
-    rebar3 \
     sudo \
     tar \
     unixodbc-dev \
