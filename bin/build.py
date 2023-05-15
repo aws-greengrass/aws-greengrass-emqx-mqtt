@@ -54,6 +54,7 @@ def main():
     parser.add_argument('--test-only', action='store_true')
     parser.add_argument('--no-test', action='store_true')
     parser.add_argument('--sdk-only', action='store_true')
+    parser.add_argument('--emqx-only', action='store_true')
     parser.add_argument('--no-sdk', action='store_true')
 
     args = parser.parse_args()
@@ -65,6 +66,9 @@ def main():
     test_mode = args.test_only
     if test_mode:
         print("Test mode! Portions of the build will be skipped")
+    emqx_only = args.emqx_only
+    if emqx_only:
+        print("EMQX-only mode! Only EMQX will be built")
     current_abs_path = os.path.abspath(os.getcwd())
 
     release_type = "RelWithDebInfo"
@@ -72,7 +76,7 @@ def main():
     if os.name == "nt":
         config = f"--config {release_type}"
 
-    if not quick_mode and not test_mode and not args.no_sdk:
+    if not quick_mode and not test_mode and not args.no_sdk and not emqx_only:
         print("Pulling all submodules recursively")
         subprocess.check_call("git submodule update --init --recursive", shell=True)
 
@@ -87,13 +91,14 @@ def main():
             return
 
     # Build plugin
-    print("Building native plugin")
+    if not emqx_only:
+        print("Building native plugin")
     os.chdir(current_abs_path)
     pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
     os.chdir("_build")
 
     enable_unit_test_flag = "-DBUILD_TESTS=OFF"
-    do_test = not (quick_mode or args.no_test or os.name == "nt") or test_mode
+    do_test = not (quick_mode or args.no_test or os.name == "nt" or emqx_only) or test_mode
     if do_test:
         print("Enabling unit tests")
         enable_unit_test_flag = "-DBUILD_TESTS=ON"
@@ -121,26 +126,27 @@ def main():
     clang_tidy = ""
     if (shutil.which("clang-tidy")) is not None:
         clang_tidy = "-DCLANG_TIDY=1"
-    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_BUILD_TYPE=\"{release_type}\""
-                          f" {clang_tidy} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
-                          shell=True)
-    # Run format the code
-    if shutil.which("clang-format") is not None:
-        print("Reformatting code using clang-format")
-        subprocess.check_call("cmake --build . --target clangformat", shell=True)
-        # Fail the build on GitHub if there are format changes needed
-        if os.getenv("GITHUB_ACTIONS") == "true":
-            try:
-                subprocess.check_call("git diff --exit-code", shell=True,
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except subprocess.CalledProcessError:
-                print("Clang format check failed")
-                sys.exit(1)
-    else:
-        print("clang-format not found, won't format or check format of files. Install using `brew install "
-              "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
+    if not emqx_only:
+        subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_BUILD_TYPE=\"{release_type}\""
+                              f" {clang_tidy} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
+                              shell=True)
+        # Run format the code
+        if shutil.which("clang-format") is not None:
+            print("Reformatting code using clang-format")
+            subprocess.check_call("cmake --build . --target clangformat", shell=True)
+            # Fail the build on GitHub if there are format changes needed
+            if os.getenv("GITHUB_ACTIONS") == "true":
+                try:
+                    subprocess.check_call("git diff --exit-code", shell=True,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except subprocess.CalledProcessError:
+                    print("Clang format check failed")
+                    sys.exit(1)
+        else:
+            print("clang-format not found, won't format or check format of files. Install using `brew install "
+                  "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
 
-    subprocess.check_call(f"cmake --build . {config}", shell=True)
+        subprocess.check_call(f"cmake --build . {config}", shell=True)
     if do_test:
         print("Running unit tests")
         # run UTs with coverage
@@ -234,6 +240,9 @@ def main():
         os.remove("build/emqx.zip")
     except FileNotFoundError:
         pass
+
+    if emqx_only:
+        return
 
     print("Building AWS Greengrass Auth Plugin")
     plugin_libs = [os.path.abspath('_build/driver_lib')]
