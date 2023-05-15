@@ -38,13 +38,26 @@ RUN apk add --no-cache \
     zip \
     zlib-dev
 
-COPY . /build
 
-# Build SDK first for docker caching
+COPY .git /build/.git
+COPY .gitmodules /build/.gitmodules
+COPY bin /build/bin
+
+# Build AWS IoT SDK
 RUN cd /build \
     && python3 -u -m pip install -r bin/requirements.txt \
     && python3 -u -m bin --sdk-only
 
+# Build EMQX
+COPY emqx.commit /build/
+RUN cd /build \
+    && python3 -u -m bin --emqx-only
+
+# Full build, including port driver, greengrass auth EMQX plugin, utilizing above cached layers
+COPY THIRD-PARTY-LICENSES emqx.commit /build/
+COPY patches /build/patches
+COPY port_driver /build/port_driver
+COPY aws_greengrass_emqx_auth /build/aws_greengrass_emqx_auth
 RUN cd /build \
     && python3 -u -m bin --no-test \
     && cd build \
