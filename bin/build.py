@@ -252,6 +252,9 @@ def main():
         else:
             shutil.copy(lib, 'priv')
 
+    # link rebar3 from emqx build for use in plugin build.
+    os.symlink(os.path.join(current_abs_path, "emqx", "rebar3"), "rebar3")
+
     plugin_build_cmd = 'make release'
     plugin_build_env = dict(os.environ, BUILD_WITHOUT_ROCKSDB="true")
 
