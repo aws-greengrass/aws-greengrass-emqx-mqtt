@@ -23,6 +23,7 @@ Run `python3 -u -m bin` in order to build everything. The built EMQX will be in 
 - Use `--quick` to build only the EMQX auth plugin. Must perform a full build first.
 - Use `--sdk-only` to build only the AWS IoT Device SDK for C++.
 - Use `--emqx-only` to build only EMQX.
+- Use `--port-driver-only` to build only the native port driver.
 - Use `--test-only` to only rebuild and test the EMQX auth plugin. Must perform a full build first.
 - Use `--no-sdk` to skip building the AWS IoT Device SDK for C++.
 
