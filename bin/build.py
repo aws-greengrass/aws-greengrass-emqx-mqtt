@@ -182,7 +182,7 @@ def main():
 
         print("Building EMQ X")
         emqx_build_cmd = 'make -j'
-        emqx_build_env = dict(os.environ)
+        emqx_build_env = dict(os.environ, BUILD_WITHOUT_ROCKSDB="true")
 
         if os.name == 'nt':
             # ensure visual studio environment is set properly
@@ -253,7 +253,7 @@ def main():
             shutil.copy(lib, 'priv')
 
     plugin_build_cmd = 'make release'
-    plugin_build_env = dict(os.environ)
+    plugin_build_env = dict(os.environ, BUILD_WITHOUT_ROCKSDB="true")
 
     if os.name == 'nt':
         vcvars_path, arch = find_vcvars_path()
@@ -283,7 +283,7 @@ def main():
         "functionality": [
             "AuthN", "AuthZ"
         ],
-        "git_ref": subprocess.check_output('git rev-parse HEAD').decode('utf-8').strip(),
+        "git_ref": subprocess.check_output('git rev-parse HEAD', shell=True).decode('utf-8').strip(),
         "metadata_vsn": "0.1.0",
         "name": AUTH_PLUGIN_NAME,
         "rel_apps": [
