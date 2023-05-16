@@ -91,6 +91,7 @@ COPY --from=port-driver /build/_build/driver_lib _build/driver_lib
 COPY patches/msvcp140.dll patches/vcruntime140.dll patches/vcruntime140_1.dll patches/
 COPY aws_greengrass_emqx_auth aws_greengrass_emqx_auth
 COPY bin/build_plugin.py bin/package.py bin/
+COPY .git .git
 RUN python3 -u -m bin --plugin-only
 
 FROM build-base as package
