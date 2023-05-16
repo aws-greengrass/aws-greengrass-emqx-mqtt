@@ -103,7 +103,7 @@ COPY --from=emqx /build/emqx/ emqx
 COPY --from=plugin /build/aws_greengrass_emqx_auth/_build aws_greengrass_emqx_auth/_build
 COPY THIRD-PARTY-LICENSES .
 COPY patches/emqx.cmd.diff patches/emqx.conf patches/emqx.diff patches/msvcr120.dll patches/acl.conf patches/
-COPY bin/package.py bin/
+COPY bin/package.py bin/build_emqx.py bin/
 RUN python3 -u -m bin --package-only \
     && cd build \
     && unzip -q emqx.zip
