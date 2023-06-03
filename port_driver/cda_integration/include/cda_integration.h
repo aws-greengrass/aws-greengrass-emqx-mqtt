@@ -7,6 +7,7 @@
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
+#include <variant>
 
 #include "logger.h"
 #include "private/certificate_updater.h"
@@ -34,6 +35,7 @@ class ClientDeviceAuthIntegration {
     static const char *GET_CLIENT_DEVICE_AUTH_TOKEN_OP;
     static const char *AUTHORIZE_CLIENT_DEVICE_ACTION;
     static const char *VERIFY_CLIENT_DEVICE_IDENTITY;
+    static const char *GET_CONFIGURATION_OP;
 
     static const char *INVALID_AUTH_TOKEN_ERROR;
 
@@ -68,6 +70,8 @@ class ClientDeviceAuthIntegration {
     GreengrassIPCWrapper &getIPCWrapper();
 
     ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
+
+    std::variant<int, std::monostate, std::unique_ptr<Aws::Crt::JsonView>> get_configuration();
 
     CertSubscribeUpdateStatus
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
