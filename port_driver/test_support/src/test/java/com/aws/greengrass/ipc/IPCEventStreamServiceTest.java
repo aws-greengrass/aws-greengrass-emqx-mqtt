@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractAuthorizeClientDeviceActionOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractGetClientDeviceAuthTokenOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractSubscribeToCertificateUpdatesOperationHandler;
+import software.amazon.awssdk.aws.greengrass.GeneratedAbstractSubscribeToConfigurationUpdateOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractUpdateStateOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractVerifyClientDeviceIdentityOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GreengrassCoreIPCService;
@@ -18,12 +19,16 @@ import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionRe
 import software.amazon.awssdk.aws.greengrass.model.AuthorizeClientDeviceActionResponse;
 import software.amazon.awssdk.aws.greengrass.model.CertificateUpdate;
 import software.amazon.awssdk.aws.greengrass.model.CertificateUpdateEvent;
+import software.amazon.awssdk.aws.greengrass.model.ConfigurationUpdateEvent;
+import software.amazon.awssdk.aws.greengrass.model.ConfigurationUpdateEvents;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenRequest;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenResponse;
 import software.amazon.awssdk.aws.greengrass.model.InvalidClientDeviceAuthTokenError;
 import software.amazon.awssdk.aws.greengrass.model.InvalidCredentialError;
 import software.amazon.awssdk.aws.greengrass.model.SubscribeToCertificateUpdatesRequest;
 import software.amazon.awssdk.aws.greengrass.model.SubscribeToCertificateUpdatesResponse;
+import software.amazon.awssdk.aws.greengrass.model.SubscribeToConfigurationUpdateRequest;
+import software.amazon.awssdk.aws.greengrass.model.SubscribeToConfigurationUpdateResponse;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateRequest;
 import software.amazon.awssdk.aws.greengrass.model.UpdateStateResponse;
 import software.amazon.awssdk.aws.greengrass.model.VerifyClientDeviceIdentityRequest;
@@ -151,6 +156,52 @@ class IPCEventStreamServiceTest {
 
             @Override
             public void handleStreamEvent(EventStreamJsonMessage streamRequestEvent) {
+            }
+        });
+
+        ipcService.setSubscribeToConfigurationUpdateHandler((context) -> new GeneratedAbstractSubscribeToConfigurationUpdateOperationHandler(context) {
+            @Override
+            protected void onStreamClosed() {
+
+            }
+
+            @Override
+            public SubscribeToConfigurationUpdateResponse handleRequest(SubscribeToConfigurationUpdateRequest request) {
+                print("subscribe_to_configuration_update");
+
+                switch (value) {
+                    case "with_success":
+                        return new SubscribeToConfigurationUpdateResponse();
+                    case "with_error":
+                        throw new InvalidCredentialError("Bad");
+                    case "with_callback":
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(1_000);
+                            } catch (InterruptedException ignored) {
+                            }
+                            sendStreamEvent(
+                                    new ConfigurationUpdateEvents()
+                                            .withConfigurationUpdateEvent(
+                                                    new ConfigurationUpdateEvent()
+                                                            .withComponentName(request.getComponentName())
+                                                            .withKeyPath(request.getKeyPath())))
+                                    .whenComplete((a, b) -> print("sent_config_update"));
+                        }).start();
+                        return new SubscribeToConfigurationUpdateResponse();
+                    case "with_timeout":
+                        try {
+                            // Default timeout in CPP is 10 seconds
+                            Thread.sleep(11_000);
+                        } catch (InterruptedException ignored) {
+                        }
+                }
+                return new SubscribeToConfigurationUpdateResponse();
+            }
+
+            @Override
+            public void handleStreamEvent(EventStreamJsonMessage streamRequestEvent) {
+
             }
         });
 
