@@ -207,6 +207,28 @@ TEST_F(CDAIntegrationTester, CDAIntegrationVerifyIdentityTest) {
     EXPECT_EQ(command, "verify_client_device_identity");
 }
 
+TEST_F(CDAIntegrationTester, CDAIntegrationGetConfigurationTest) {
+    SendCommand("set with_success");
+    EXPECT_TRUE(std::holds_alternative<std::unique_ptr<Aws::Crt::JsonView>>(cda_integ->get_configuration()));
+    auto command = NextCommand();
+    EXPECT_EQ(command, "get_configuration");
+
+    SendCommand("set with_error");
+    EXPECT_TRUE(std::holds_alternative<int>(cda_integ->get_configuration()));
+    command = NextCommand();
+    EXPECT_EQ(command, "get_configuration");
+
+    SendCommand("set with_timeout");
+    EXPECT_TRUE(std::holds_alternative<int>(cda_integ->get_configuration()));
+    command = NextCommand();
+    EXPECT_EQ(command, "get_configuration");
+
+    SendCommand("set with_empty");
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(cda_integ->get_configuration()));
+    command = NextCommand();
+    EXPECT_EQ(command, "get_configuration");
+}
+
 TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToConfigurationTest) {
     SendCommand("set with_success");
     auto callback = std::make_unique<std::function<void()>>([]() {});
