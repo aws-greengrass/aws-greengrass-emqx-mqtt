@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractAuthorizeClientDeviceActionOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractGetClientDeviceAuthTokenOperationHandler;
+import software.amazon.awssdk.aws.greengrass.GeneratedAbstractGetConfigurationOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractSubscribeToCertificateUpdatesOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractSubscribeToConfigurationUpdateOperationHandler;
 import software.amazon.awssdk.aws.greengrass.GeneratedAbstractUpdateStateOperationHandler;
@@ -23,6 +24,8 @@ import software.amazon.awssdk.aws.greengrass.model.ConfigurationUpdateEvent;
 import software.amazon.awssdk.aws.greengrass.model.ConfigurationUpdateEvents;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenRequest;
 import software.amazon.awssdk.aws.greengrass.model.GetClientDeviceAuthTokenResponse;
+import software.amazon.awssdk.aws.greengrass.model.GetConfigurationRequest;
+import software.amazon.awssdk.aws.greengrass.model.GetConfigurationResponse;
 import software.amazon.awssdk.aws.greengrass.model.InvalidClientDeviceAuthTokenError;
 import software.amazon.awssdk.aws.greengrass.model.InvalidCredentialError;
 import software.amazon.awssdk.aws.greengrass.model.SubscribeToCertificateUpdatesRequest;
@@ -40,6 +43,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashMap;
 
 class IPCEventStreamServiceTest {
     private IPCEventStreamService ipcEventStreamService;
@@ -152,6 +156,45 @@ class IPCEventStreamServiceTest {
                         }
                 }
                 return new VerifyClientDeviceIdentityResponse();
+            }
+
+            @Override
+            public void handleStreamEvent(EventStreamJsonMessage streamRequestEvent) {
+            }
+        });
+
+        ipcService.setGetConfigurationHandler((context) -> new GeneratedAbstractGetConfigurationOperationHandler(context) {
+            @Override
+            protected void onStreamClosed() {
+            }
+
+            @Override
+            public GetConfigurationResponse handleRequest(GetConfigurationRequest request) {
+                print("get_configuration");
+
+                switch (value) {
+                    case "with_success":
+                        return new GetConfigurationResponse()
+                                .withComponentName("aws.greengrass.clientdevices.mqtt.EMQX")
+                                .withValue(new HashMap<String, Object>() {{
+                                    put("root", new HashMap<String, Object>() {{
+                                        put("a", 1);
+                                        put("b", true);
+                                        put("c", "value");
+                                    }});
+                                }});
+                    case "with_empty":
+                        return new GetConfigurationResponse();
+                    case "with_error":
+                        throw new InvalidCredentialError("Bad");
+                    case "with_timeout":
+                        try {
+                            // Default timeout in CPP is 5 seconds
+                            Thread.sleep(6_000);
+                        } catch (InterruptedException ignored) {
+                        }
+                }
+                return new GetConfigurationResponse();
             }
 
             @Override
