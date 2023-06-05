@@ -30,14 +30,14 @@ class ConfigurationUpdatesHandler : public GG::SubscribeToConfigurationUpdateStr
 };
 
 class ConfigurationSubscriber {
+  public:
+    static const std::string localOverrideNamespace;
+
+    ConfigurationSubscriber(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
+    ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
+
   private:
     GG::GreengrassCoreIpcClient &ipcClient;
     std::shared_ptr<ConfigurationUpdatesHandler> updatesHandler;
     std::shared_ptr<GG::SubscribeToConfigurationUpdateOperation> operation;
-
-  public:
-    ConfigurationSubscriber(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
-    ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::string> componentName,
-                                                                    std::vector<std::string> keyPath,
-                                                                    std::unique_ptr<std::function<void()>> callback);
 };

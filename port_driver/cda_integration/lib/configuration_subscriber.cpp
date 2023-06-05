@@ -9,6 +9,8 @@
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
+const std::string ConfigurationSubscriber::localOverrideNamespace = "localOverride";
+
 void ConfigurationUpdatesHandler::OnStreamEvent(
     GG::ConfigurationUpdateEvents *response) { // NOLINT(misc-unused-parameters)
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
@@ -27,9 +29,7 @@ void ConfigurationUpdatesHandler::OnStreamClosed() {
 }
 
 ConfigurationSubscribeStatus
-ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std::string> componentName,
-                                                            std::vector<std::string> keyPath,
-                                                            std::unique_ptr<std::function<void()>> callback) {
+ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback) {
     updatesHandler = std::make_shared<ConfigurationUpdatesHandler>(std::move(callback));
     operation = ipcClient.NewSubscribeToConfigurationUpdate(updatesHandler);
     if (!operation) {
@@ -38,10 +38,7 @@ ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std:
     }
 
     GG::SubscribeToConfigurationUpdateRequest request;
-    if (componentName) {
-        request.SetComponentName(Aws::Crt::String(componentName->c_str())); // NOLINT(readability-redundant-string-cstr)
-    }
-    request.SetKeyPath(Aws::Crt::Vector<Aws::Crt::String>(keyPath.begin(), keyPath.end()));
+    request.SetKeyPath({Aws::Crt::String(localOverrideNamespace)});
 
     auto activate = operation->Activate(request, nullptr);
     activate.wait();
@@ -53,19 +50,21 @@ ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std:
     }
 
     auto response = GG::SubscribeToConfigurationUpdateResult(responseFuture.get());
-    if (!response) {
-        auto responseType = response.GetResultType();
-        LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Subscribe failed with response type %d", responseType);
-        if (responseType == OPERATION_ERROR) {
-            auto *error = response.GetOperationError();
-            if (error != nullptr) {
-                LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Config updates subscribe operation failure response: %s",
-                      error->GetMessage().value().c_str());
-            }
-        } else if (responseType == RPC_ERROR) {
-            auto error = response.GetRpcError();
-            LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Config updates RPC failure response: %s", error.StatusToString().c_str())
+    switch (response.GetResultType()) {
+    case OPERATION_RESPONSE:
+        break;
+    case OPERATION_ERROR:
+        if (response.GetOperationError() != nullptr) {
+            LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Config updates subscribe operation failure response: %s",
+                  response.GetOperationError()->GetMessage().value().c_str());
         }
+        return ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
+    case RPC_ERROR:
+        LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Config updates RPC failure response: %s",
+              response.GetRpcError().StatusToString().c_str())
+        return ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
+    default:
+        LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Subscribe failed with response type %d", response.GetResultType());
         return ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     }
 

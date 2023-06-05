@@ -67,9 +67,7 @@ class ClientDeviceAuthIntegration {
 
     GreengrassIPCWrapper &getIPCWrapper();
 
-    ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::string> componentName,
-                                                                    std::vector<std::string> keyPath,
-                                                                    std::unique_ptr<std::function<void()>> callback);
+    ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
 
     CertSubscribeUpdateStatus
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,

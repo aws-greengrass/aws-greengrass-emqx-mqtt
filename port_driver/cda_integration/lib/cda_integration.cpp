@@ -36,12 +36,9 @@ void ClientDeviceAuthIntegration::connect() {
 GreengrassIPCWrapper &ClientDeviceAuthIntegration::getIPCWrapper() { return greengrassIpcWrapper; }
 
 ConfigurationSubscribeStatus
-ClientDeviceAuthIntegration::subscribe_to_configuration_updates(std::unique_ptr<std::string> componentName,
-                                                                std::vector<std::string> keyPath,
-                                                                std::unique_ptr<std::function<void()>> callback) {
+ClientDeviceAuthIntegration::subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback) {
     ConfigurationSubscribeStatus configurationSubscribeStatus =
-        configurationSubscriber.subscribe_to_configuration_updates(std::move(componentName), std::move(keyPath),
-                                                                   std::move(callback));
+        configurationSubscriber.subscribe_to_configuration_updates(std::move(callback));
     if (configurationSubscribeStatus == ConfigurationSubscribeStatus::SUBSCRIBE_SUCCESS) {
         LOG_I(CDA_INTEG_SUBJECT, "Successfully subscribed to EMQX configuration");
     } else {
