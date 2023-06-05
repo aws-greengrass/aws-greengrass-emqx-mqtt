@@ -9,8 +9,6 @@
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
-const std::string ConfigurationSubscriber::localOverrideNamespace = "localOverride";
-
 void ConfigurationUpdatesHandler::OnStreamEvent(
     GG::ConfigurationUpdateEvents *response) { // NOLINT(misc-unused-parameters)
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
