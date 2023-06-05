@@ -4,6 +4,7 @@
  */
 
 #include "private/configuration_subscriber.h"
+#include "config.h"
 #include "logger.h"
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
@@ -36,7 +37,7 @@ ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std:
     }
 
     GG::SubscribeToConfigurationUpdateRequest request;
-    request.SetKeyPath({Aws::Crt::String(localOverrideNamespace)});
+    request.SetKeyPath({Aws::Crt::String(aws::greengrass::emqx::localOverrideNamespace)});
 
     auto activate = operation->Activate(request, nullptr);
     activate.wait();

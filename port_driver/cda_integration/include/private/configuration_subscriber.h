@@ -31,8 +31,6 @@ class ConfigurationUpdatesHandler : public GG::SubscribeToConfigurationUpdateStr
 
 class ConfigurationSubscriber {
   public:
-    inline static const std::string localOverrideNamespace = "localOverride";
-
     ConfigurationSubscriber(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
     ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
 
