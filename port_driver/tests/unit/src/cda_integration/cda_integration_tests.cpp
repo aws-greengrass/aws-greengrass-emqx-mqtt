@@ -207,6 +207,40 @@ TEST_F(CDAIntegrationTester, CDAIntegrationVerifyIdentityTest) {
     EXPECT_EQ(command, "verify_client_device_identity");
 }
 
+TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToConfigurationTest) {
+    SendCommand("set with_success");
+    auto callback = std::make_unique<std::function<void()>>([]() {});
+    EXPECT_EQ(ConfigurationSubscribeStatus::SUBSCRIBE_SUCCESS,
+              cda_integ->subscribe_to_configuration_updates(std::move(callback)));
+    auto command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_configuration_update");
+
+    SendCommand("set with_error");
+    callback = std::make_unique<std::function<void()>>([]() {});
+    EXPECT_EQ(ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE,
+              cda_integ->subscribe_to_configuration_updates(std::move(callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_configuration_update");
+
+    SendCommand("set with_timeout");
+    callback = std::make_unique<std::function<void()>>([]() {});
+    EXPECT_EQ(ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_TIMEOUT_RESPONSE,
+              cda_integ->subscribe_to_configuration_updates(std::move(callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_configuration_update");
+
+    bool received = false;
+    SendCommand("set with_callback");
+    callback = std::make_unique<std::function<void()>>([&received]() { received = true; });
+    EXPECT_EQ(ConfigurationSubscribeStatus::SUBSCRIBE_SUCCESS,
+              cda_integ->subscribe_to_configuration_updates(std::move(callback)));
+    command = NextCommand();
+    EXPECT_EQ(command, "subscribe_to_configuration_update");
+    command = NextCommand();
+    EXPECT_EQ(command, "sent_config_update");
+    EXPECT_TRUE(received);
+}
+
 TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesTest) {
     std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
     SendCommand("set with_success");
