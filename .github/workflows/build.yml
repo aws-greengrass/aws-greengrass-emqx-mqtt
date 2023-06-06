@@ -32,16 +32,113 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Dependencies
+
+      #=========================================
+      # Test dependencies (ubuntu)
+      #=========================================
+
+      # TODO cache
+      - name: Install test dependencies (ubuntu)
         if: matrix.os == 'ubuntu-20.04'
         run: |
           sudo apt-add-repository "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" && sudo apt update && sudo apt install -y clang-tidy-14
           # Add llvm-14 binaries into the path early on
           echo "/usr/lib/llvm-14/bin" >> $GITHUB_PATH
-      - name: Build
+
+      #=========================================
+      # Build script python dependencies
+      #=========================================
+
+      - name: Cache Pip
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~\AppData\Local\pip\Cache
+            ~/.cache/pip
+          key: cache-pip-${{ matrix.os }}-${{ hashFiles('bin/requirements.txt') }}
+          restore-keys: |
+            cache-pip-${{ matrix.os }}-
+
+      - name: Install requirements
         run: |
           python3 -m pip install -r bin/requirements.txt
-          python3 -u -m bin
+
+      #=========================================
+      #  Build AWS IoT Device SDK
+      #=========================================
+
+      - name: Restore SDK Cache
+        id: cache-sdk-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            _build_sdk
+          key: cache-sdk-${{ matrix.os }}
+
+      - name: Build SDK
+        if: steps.cache-sdk-restore.outputs.cache-hit != 'true'
+        # TODO factor out pip install
+        run: |
+          python3 -u -m bin --sdk-only
+
+      - name: Save SDK Cache
+        id: cache-sdk-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            _build_sdk
+          key: ${{ steps.cache-sdk-restore.outputs.cache-primary-key }}
+
+      #=========================================
+      #  Build EMQX
+      #=========================================
+
+      - name: Restore EMQX Cache
+        id: cache-emqx-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            emqx
+          key: cache-emqx-${{ matrix.os }}
+
+      - name: Build EMQX
+        if: steps.cache-emqx-restore.outputs.cache-hit != 'true'
+        run: |
+          python3 -u -m bin --emqx-only
+
+      - name: Save EMQX Cache
+        id: cache-emqx-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            emqx
+          key: ${{ steps.cache-emqx-restore.outputs.cache-primary-key }}
+
+      #=========================================
+      #  Build Port Driver and Plugin
+      #=========================================
+
+      - name: Restore Build Cache
+        id: cache-build-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            _build
+          key: cache-build-${{ matrix.os }}
+
+      - name: Build
+        run: |
+          python3 -u -m bin --port-driver-only
+          python3 -u -m bin --quick
+
+      - name: Save Build Cache
+        id: cache-build-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            _build
+          key: ${{ steps.cache-build-restore.outputs.cache-primary-key }}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
