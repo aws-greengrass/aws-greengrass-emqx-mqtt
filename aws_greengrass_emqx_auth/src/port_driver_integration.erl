@@ -11,6 +11,7 @@
   , verify_client_certificate/1
   , register_fun/2
   , request_certificates/0
+  , subscribe_to_configuration_updates/1
 ]).
 
 %% OPERATIONS
@@ -18,6 +19,7 @@
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
 -define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
+-define(SUBSCRIBE_TO_CONFIGURATION_UPDATES, 7).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -148,6 +150,10 @@ verify_client_certificate(CertPem) ->
 
 request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
+
+subscribe_to_configuration_updates(Callback) ->
+  register_fun(certificate_update, Callback),
+  call_port({?SUBSCRIBE_TO_CONFIGURATION_UPDATES}).
 
 register_fun(Atom, Fun) ->
   greengrass_port_driver ! {register_fun, Atom, Fun}.
