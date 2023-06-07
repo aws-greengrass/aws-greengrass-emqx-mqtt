@@ -30,6 +30,7 @@ struct atoms {
     ErlDrvTermData unknown;
     ErlDrvTermData event;
     ErlDrvTermData certificate_update;
+    ErlDrvTermData configuration_update;
 };
 static struct atoms ATOMS {};
 static const char *CONSOLE = "console";
@@ -97,6 +98,7 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { //
     ATOMS.bad_token = driver_mk_atom(const_cast<char *>("bad_token"));
     ATOMS.unknown = driver_mk_atom(const_cast<char *>("unknown"));
     ATOMS.certificate_update = driver_mk_atom(const_cast<char *>("certificate_update"));
+    ATOMS.configuration_update = driver_mk_atom(const_cast<char *>("configuration_update"));
     ATOMS.event = driver_mk_atom(const_cast<char *>("event"));
 
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
@@ -471,6 +473,19 @@ void handle_certificate_update_subscription(DriverContext *context) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
+void handle_configuration_update_subscription(DriverContext *context) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+    ErlDrvTermData result_atom = ATOMS.unknown;
+
+    defer { write_atom_to_port(context, result_atom, return_code); };
+    auto callback = std::make_unique<std::function<void()>>(
+        [context]() { send_event_to_port(context, ATOMS.configuration_update); });
+    const ConfigurationSubscribeStatus result =
+        context->cda_integration->subscribe_to_configuration_updates(std::move(callback));
+    result_atom = result == ConfigurationSubscribeStatus::SUBSCRIBE_SUCCESS ? ATOMS.valid : ATOMS.invalid;
+    return_code = RETURN_CODE_SUCCESS;
+}
+
 static void handle_unknown_op(DriverContext *context) {
     write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
@@ -530,6 +545,10 @@ void drv_output(ErlDrvData handle, ErlIOVec *erlIoVec) {
     case SUBSCRIBE_TO_CERTIFICATE_UPDATES:
         LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CERTIFICATE_UPDATES")
         handle_certificate_update_subscription(context);
+        break;
+    case SUBSCRIBE_TO_CONFIGURATION_UPDATES:
+        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CONFIGURATION_UPDATES")
+        handle_configuration_update_subscription(context);
         break;
     default:
         LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", operation);
