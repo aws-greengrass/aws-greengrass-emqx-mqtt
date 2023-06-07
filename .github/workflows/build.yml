@@ -111,7 +111,7 @@ jobs:
         run: |
           python3 -u -m bin --port-driver-only
           python3 -u -m bin --quick
- 
+
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
