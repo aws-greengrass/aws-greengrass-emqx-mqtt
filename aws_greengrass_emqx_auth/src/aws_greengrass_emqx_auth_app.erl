@@ -16,6 +16,7 @@ start(_StartType, _StartArgs) ->
   load_config(),
   port_driver_integration:start(),
   port_driver_integration:subscribe_to_configuration_updates(fun on_configuration_update/0),
+  logger:info("Get Configuration Test: ~p", [port_driver_integration:get_configuration()]),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
