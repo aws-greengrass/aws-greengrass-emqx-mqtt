@@ -143,7 +143,8 @@ check_authorization(ClientId, AuthToken, Resource, Action, IsRetry) ->
       case authenticate_client_device(ClientId, get(cert_pem)) of
         ok -> check_authorization(ClientId, get(cda_auth_token), Resource, Action, true);
         stop ->
-          logger:info("Could not get a new auth token"),
+          logger:info("Could not get a new auth token. Kicking client (~s) to have client reconnect with updated credentials", [ClientId]),
+          emqx_mgmt:kickout_client(ClientId),
           unauthorized
       end;
     {ok, bad_token} when IsRetry == true ->
