@@ -75,6 +75,17 @@ ClientDeviceAuthIntegration::get_configuration() {
     }
 
     auto result = GG::GetConfigurationResult(resultFuture.get());
+
+    if (result.GetOperationError() != nullptr &&
+        result.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
+        LOG_I(
+            CDA_INTEG_SUBJECT,
+            "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
+            aws::greengrass::emqx::localOverrideNamespace.c_str(),
+            aws::greengrass::emqx::localOverrideNamespace.c_str());
+        return std::monostate();
+    }
+
     auto resultType = result.GetResultType();
     if (resultType != OPERATION_RESPONSE) {
         handle_response_error(GET_CONFIGURATION_OP, resultType, result.GetOperationError());
