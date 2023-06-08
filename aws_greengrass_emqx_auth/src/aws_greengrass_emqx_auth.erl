@@ -215,7 +215,8 @@ is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retr
   case reauthenticate(ClientId) of
     {ok, _} -> is_authorized(Retries + 1, ClientId, Resource, Action);
     _ ->
-      logger:debug("Could not get a new auth token"),
+      logger:info("Could not get a new auth token. Kicking client (~s) to have client reconnect with updated credentials", [ClientId]),
+      emqx_mgmt:kickout_client(ClientId),
       ?UNAUTHORIZED
   end;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
