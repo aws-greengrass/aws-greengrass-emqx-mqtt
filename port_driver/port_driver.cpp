@@ -297,9 +297,9 @@ static void generate_result_from_json_view_object(std::shared_ptr<Aws::Crt::Json
             generate_result_from_json_view_object(std::make_shared<Aws::Crt::JsonView>(value), output);
 
             // we must explicitly copy data from json view
-            const std::string::size_type size = key.size();
-            char *key_copy = new char[size + 1];
-            memcpy(key_copy, key.c_str(), size + 1);
+            // TODO do we need to delete this?
+            char *key_copy = new char[key.size() + 1];
+            key.copy(key_copy, key.size() + 1);
 
             output->push(key.length());
             output->push(reinterpret_cast<ErlDrvTermData>(key_copy));
@@ -331,9 +331,8 @@ static void generate_result_from_json_view_object(std::shared_ptr<Aws::Crt::Json
         Aws::Crt::String str_val = view->AsString();
 
         // we must explicitly copy data from json view
-        const std::string::size_type size = str_val.size();
-        char *str_copy = new char[size + 1];
-        memcpy(str_copy, str_val.c_str(), size + 1);
+        char *str_copy = new char[str_val.size() + 1];
+        str_val.copy(str_copy, str_val.size() + 1);
 
         output->push(str_val.length());
         output->push(reinterpret_cast<ErlDrvTermData>(str_copy));
