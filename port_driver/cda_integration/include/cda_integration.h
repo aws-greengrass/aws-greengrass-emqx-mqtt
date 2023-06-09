@@ -7,9 +7,11 @@
 
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
+#include <variant>
 
 #include "logger.h"
 #include "private/certificate_updater.h"
+#include "private/configuration_subscriber.h"
 #include "private/ipc_wrapper.h"
 
 namespace GG = Aws::Greengrass;
@@ -27,11 +29,13 @@ class ClientDeviceAuthIntegration {
   private:
     GreengrassIPCWrapper greengrassIpcWrapper;
     CertificateUpdater certificateUpdater;
+    ConfigurationSubscriber configurationSubscriber;
     int timeoutSeconds;
 
     static const char *GET_CLIENT_DEVICE_AUTH_TOKEN_OP;
     static const char *AUTHORIZE_CLIENT_DEVICE_ACTION;
     static const char *VERIFY_CLIENT_DEVICE_IDENTITY;
+    static const char *GET_CONFIGURATION_OP;
 
     static const char *INVALID_AUTH_TOKEN_ERROR;
 
@@ -46,7 +50,7 @@ class ClientDeviceAuthIntegration {
 
     ClientDeviceAuthIntegration(GG::GreengrassCoreIpcClient *ipcClient, int timeoutSeconds)
         : greengrassIpcWrapper(ipcClient, timeoutSeconds), certificateUpdater(greengrassIpcWrapper.getIPCClient()),
-          timeoutSeconds(timeoutSeconds){};
+          configurationSubscriber(greengrassIpcWrapper.getIPCClient()), timeoutSeconds(timeoutSeconds){};
 
     bool on_client_connect(const char *clientId, const char *pem);
 
@@ -64,6 +68,10 @@ class ClientDeviceAuthIntegration {
     void connect();
 
     GreengrassIPCWrapper &getIPCWrapper();
+
+    ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
+
+    std::variant<int, std::monostate, std::unique_ptr<Aws::Crt::JsonView>> get_configuration();
 
     CertSubscribeUpdateStatus
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,

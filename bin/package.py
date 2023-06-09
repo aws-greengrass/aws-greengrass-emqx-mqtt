@@ -2,6 +2,8 @@
 #  SPDX-License-Identifier: Apache-2.0
 import io
 import os
+import pathlib
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -45,7 +47,6 @@ def patch(original, patch_file):
 def do_patch(zip_path, add=None):
     if add is None:
         add = {}
-    add["emqx/data/loaded_plugins"] = "patches/loaded_plugins"
     add["emqx/THIRD-PARTY-LICENSES"] = "THIRD-PARTY-LICENSES"
 
     update_zip(
@@ -53,10 +54,33 @@ def do_patch(zip_path, add=None):
         updates={
             "emqx/bin/emqx.cmd": lambda o: patch(o, "patches/emqx.cmd.diff"),
             "emqx/bin/emqx": lambda o: patch(o, "patches/emqx.diff"),
-            "emqx/bin/emqx_ctl.cmd": lambda o: patch(o, "patches/emqx_ctl.diff")
         },
         add=add
     )
+
+
+def package(context):
+    print("Zipping EMQ X")
+    pathlib.Path("build").mkdir(parents=True, exist_ok=True)
+    try:
+        os.remove("build/emqx.zip")
+    except FileNotFoundError:
+        pass
+    try:
+        os.remove(f"emqx/_build/emqx/rel/emqx/emqx-{context.get_emqx_version()}.tar.gz")
+    except FileNotFoundError:
+        pass
+    shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
+
+    print("Patching EMQ X")
+    add = {
+        "emqx/etc/acl.conf": "patches/acl.conf",
+        "emqx/etc/emqx.conf": "patches/emqx.conf"
+    }
+    # On Windows, bundle in msvc runtime 120
+    if os.name == 'nt':
+        add[f"emqx/erts-{context.get_erts_version()}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
+    do_patch("build/emqx.zip", add=add)
 
 
 if __name__ == "__main__":

@@ -2,233 +2,184 @@
 #  SPDX-License-Identifier: Apache-2.0
 
 import argparse
-import pathlib
-import shutil
-import subprocess
-
 import os
-import sys
-import wget
-
-from .package import do_patch
+from .utils import find_vcvars_path
 
 
-def change_dir_permissions_recursive(path, mode):
-    for root, dirs, files in os.walk(path, topdown=False):
-        for dir in [os.path.join(root,d) for d in dirs]:
-            os.chmod(dir, mode)
-    for file in [os.path.join(root, f) for f in files]:
-        os.chmod(file, mode)
+# NOTE: imports are made lazily, for purposes of image layer caching for this repo's Dockerfile.
+
+class Context:
+    """
+    Context that's available to all stages of the build.
+    """
+
+    def __init__(self) -> None:
+        # build modes
+        self.quick = False
+        self.test_only = False
+        self.no_test = False
+        self.sdk_only = False
+        self.emqx_only = False
+        self.port_driver_only = False
+        self.plugin_only = False
+        self.package_only = False
+        self.no_sdk = False
+        # constants
+        self.cmake_build_type = 'RelWithDebInfo'
+        self.auth_plugin_name = 'aws_greengrass_emqx_auth'
+        self.auth_plugin_version = '1.0.0'  # TODO get this dynamically
+        self.original_path = os.path.abspath(os.getcwd())
+        # not available until emqx has been built
+        self._erts_version = None
+        # not available until emqx has been built
+        self._emqx_version = None
+
+    def cmake_config_arg(self):
+        return f'--config {self.cmake_build_type}' if os.name == 'nt' else ''
+
+    def get_erts_version(self):
+        if self._erts_version is None:
+            from .build_emqx import load_erts_version
+            prev_dir = os.getcwd()
+            os.chdir(os.path.join(self.original_path, 'emqx'))
+            self._erts_version = load_erts_version()
+            os.chdir(prev_dir)
+        return self._erts_version
+
+    def get_emqx_version(self):
+        if self._emqx_version is None:
+            from .build_emqx import load_emqx_version
+            prev_dir = os.getcwd()
+            os.chdir(os.path.join(self.original_path, 'emqx'))
+            self._emqx_version = load_emqx_version()
+            os.chdir(prev_dir)
+        return self._emqx_version
+
+    def get_vcvars_path(self):
+        return find_vcvars_path()
+
+
+class Stage:
+    def __init__(self, name, only=False, skip=False, quick=False, testable=False, run=None) -> None:
+        self.name = name
+        self.only = only
+        self.skip = skip
+        self.quick = quick
+        self.testable = testable
+        self.run = run
+
+    def __str__(self) -> str:
+        return self.name
 
 
 def main():
+    context = Context()
+
+    class StoreInContextAction(argparse.Action):
+        """
+        An argparse action that takes a flag arg, like --emqx-only,
+        and sets the corresponding field in Context to True (e.g. context.emqx_only = True)
+        """
+        def __init__(self, option_strings, dest, **kwargs):
+            super().__init__(option_strings, dest, 0, True, **kwargs)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            mode = option_string[2:].replace('-', '_')
+            setattr(context, mode, True)
+
+    action = StoreInContextAction
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--quick', action='store_true')
-    parser.add_argument('--test-only', action='store_true')
-    parser.add_argument('--no-test', action='store_true')
-    parser.add_argument('--sdk-only', action='store_true')
+    parser.add_argument('--quick', action=action)
+    parser.add_argument('--test-only', action=action)
+    parser.add_argument('--no-test', action=action)
+    parser.add_argument('--sdk-only', action=action)
+    parser.add_argument('--emqx-only', action=action)
+    parser.add_argument('--port-driver-only', action=action)
+    parser.add_argument('--plugin-only', action=action)
+    parser.add_argument('--package-only', action=action)
+    parser.add_argument('--no-sdk', action=action)
+    # set build modes in context
+    parser.parse_args()
 
-    args = parser.parse_args()
-    # Quick mode only builds our own plugin C++ code and puts it into the emqx zip file.
-    # Run a full build before doing a quick build.
-    quick_mode = args.quick
-    if quick_mode:
+    if context.quick:
         print("Quick mode! Portions of the build will be skipped")
-    test_mode = args.test_only
-    if test_mode:
+    if context.test_only:
         print("Test mode! Portions of the build will be skipped")
-    current_abs_path = os.path.abspath(os.getcwd())
+    if context.emqx_only:
+        print("EMQX-only mode! Only EMQX will be built")
 
-    release_type = "RelWithDebInfo"
-    config = ""
-    if os.name == "nt":
-        config = f"--config {release_type}"
+    def build_sdk_action():
+        from .build_sdk import build_sdk
+        build_sdk(context)
 
-    if not quick_mode and not test_mode:
-        print("Pulling all submodules recursively")
-        subprocess.check_call("git submodule update --init --recursive", shell=True)
+    def build_port_driver_action():
+        from .build_port_driver import build_port_driver
+        build_port_driver(context)
 
-        print("Building IPC SDK")
-        pathlib.Path("_build_sdk").mkdir(parents=True, exist_ok=True)
-        os.chdir("_build_sdk")
-        # Build SDK
-        subprocess.check_call(f"cmake -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=\"{release_type}\""
-                              " -DBUILD_TESTING=OFF ../aws-iot-device-sdk-cpp-v2", shell=True)
-        subprocess.check_call(f"cmake --build . --target install {config}", shell=True)
-        if args.sdk_only:
-            return
+    def build_emqx_action():
+        from .build_emqx import build_emqx
+        build_emqx(context)
 
-    # Build plugin
-    print("Building native plugin")
-    os.chdir(current_abs_path)
-    pathlib.Path("_build").mkdir(parents=True, exist_ok=True)
-    os.chdir("_build")
+    def build_plugin_action():
+        from .build_plugin import build_plugin
+        build_plugin(context)
 
-    enable_unit_test_flag = "-DBUILD_TESTS=OFF"
-    do_test = not (quick_mode or args.no_test or os.name == "nt") or test_mode
-    if do_test:
-        print("Enabling unit tests")
-        enable_unit_test_flag = "-DBUILD_TESTS=ON"
-        # install lcov on non-windows for coverage
-        zip_name = "lcov-1.16.zip"
-        dir_name = "lcov-1.16"
-        if os.path.isfile(zip_name):
-            os.remove(zip_name)
-        if os.path.isdir(dir_name):
-            shutil.rmtree(dir_name)
-        wget.download("https://github.com/linux-test-project/lcov/archive/refs/tags/v1.16.zip")
-        shutil.unpack_archive(zip_name, ".")
-        os.chdir(dir_name)
-        change_dir_permissions_recursive("bin", 0o777)
-        subprocess.check_call("sudo make install", shell=True)
+    def package_action():
+        from .package import package
+        package(context)
 
-    os.chdir(current_abs_path)
-    os.chdir("_build")
+    stages = [
+        Stage(
+            name='sdk',
+            skip=context.no_sdk,
+            only=context.sdk_only,
+            run=build_sdk_action,
+        ),
+        Stage(
+            name='port-driver',
+            only=context.port_driver_only,
+            testable=True,
+            run=build_port_driver_action,
+        ),
+        Stage(
+            name='emqx',
+            only=context.emqx_only,
+            run=build_emqx_action,
+        ),
+        Stage(
+            name='plugin',
+            only=context.plugin_only,
+            quick=True,
+            run=build_plugin_action,
+        ),
+        Stage(
+            name='package',
+            only=context.package_only,
+            quick=True,
+            run=package_action,
+        )
+    ]
 
-    generator = ""
-    if os.name == 'nt':
-        print("Setting generator for Windows")
-        generator = "-A x64"
+    def next_stage():
+        done = False
+        while stages and not done:
+            stage = stages.pop(0)
+            if stage.skip:
+                continue
+            if context.quick and not stage.quick:
+                continue
+            if context.test_only and not stage.testable:
+                continue
+            # skip if another stage should only execute
+            if any(map(lambda stg: stg.only, stages)):
+                continue
+            # check if we're in a terminal stage
+            if stage.only:
+                done = True
+            yield stage
 
-    clang_tidy = ""
-    if (shutil.which("clang-tidy")) is not None:
-        clang_tidy = "-DCLANG_TIDY=1"
-    subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_BUILD_TYPE=\"{release_type}\""
-                          f" {clang_tidy} -DCMAKE_PREFIX_PATH={current_abs_path}/_build_sdk ../port_driver/",
-                          shell=True)
-    # Run format the code
-    if shutil.which("clang-format") is not None:
-        print("Reformatting code using clang-format")
-        subprocess.check_call("cmake --build . --target clangformat", shell=True)
-        # Fail the build on GitHub if there are format changes needed
-        if os.getenv("GITHUB_ACTIONS") == "true":
-            try:
-                subprocess.check_call("git diff --exit-code", shell=True,
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except subprocess.CalledProcessError:
-                print("Clang format check failed")
-                sys.exit(1)
-    else:
-        print("clang-format not found, won't format or check format of files. Install using `brew install "
-              "clang-format`, `sudo apt install -y clang-format`, or `choco install -y llvm`")
-
-    subprocess.check_call(f"cmake --build . {config}", shell=True)
-    if do_test:
-        print("Running unit tests")
-        # run UTs with coverage
-        subprocess.check_call("cmake --build . --target port_driver_unit_tests-coverage", shell=True)
-    os.chdir(current_abs_path)
-    # Put the output driver library into priv which will be built into the EMQ X distribution bundle
-    shutil.copytree("_build/driver_lib", "priv", dirs_exist_ok=True)
-
-    if test_mode:
-        return
-
-    if not quick_mode:
-        print("Cloning EMQ X")
-        try:
-            subprocess.check_call("git clone https://github.com/emqx/emqx.git", shell=True)
-        except subprocess.CalledProcessError as e:
-            # Ignore EMQ X already cloned
-            if e.returncode != 128:
-                raise
-
-        with open('emqx.commit', 'r') as file:
-            emqx_commit_id = file.read().rstrip()
-        os.chdir("emqx")
-        subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
-        pathlib.Path("_checkouts").mkdir(parents=True, exist_ok=True)
-        os.chdir(current_abs_path)
-        shutil.copyfile(".github/emqx_plugins_patch", "emqx/lib-extra/plugins")
-
-        print("Setting up EMQ X plugin checkout symlink")
-        try:
-            # Remove existing symlink (if any) before linking
-            os.remove(f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth")
-        except FileNotFoundError:
-            pass
-        os.symlink(current_abs_path, f"{current_abs_path}/emqx/_checkouts/aws_greengrass_emqx_auth",
-                   target_is_directory=True)
-
-        os.chdir("emqx")
-        print("Building EMQ X")
-        if os.name == 'nt':
-            print("Setting additional env var for Windows")
-            vs_paths = {("C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files (x86)\\Microsoft Visual "
-                         "Studio\\2019\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files\\Microsoft Visual "
-                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files\\Microsoft Visual "
-                         "Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
-                        ("C:\\Program Files (x86)\\Microsoft Visual "
-                        "Studio\\2022\\BuildTools\\Common7\\Tools\\VsDevCmd.bat", "-arch=amd64")}
-            for vs_path in vs_paths:
-                vs_arch = vs_path[1]
-                vs_path = vs_path[0]
-                if os.path.exists(vs_path):
-                    break
-            else:
-                raise FileNotFoundError("Unable to find where VS is installed!")
-            additional_env_var_script = f'call "{vs_path}" {vs_arch}'
-            subprocess.check_call(f"{additional_env_var_script} && make -j", shell=True,
-                                  env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
-        else:
-            subprocess.check_call(f"make -j", shell=True,
-                                  env=dict(os.environ, EMQX_EXTRA_PLUGINS="aws_greengrass_emqx_auth"))
-
-        erts_version = None
-        with open('_build/emqx/rel/emqx/releases/emqx_vars', 'r') as f:
-            for line in f.readlines():
-                if line.startswith('ERTS_VSN'):
-                    erts_version = line.split('ERTS_VSN=')[1].strip().strip("\"")
-        if erts_version is None:
-            raise ValueError("Didn't find ERTS version")
-        print(f'ERTS version {erts_version}')
-
-        # Remove erl.ini. This, paired with not cd-ing in emqx.cmd,
-        # will allow erlang to use the greengrass work dir as its
-        # working directory.  We want this because in Windows,
-        # we moved the etc and data dirs to the work dir.
-        #
-        # Ideally this removal should happen during do_patch,
-        # but ZipFile doesn't support the removal of files.
-        try:
-            os.remove(f'_build/emqx/rel/emqx/erts-{erts_version}/bin/erl.ini')
-        except FileNotFoundError:
-            pass
-        # Remove the default certs that ship with EMQX just to be sure they can't be used for any reason
-        shutil.rmtree("_build/emqx/rel/emqx/etc/certs")
-
-        os.chdir(current_abs_path)
-        pathlib.Path("build").mkdir(parents=True, exist_ok=True)
-        try:
-            os.remove("build/emqx.zip")
-        except FileNotFoundError:
-            pass
-        print("Zipping EMQ X")
-        shutil.make_archive("build/emqx", "zip", "emqx/_build/emqx/rel")
-
-        print("Patching EMQ X")
-        add = {"emqx/etc/plugins/aws_greengrass_emqx_auth.conf": "etc/aws_greengrass_emqx_auth.conf",
-               "emqx/etc/acl.conf": "patches/acl.conf",
-               "emqx/etc/emqx.conf": "patches/emqx.conf"}
-
-        # On Windows, bundle in msvc runtime 120
-        if os.name == 'nt':
-            add[f"emqx/erts-{erts_version}/bin/msvcr120.dll"] = "patches/msvcr120.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/msvcp140.dll"] = "patches/msvcp140.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140.dll"] = "patches/vcruntime140.dll"
-            add[f"emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv/vcruntime140_1.dll"] = "patches/vcruntime140_1.dll"
-        do_patch("build/emqx.zip", add=add)
-
-    os.chdir(current_abs_path)
-    if quick_mode:
-        subprocess.check_call("rebar3 compile", shell=True)
-        shutil.copytree("_build/default/lib/aws_greengrass_emqx_auth/ebin",
-                        "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/ebin", dirs_exist_ok=True),
-
-    # If EMQ X is already unzipped into build, then update our built plugin native code so we don't need to unzip again
-    if os.path.exists("build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv"):
-        shutil.copytree("_build/driver_lib", "build/emqx/lib/aws_greengrass_emqx_auth-1.0.0/priv", dirs_exist_ok=True)
+    for s in next_stage():
+        os.chdir(context.original_path)
+        print(f'Beginning build stage: {s}')
+        s.run()

@@ -1,11 +1,29 @@
---- emqx	2022-08-31 07:20:47.000000000 -0400
-+++ emqx	2022-09-06 19:04:45.000000000 -0400
-@@ -390,7 +390,7 @@
+--- emqx	(revision a8f6215a36953e428d902ec29d97bb2461f93e75)
++++ emqx	(date 1683920814527)
+@@ -775,7 +775,7 @@
  
-     ## Merge cuttlefish generated *.args into the vm.args
-     TMP_ARG_FILE="$RUNNER_DATA_DIR/configs/vm.args.tmp"
--    cp "$RUNNER_ETC_DIR/vm.args" "$TMP_ARG_FILE"
-+    cat "$RUNNER_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
+     ## Merge hocon generated *.args into the vm.args
+     TMP_ARG_FILE="$CONFIGS_DIR/vm.args.tmp"
+-    cp "$EMQX_ETC_DIR/vm.args" "$TMP_ARG_FILE"
++    cat "$EMQX_ETC_DIR/vm.args" > "$TMP_ARG_FILE"
      echo "" >> "$TMP_ARG_FILE"
      echo "-pa \"${REL_DIR}/consolidated\"" >> "$TMP_ARG_FILE"
-     sed '/^#/d' "$CUTTLE_GEN_ARG_FILE" | sed '/^$/d' | while IFS='' read -r ARG_LINE || [ -n "$ARG_LINE" ]; do
+     ## read lines from generated vm.<time>.args file
+@@ -865,7 +865,7 @@
+ tr_log_to_env() {
+     local log_to=${EMQX_LOG__TO:-undefined}
+     # unset because it's unknown to 5.0
+-    unset EMQX_LOG__TO
++    echo "skipping unset EMQX_LOG__TO"
+     case "${log_to}" in
+         console)
+             export EMQX_LOG__CONSOLE_HANDLER__ENABLE='true'
+@@ -894,7 +894,7 @@
+ maybe_log_to_console() {
+     if [ "${EMQX_LOG__TO:-}" = 'default' ]; then
+         # want to use config file defaults, do nothing
+-        unset EMQX_LOG__TO
++        echo "skipping unset EMQX_LOG__TO"
+     else
+         tr_log_to_env
+         # ensure defaults

@@ -5,7 +5,7 @@
       "version": "NEXT_PATCH",
       "build": {
         "build_system": "custom",
-        "custom_build_command" : "sh -c ./gdk-build.sh"
+        "custom_build_command" : ["python", "gdk-build.py"]
       },
       "publish": {
         "bucket": "gg-dev-artifacts",

@@ -21,7 +21,7 @@ load() ->
   end.
 
 cleanPemCache() ->
-  case catch emqx_mgmt:clean_pem_cache() of
+  case catch emqx_mgmt:clean_pem_cache_all() of
     ok -> logger:info("Finished cleaning pem cache!");
     _ -> logger:error("Failed to clean PEM cache!")
   end.

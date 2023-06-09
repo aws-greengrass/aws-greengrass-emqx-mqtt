@@ -6,8 +6,10 @@
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 #include <functional>
+#include <variant>
 
 #include "cda_integration.h"
+#include "config.h"
 
 #define DEFAULT_TIMEOUT_SECONDS 5.0
 
@@ -23,6 +25,7 @@ const char *ClientDeviceAuthIntegration::FAILED_NO_RESPONSE_VALUE = "%s response
 const char *ClientDeviceAuthIntegration::GET_CLIENT_DEVICE_AUTH_TOKEN_OP = "GetClientDeviceAuthToken";
 const char *ClientDeviceAuthIntegration::AUTHORIZE_CLIENT_DEVICE_ACTION = "AuthorizeClientDeviceAction";
 const char *ClientDeviceAuthIntegration::VERIFY_CLIENT_DEVICE_IDENTITY = "VerifyClientDeviceIdentity";
+const char *ClientDeviceAuthIntegration::GET_CONFIGURATION_OP = "GetConfiguration";
 
 const char *ClientDeviceAuthIntegration::INVALID_AUTH_TOKEN_ERROR = "aws.greengrass#InvalidClientDeviceAuthTokenError";
 
@@ -46,6 +49,81 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     }
     LOG_I(CDA_INTEG_SUBJECT, "Certs were successfully retrieved from Greengrass IPC");
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
+}
+
+std::variant<int, std::monostate, std::unique_ptr<Aws::Crt::JsonView>>
+ClientDeviceAuthIntegration::get_configuration() {
+    auto getConfigOperation = greengrassIpcWrapper.getIPCClient().NewGetConfiguration();
+    if (!getConfigOperation) {
+        LOG_E(GET_CONFIG_SUBJECT, FAILED_OPERATION_FMT, GET_CONFIGURATION_OP);
+        return 1;
+    }
+
+    GG::GetConfigurationRequest request;
+    request.SetKeyPath({Aws::Crt::String(aws::greengrass::emqx::localOverrideNamespace)});
+
+    auto activate = getConfigOperation->Activate(request).get();
+    if (!activate) {
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_ACTIVATION_FMT, GET_CONFIGURATION_OP, activate.StatusToString().c_str());
+        return 1;
+    }
+
+    auto resultFuture = getConfigOperation->GetOperationResult();
+    if (resultFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
+        LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CONFIGURATION_OP);
+        return 1;
+    }
+
+    auto result = GG::GetConfigurationResult(resultFuture.get());
+    auto resultType = result.GetResultType();
+    if (resultType != OPERATION_RESPONSE) {
+        handle_response_error(GET_CONFIGURATION_OP, resultType, result.GetOperationError());
+        return 1;
+    }
+
+    if (result.GetOperationResponse() == nullptr || !result.GetOperationResponse()->GetValue().has_value()) {
+        LOG_I(CDA_INTEG_SUBJECT,
+              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
+        return std::monostate();
+    }
+    auto response = result.GetOperationResponse()->GetValue().value();
+
+    auto config_view = response.View();
+    if (config_view.IsNull()) {
+        LOG_I(CDA_INTEG_SUBJECT,
+              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
+        return std::monostate();
+    }
+
+    if (!config_view.IsObject()) {
+        LOG_E(CDA_INTEG_SUBJECT,
+              "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
+              "by updating the deployment with "
+              "\"RESET\":[\"/%s\"]",
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
+        return 1;
+    }
+
+    return std::make_unique<Aws::Crt::JsonView>(config_view);
+}
+
+ConfigurationSubscribeStatus
+ClientDeviceAuthIntegration::subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback) {
+    ConfigurationSubscribeStatus configurationSubscribeStatus =
+        configurationSubscriber.subscribe_to_configuration_updates(std::move(callback));
+    if (configurationSubscribeStatus == ConfigurationSubscribeStatus::SUBSCRIBE_SUCCESS) {
+        LOG_I(CDA_INTEG_SUBJECT, "Successfully subscribed to EMQX configuration");
+    } else {
+        LOG_E(CDA_INTEG_SUBJECT, "Failed to subscribe to configuration updates with status %d",
+              (int)configurationSubscribeStatus);
+    }
+    return configurationSubscribeStatus;
 }
 
 std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth_token(const char *clientId,

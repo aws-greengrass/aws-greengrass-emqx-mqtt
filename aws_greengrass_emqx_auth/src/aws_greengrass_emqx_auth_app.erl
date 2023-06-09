@@ -13,24 +13,36 @@
 
 start(_StartType, _StartArgs) ->
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
+  load_config(),
   port_driver_integration:start(),
+  port_driver_integration:subscribe_to_configuration_updates(fun on_configuration_update/0),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
 
+on_configuration_update() ->
+  %% TODO get configuration and set emqx config
+  logger:info("Configuration update received").
+
+load_config() ->
+  case aws_greengrass_emqx_conf:load() of
+    {error, _} = Err ->
+      logger:error("Failed to load plugin configuration: ~p", [Err]),
+      exit(Err);
+    Ok -> Ok
+  end.
+
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:auth_mode() of
-    bypass -> ok;
+    bypass ->
+      logger:info("Skipping custom cert verification");
     _ ->
-      case tls_custom_certificate_verification:enable() of
-        ok -> ok;
-        nossl ->
-          ErrorString = "Could not find active SSL listener",
-          throw({error, ErrorString});
+      case tls_custom_certificate_verification:enable(mtls) of
+        ok ->
+          logger:info("Custom cert verification enabled");
         {error, Reason} ->
-          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s",
-            [Reason]),
+          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s", [Reason]),
           throw({error, ErrorString})
       end
   end.

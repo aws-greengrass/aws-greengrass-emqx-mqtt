@@ -11,15 +11,15 @@
   , verify_client_certificate/1
   , register_fun/2
   , request_certificates/0
+  , subscribe_to_configuration_updates/1
 ]).
-
--include("emqx.hrl").
 
 %% OPERATIONS
 -define(GET_CLIENT_DEVICE_AUTH_TOKEN, 3).
 -define(ON_CLIENT_CHECK_ACL, 4).
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
 -define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
+-define(SUBSCRIBE_TO_CONFIGURATION_UPDATES, 7).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -51,7 +51,10 @@ start() ->
   receive
     %% ensure process is registered so we can
     %% safely send messages without race conditions
-    port_driver_initialized -> ok
+    port_driver_initialized -> ok;
+    {ErrType, Err, Reason, StackTrace} ->
+      logger:error("Port driver initialization failed: ~p ~p:~p. Stacktrace: ~p", [ErrType, Err, Reason, StackTrace]),
+      exit({error, {ErrType, io:format("~p:~p", [Err, Reason])}})
   end.
 
 stop() ->
@@ -59,10 +62,27 @@ stop() ->
   greengrass_port_driver ! stop.
 
 init(PortDriver, CallerPID) ->
-  register(greengrass_port_driver, self()),
-  CallerPID ! port_driver_initialized,
-  Port = open_port({spawn, PortDriver}, [binary]),
-  loop(Port).
+  try register(greengrass_port_driver, self()) of _ ->
+    case open_portdriver_port(PortDriver) of
+      {Err, Reason, StackTrace} ->
+        CallerPID ! {failed_to_open_port, Err, Reason, StackTrace};
+      Port ->
+        CallerPID ! port_driver_initialized,
+        loop(Port)
+    end
+  catch Err:Reason:StackTrace ->
+    CallerPID ! {unable_to_register_process, Err, Reason, StackTrace}
+  end.
+
+open_portdriver_port(PortDriver) ->
+  logger:debug("Opening port: ~p", [PortDriver]),
+  try open_port({spawn_driver, PortDriver}, [binary]) of
+    Port when is_port(Port) ->
+      logger:debug("Port ~p opened", [PortDriver]),
+      Port
+  catch Err:Reason:StackTrace ->
+    {Err, Reason, StackTrace}
+  end.
 
 empty() -> ok.
 
@@ -118,6 +138,7 @@ loop(Port, Inflight, Counter, FunMap) ->
       exit(port_terminated)
   end.
 
+-spec(get_auth_token(string, string) -> {ok, any()} | {error, atom()}).
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).
 
@@ -130,9 +151,14 @@ verify_client_certificate(CertPem) ->
 request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
 
+subscribe_to_configuration_updates(Callback) ->
+  register_fun(certificate_update, Callback),
+  call_port({?SUBSCRIBE_TO_CONFIGURATION_UPDATES}).
+
 register_fun(Atom, Fun) ->
   greengrass_port_driver ! {register_fun, Atom, Fun}.
 
+-spec(receive_back() -> {ok, any()} | {error, atom()}).
 receive_back() ->
   receive
     {greengrass_port_driver, Data} ->
@@ -146,10 +172,12 @@ receive_back() ->
       end
   end.
 
+-spec(call_port(#{}, async) -> {ok, any()} | {error, atom()}).
 call_port(Msg, async) ->
   greengrass_port_driver ! {call, self(), Msg, async},
   receive_back().
 
+-spec(call_port(#{}) -> {ok, any()} | {error, atom()}).
 call_port(Msg) ->
   greengrass_port_driver ! {call, self(), Msg},
   receive_back().
