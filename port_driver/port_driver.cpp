@@ -6,7 +6,6 @@
 #include "port_driver.h"
 #include "common.h"
 #include "defer.h"
-#include <any>
 #include <aws/crt/Api.h>
 #include <cda_integration.h>
 #include <cstring>
