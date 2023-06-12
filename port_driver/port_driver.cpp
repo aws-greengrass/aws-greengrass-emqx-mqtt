@@ -144,6 +144,8 @@ struct packer {
     std::unique_ptr<std::string> strResult = {};
     std::shared_ptr<Aws::Crt::JsonView> jsonViewResult = {};
     std::stack<ErlDrvTermData> spec;
+    std::vector<std::shared_ptr<double>> numbers;
+    std::vector<std::shared_ptr<std::string>> strings;
     DriverContext *context;
     ErlDrvTermData result = ATOMS.fail;
     char returnCode = RETURN_CODE_UNEXPECTED;
@@ -280,20 +282,16 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
     }
 
     if (view->IsIntegerType()) {
-        pack->spec.push(0);
-        pack->spec.push(ERL_DRV_MAP);
-        // pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
-        // pack->spec.push(ERL_DRV_INT);
+        pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
+        pack->spec.push(ERL_DRV_INT);
         return;
     }
 
     if (view->IsFloatingPointType()) {
-        pack->spec.push(0);
-        pack->spec.push(ERL_DRV_MAP);
-        // TODO
-        // auto double_val = view->AsDouble();
-        // pack->spec.push(reinterpret_cast<ErlDrvTermData>(&double_val));
-        // pack->spec.push(ERL_DRV_FLOAT);
+        auto ptr = std::make_shared<double>(view->AsDouble());
+        pack->numbers.emplace_back(ptr);
+        pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr.get()));
+        pack->spec.push(ERL_DRV_FLOAT);
         return;
     }
 
@@ -304,9 +302,10 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
 
     if (view->IsString()) {
         // TODO binary instead because we don't know if it's an atom or not
-        auto str_val = view->AsString();
-        pack->spec.push(str_val.length());
-        pack->spec.push(reinterpret_cast<ErlDrvTermData>(str_val.c_str()));
+        auto ptr = std::make_shared<std::string>(view->AsString());
+        pack->strings.emplace_back(ptr);
+        pack->spec.push(ptr->length());
+        pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
         pack->spec.push(ERL_DRV_STRING);
         return;
     }
@@ -329,9 +328,11 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
 
             generate_result_from_json_view_object(pack, std::make_shared<Aws::Crt::JsonView>(value));
 
-            pack->spec.push(key.length());
-            pack->spec.push(reinterpret_cast<ErlDrvTermData>(key.c_str()));
-            pack->spec.push(ERL_DRV_STRING); // TODO binary?
+            auto ptr = std::make_shared<std::string>(key);
+            pack->strings.emplace_back(ptr);
+            pack->spec.push(ptr->length());
+            pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
+            pack->spec.push(ERL_DRV_STRING); // TODO binary
         }
     }
 }
@@ -360,32 +361,22 @@ static void write_empty_map_to_port(DriverContext *context, const char return_co
 
 static void write_output(ErlDrvTermData port, packer *pack) {
     int spec_size = pack->spec.size();
-    LOG_I(PORT_DRIVER_SUBJECT, "writing spec of size %d", spec_size);
     ErlDrvTermData *spec = new ErlDrvTermData[spec_size];
     defer { delete[] spec; };
 
     for (int i = 0; i < spec_size; i++) {
-        LOG_I(PORT_DRIVER_SUBJECT, "wrote item %d", i);
         spec[i] = pack->spec.top();
         pack->spec.pop();
     }
 
     if (erl_drv_output_term(port, spec, spec_size) < 0) {
         LOG_E(PORT_DRIVER_SUBJECT, "Driver output failed");
-    } else {
-        LOG_I(PORT_DRIVER_SUBJECT, "Driver output succeeded");
     }
-}
-
-static void demo_response(packer *pack) {
-    pack->spec.push(0);
-    pack->spec.push(ERL_DRV_MAP);
 }
 
 static void write_async_json_view_response(packer *pack) {
     auto port = driver_mk_port(pack->context->port);
-    generate_async_spec(port, pack, demo_response);
-    // generate_async_spec(port, pack, generate_result_from_json_view);
+    generate_async_spec(port, pack, generate_result_from_json_view);
     write_output(port, pack);
 }
 
