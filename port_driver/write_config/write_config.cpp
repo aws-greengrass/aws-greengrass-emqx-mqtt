@@ -8,6 +8,7 @@
 #include "../defer.h"
 #include "cda_integration.h"
 #include <array>
+#include <aws/crt/external/cJSON.h>
 #include <fstream>
 #include <memory>
 #include <variant>
@@ -168,9 +169,10 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
     // We then replace the contents of local-override.conf with the user provided config. We do not check if the 
     // config is valid, this is handled by EMQx.
-    std::string strVal = config_view.WriteReadable();
+    auto output = cJSON_Print(config_view.Materialize());
+    defer { cJSON_free(output); };
     LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
-    out_path << strVal << std::endl;
+    out_path << output << std::endl;
 
     return 0;
 }
