@@ -136,25 +136,20 @@ EXPORTED void drv_stop(ErlDrvData handle) {
     aws_logger_clean_up(&our_logger);
 }
 
-// Convenience function to generate result data that will be consumed
-// by the Greengrass EMQX Auth Plugin.
-//
-// The following Erlang term will be generated,
-//
-//  {port, {data, [return_code, result]}}
-//
-// where result can be any erlang term.
-//
-// see https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-static std::shared_ptr<std::vector<ErlDrvTermData>>
-generate_result_data(ErlDrvTermData port, ErlDrvTermData return_code,
-                     std::function<void(std::shared_ptr<std::vector<ErlDrvTermData>>)> result_writer) {
-    std::vector<ErlDrvTermData> spec = {ERL_DRV_PORT, port, ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT, return_code};
-    std::shared_ptr<std::vector<ErlDrvTermData>> spec_ptr = std::make_shared<std::vector<ErlDrvTermData>>(spec);
-    result_writer(spec_ptr);
-    spec_ptr.get()->insert(spec_ptr.get()->end(), {ERL_DRV_LIST, 2, ERL_DRV_TUPLE, 2, ERL_DRV_TUPLE, 2});
-    return spec_ptr;
-}
+struct packer {
+    std::unique_ptr<char[]> client_id = {};
+    std::unique_ptr<char[]> pem = {};
+    std::unique_ptr<char[]> auth_token = {};
+    std::unique_ptr<char[]> resource = {};
+    std::unique_ptr<char[]> operation = {};
+    std::unique_ptr<std::string> strResult = {};
+    std::shared_ptr<Aws::Crt::JsonView> jsonViewResult = {};
+    std::stack<ErlDrvTermData> spec;
+    DriverContext *context;
+    ErlDrvTermData result = ATOMS.fail;
+    char returnCode = RETURN_CODE_UNEXPECTED;
+    EI_LONGLONG requestId;
+};
 
 // Convenience function to generate async result data that will be consumed
 // by the Greengrass EMQX Auth Plugin.
@@ -166,15 +161,24 @@ generate_result_data(ErlDrvTermData port, ErlDrvTermData return_code,
 // where result can be any erlang term.
 //
 // see https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-static std::shared_ptr<std::vector<ErlDrvTermData>>
-generate_async_result_data(ErlDrvTermData port, ErlDrvTermData request_id, ErlDrvTermData return_code,
-                           std::function<void(std::shared_ptr<std::vector<ErlDrvTermData>>)> result_writer) {
-    std::vector<ErlDrvTermData> spec = {ERL_DRV_PORT, port,       ERL_DRV_INT64, request_id,
-                                        ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT,   return_code};
-    std::shared_ptr<std::vector<ErlDrvTermData>> spec_ptr = std::make_shared<std::vector<ErlDrvTermData>>(spec);
-    result_writer(spec_ptr);
-    spec_ptr.get()->insert(spec_ptr.get()->end(), {ERL_DRV_LIST, 2, ERL_DRV_TUPLE, 2, ERL_DRV_TUPLE, 3});
-    return spec_ptr;
+static void generate_async_spec(ErlDrvTermData port, packer *pack, std::function<void(packer *)> result_writer) {
+    pack->spec.push(3);
+    pack->spec.push(ERL_DRV_TUPLE);
+    pack->spec.push(2);
+    pack->spec.push(ERL_DRV_TUPLE);
+    pack->spec.push(2);
+    pack->spec.push(ERL_DRV_LIST);
+
+    result_writer(pack);
+
+    pack->spec.push(static_cast<ErlDrvTermData>(pack->returnCode));
+    pack->spec.push(ERL_DRV_INT);
+    pack->spec.push(ATOMS.data);
+    pack->spec.push(ERL_DRV_ATOM);
+    pack->spec.push(reinterpret_cast<ErlDrvTermData>(&pack->requestId));
+    pack->spec.push(ERL_DRV_INT64);
+    pack->spec.push(port);
+    pack->spec.push(ERL_DRV_PORT);
 }
 
 static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom) {
@@ -188,21 +192,6 @@ static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom)
         LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting atom event");
     }
 }
-
-struct packer {
-    std::unique_ptr<char[]> client_id = {};
-    std::unique_ptr<char[]> pem = {};
-    std::unique_ptr<char[]> auth_token = {};
-    std::unique_ptr<char[]> resource = {};
-    std::unique_ptr<char[]> operation = {};
-    std::unique_ptr<std::string> strResult = {};
-    std::unique_ptr<Aws::Crt::JsonView> jsonViewResult = {};
-    std::shared_ptr<std::vector<std::any>> references = {};
-    DriverContext *context;
-    ErlDrvTermData result = ATOMS.fail;
-    char returnCode = RETURN_CODE_UNEXPECTED;
-    EI_LONGLONG requestId;
-};
 
 static void write_async_atom_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
                                      const char returnCode) {
@@ -284,10 +273,47 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void generate_result_from_json_view_object(std::shared_ptr<Aws::Crt::JsonView> view,
-                                                  std::shared_ptr<std::stack<ErlDrvTermData>> output,
-                                                  std::shared_ptr<std::vector<std::any>> references) {
-    if (!view || !output) {
+static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    if (view->IsBool()) {
+        pack->spec.push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
+        pack->spec.push(ERL_DRV_ATOM);
+        return;
+    }
+
+    if (view->IsIntegerType()) {
+        pack->spec.push(0);
+        pack->spec.push(ERL_DRV_MAP);
+        // pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
+        // pack->spec.push(ERL_DRV_INT);
+        return;
+    }
+
+    if (view->IsFloatingPointType()) {
+        pack->spec.push(0);
+        pack->spec.push(ERL_DRV_MAP);
+        // TODO
+        // auto double_val = view->AsDouble();
+        // pack->spec.push(reinterpret_cast<ErlDrvTermData>(&double_val));
+        // pack->spec.push(ERL_DRV_FLOAT);
+        return;
+    }
+
+    if (view->IsListType()) {
+        // TODO
+        return;
+    }
+
+    if (view->IsString()) {
+        // TODO binary instead because we don't know if it's an atom or not
+        auto str_val = view->AsString();
+        pack->spec.push(str_val.length());
+        pack->spec.push(reinterpret_cast<ErlDrvTermData>(str_val.c_str()));
+        pack->spec.push(ERL_DRV_STRING);
+        return;
+    }
+
+    if (view->IsNull()) {
+        pack->spec.push(ERL_DRV_NIL);
         return;
     }
 
@@ -295,130 +321,74 @@ static void generate_result_from_json_view_object(std::shared_ptr<Aws::Crt::Json
         auto objs = view->GetAllObjects();
 
         auto num_keys = objs.size();
-        output->push(num_keys);
-        output->push(ERL_DRV_MAP);
+        pack->spec.push(num_keys);
+        pack->spec.push(ERL_DRV_MAP);
 
         for (auto child : objs) {
             auto key = child.first;
             auto value = child.second;
-            generate_result_from_json_view_object(std::make_shared<Aws::Crt::JsonView>(value), output, references);
 
-            // we must explicitly copy data from json view
-            char *key_ref = new char[key.size() + 1];
-            key.copy(key_ref, key.size() + 1);
-            references->emplace_back(key_ref); // prevent value from being deleted
+            generate_result_from_json_view_object(pack, std::make_shared<Aws::Crt::JsonView>(value));
 
-            output->push(key.length());
-            output->push(reinterpret_cast<ErlDrvTermData>(key_ref));
-            output->push(ERL_DRV_STRING); // TODO binary?
+            pack->spec.push(key.length());
+            pack->spec.push(reinterpret_cast<ErlDrvTermData>(key.c_str()));
+            pack->spec.push(ERL_DRV_STRING); // TODO binary?
         }
-    } else if (view->IsBool()) {
-        output->push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
-        output->push(ERL_DRV_ATOM);
-    } else if (view->IsFloatingPointType()) {
-        auto double_val = view->AsDouble();
-        auto copy = double_val; // we must explicitly copy data from json view
-        auto double_ptr = &copy;
-        references->emplace_back(double_ptr); // prevent value from being deleted
-        output->push(reinterpret_cast<ErlDrvTermData>(double_ptr));
-        output->push(ERL_DRV_FLOAT);
-    } else if (view->IsIntegerType()) {
-        auto int_val = view->AsInt64();
-        auto copy = int_val; // we must explicitly copy data from json view
-        auto int_ptr = &copy;
-        references->emplace_back(int_ptr); // prevent value from being deleted
-        output->push(reinterpret_cast<ErlDrvTermData>(int_ptr));
-        output->push(ERL_DRV_INT64);
-    } else if (view->IsListType()) {
-        // TODO
-    } else if (view->IsNull()) {
-        // TODO return boolean just for testing
-        output->push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
-        output->push(ERL_DRV_ATOM);
-        // output->push(ERL_DRV_NIL); // this shows up as []?
-    } else if (view->IsString()) {
-        Aws::Crt::String str_val = view->AsString();
-
-        // we must explicitly copy data from json view
-        char *str_val_ref = new char[str_val.size() + 1];
-        str_val.copy(str_val_ref, str_val.size() + 1);
-        references->emplace_back(str_val_ref); // prevent value from being deleted
-
-        output->push(str_val.length());
-        output->push(reinterpret_cast<ErlDrvTermData>(str_val_ref));
-        output->push(ERL_DRV_STRING);
     }
 }
 
-static void generate_result_from_json_view(std::shared_ptr<Aws::Crt::JsonView> view_ptr,
-                                           std::shared_ptr<std::vector<ErlDrvTermData>> result_ptr,
-                                           std::shared_ptr<std::vector<std::any>> references) {
-    if (!result_ptr) {
-        return;
-    }
-    auto result = result_ptr.get();
-
-    if (!view_ptr) {
+static void generate_result_from_json_view(packer *pack) {
+    if (!pack->jsonViewResult || !pack->jsonViewResult.get()->IsObject()) {
         // empty map
-        result->insert(result->end(), {ERL_DRV_MAP, 0});
+        pack->spec.push(0);
+        pack->spec.push(ERL_DRV_MAP);
         return;
     }
-    auto view = view_ptr.get();
+    generate_result_from_json_view_object(pack, pack->jsonViewResult);
+}
 
-    if (view->IsNull() || !view->IsObject()) {
-        // empty map
-        result->insert(result->end(), {ERL_DRV_MAP, 0});
-        return;
-    }
-
-    auto map_output = std::make_shared<std::stack<ErlDrvTermData>>(std::stack<ErlDrvTermData>{});
-    generate_result_from_json_view_object(view_ptr, map_output, references);
-    while (!map_output->empty()) {
-        result->insert(result->end(), {map_output->top()});
-        map_output->pop();
+static void write_empty_map_to_port(DriverContext *context) {
+    ErlDrvTermData spec[] = {ERL_DRV_MAP, 0};
+    if (erl_drv_output_term(driver_mk_port(context->port), spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting empty map result");
     }
 }
 
-static void write_json_view_to_port(DriverContext *context, std::unique_ptr<Aws::Crt::JsonView> view_ptr,
-                                    const char return_code, std::shared_ptr<std::vector<std::any>> references) {
-    auto port = driver_mk_port(context->port);
-    std::shared_ptr<Aws::Crt::JsonView> shared_view_ptr = std::move(view_ptr);
+static void write_output(ErlDrvTermData port, packer *pack) {
+    int spec_size = pack->spec.size();
+    LOG_I(PORT_DRIVER_SUBJECT, "writing spec of size %d", spec_size);
+    ErlDrvTermData *spec = new ErlDrvTermData[spec_size];
+    defer { delete[] spec; };
 
-    auto map_writer = [shared_view_ptr, references](std::shared_ptr<std::vector<ErlDrvTermData>> result_ptr) {
-        generate_result_from_json_view(shared_view_ptr, result_ptr, references);
-    };
+    for (int i = 0; i < spec_size; i++) {
+        LOG_I(PORT_DRIVER_SUBJECT, "wrote item %d", i);
+        spec[i] = pack->spec.top();
+        pack->spec.pop();
+    }
 
-    std::shared_ptr<std::vector<ErlDrvTermData>> spec =
-        generate_result_data(port, static_cast<ErlDrvTermData>(return_code), map_writer);
-
-    if (erl_drv_output_term(port, spec.get()->data(), spec.get()->size()) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting json view result");
+    if (erl_drv_output_term(port, spec, spec_size) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Driver output failed");
+    } else {
+        LOG_I(PORT_DRIVER_SUBJECT, "Driver output succeeded");
     }
 }
 
-static void write_async_json_view_response(DriverContext *context, EI_LONGLONG requestId,
-                                           std::unique_ptr<Aws::Crt::JsonView> view_ptr, const char return_code,
-                                           std::shared_ptr<std::vector<std::any>> references) {
-    auto port = driver_mk_port(context->port);
-    std::shared_ptr<Aws::Crt::JsonView> shared_view_ptr = std::move(view_ptr);
+static void demo_response(packer *pack) {
+    pack->spec.push(0);
+    pack->spec.push(ERL_DRV_MAP);
+}
 
-    auto map_writer = [shared_view_ptr, references](std::shared_ptr<std::vector<ErlDrvTermData>> result_ptr) {
-        generate_result_from_json_view(shared_view_ptr, result_ptr, references);
-    };
-
-    std::shared_ptr<std::vector<ErlDrvTermData>> spec = generate_async_result_data(
-        port, reinterpret_cast<ErlDrvTermData>(&requestId), static_cast<ErlDrvTermData>(return_code), map_writer);
-
-    if (erl_drv_output_term(port, spec.get()->data(), spec.get()->size()) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting async json view result");
-    }
+static void write_async_json_view_response(packer *pack) {
+    auto port = driver_mk_port(pack->context->port);
+    generate_async_spec(port, pack, demo_response);
+    // generate_async_spec(port, pack, generate_result_from_json_view);
+    write_output(port, pack);
 }
 
 static void write_async_json_view_response_and_free(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
     defer { delete pack; };
-    write_async_json_view_response(pack->context, pack->requestId, std::move(pack->jsonViewResult), pack->returnCode,
-                                   pack->references);
+    write_async_json_view_response(pack);
 }
 
 static void write_async_atom_response_and_free(void *buf) {
@@ -696,14 +666,10 @@ static void get_configuration(void *buf) {
 
 static void handle_get_configuration(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
-    auto result = std::unique_ptr<Aws::Crt::JsonView>{};
-    std::vector<std::any> references = {};
-    auto references_ptr = std::make_shared<std::vector<std::any>>(references);
 
-    defer { write_json_view_to_port(context, std::move(result), return_code, references_ptr); };
+    defer { write_empty_map_to_port(context); };
 
     auto *packed = new packer{
-        .references = references_ptr,
         .context = context,
     };
     // Decode the request ID which is used to identify the caller back in Erlang
