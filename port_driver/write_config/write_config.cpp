@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include "config.h"
 #include "../common.h"
 #include "../defer.h"
 #include "cda_integration.h"
@@ -19,7 +20,6 @@ static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
 
-static const char *LOCAL_OVERRIDE_NAMESPACE = "localOverride";
 static const char *LOCAL_CONF_FILE = "data/configs/local-override.conf";
 
 static struct aws_logger our_logger {};
@@ -125,7 +125,7 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
 }
 
 int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
-    auto config_value = get_emqx_configuration(ipc, LOCAL_OVERRIDE_NAMESPACE);
+    auto config_value = get_emqx_configuration(ipc, aws::greengrass::emqx::localOverrideNamespace.c_str());
     // If we couldn't get the configuration due to an error and need to exit, then exit with the
     // exit code from get_emqx_configuration.
     if (holds_alternative<int>(config_value)) {
@@ -136,7 +136,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     if (config_view.IsNull()) {
         LOG_I(WRITE_CONFIG_SUBJECT,
               "Configuration value /%s was null. This is not a problem, but no configuration changes in /%s will apply",
-              LOCAL_OVERRIDE_NAMESPACE, LOCAL_OVERRIDE_NAMESPACE);
+              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 0;
     }
     if (!config_view.IsObject()) {
@@ -144,7 +145,9 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
               "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
               "by updating the deployment with "
               "\"RESET\":[\"/%s\"]",
-              LOCAL_OVERRIDE_NAMESPACE, LOCAL_OVERRIDE_NAMESPACE, LOCAL_OVERRIDE_NAMESPACE);
+              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
+              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 1;
     }
 
@@ -155,25 +158,18 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Try to create the directories as needed, ignoring errors
     std::filesystem::create_directories(file_path.parent_path());
 
-    // Enable append mode
-    std::ofstream::openmode open_mode = std::ofstream::out;
-    open_mode |= std::ofstream::app;
-
     // Open file for writing. Will create file if it doesn't exist.
+    std::ofstream::openmode open_mode = std::ofstream::out;
     auto out_path = std::ofstream(file_path, open_mode);
     defer { out_path.close(); };
-
-    // Immediately add a new line so that user's contents definitely come in a line after the existing values
-    out_path << std::endl;
 
     // Configuration is in the form of 
     // {"localOverride": {"listeners": {"ssl": {"default": ...}}}}
     // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
-    // We can then take the config, remove the start and end braces, and append it to local-override.conf. We do not
-    // check if the config is valid, this is handled by EMQx. We only take the user's provided config and append it.
-    auto strVal = config_view.AsString();
-    strVal = strVal.substr(1, strVal.size() - 2);
-    LOG_I(WRITE_CONFIG_SUBJECT, "Applying configuration value overrides to %s", LOCAL_CONF_FILE);
+    // We then replace the contents of local-override.conf with the user provided config. We do not check if the 
+    // config is valid, this is handled by EMQx.
+    std::string strVal = config_view.WriteReadable();
+    LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
     out_path << strVal << std::endl;
 
     return 0;
