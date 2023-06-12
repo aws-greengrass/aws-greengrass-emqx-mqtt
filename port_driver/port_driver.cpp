@@ -346,9 +346,14 @@ static void generate_result_from_json_view(packer *pack) {
     generate_result_from_json_view_object(pack, pack->jsonViewResult);
 }
 
-static void write_empty_map_to_port(DriverContext *context) {
-    ErlDrvTermData spec[] = {ERL_DRV_MAP, 0};
-    if (erl_drv_output_term(driver_mk_port(context->port), spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+static void write_empty_map_to_port(DriverContext *context, const char return_code) {
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, empty map]}}
+    auto port = driver_mk_port(context->port);
+    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port, ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT,   (ErlDrvTermData)return_code,
+                             ERL_DRV_MAP,   0,    ERL_DRV_LIST, 2,          ERL_DRV_TUPLE, 2,
+                             ERL_DRV_TUPLE, 2};
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
         LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting empty map result");
     }
 }
@@ -666,7 +671,7 @@ static void get_configuration(void *buf) {
 static void handle_get_configuration(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
 
-    defer { write_empty_map_to_port(context); };
+    defer { write_empty_map_to_port(context, return_code); };
 
     auto *packed = new packer{
         .context = context,
