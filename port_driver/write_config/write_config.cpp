@@ -3,12 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "config.h"
 #include "../common.h"
 #include "../defer.h"
 #include "cda_integration.h"
+#include "config.h"
 #include <array>
-#include <aws/crt/external/cJSON.h>
 #include <fstream>
 #include <memory>
 #include <variant>
@@ -137,7 +136,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     if (config_view.IsNull()) {
         LOG_I(WRITE_CONFIG_SUBJECT,
               "Configuration value /%s was null. This is not a problem, but no configuration changes in /%s will apply",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
               aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 0;
     }
@@ -146,8 +145,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
               "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
               "by updating the deployment with "
               "\"RESET\":[\"/%s\"]",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
-              aws::greengrass::emqx::localOverrideNamespace.c_str(), 
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
               aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 1;
     }
@@ -164,13 +163,12 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     auto out_path = std::ofstream(file_path, open_mode);
     defer { out_path.close(); };
 
-    // Configuration is in the form of 
+    // Configuration is in the form of
     // {"localOverride": {"listeners": {"ssl": {"default": ...}}}}
     // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
-    // We then replace the contents of local-override.conf with the user provided config. We do not check if the 
+    // We then replace the contents of local-override.conf with the user provided config. We do not check if the
     // config is valid, this is handled by EMQx.
-    auto output = cJSON_Print(config_view.Materialize());
-    defer { cJSON_free(output); };
+    Aws::Crt::String output = config_view.WriteReadable();
     LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
     out_path << output << std::endl;
 
