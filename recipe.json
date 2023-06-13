@@ -49,16 +49,12 @@
       },
       "Lifecycle": {
         "install": {
-          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\plugins {work:path}\\plugins /E",
-          "requiresPrivilege": true
+          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\plugins {work:path}\\plugins /E"
         },
         "startup": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
-          "timeout": "{configuration:/startupTimeoutSeconds}",
-          "requiresPrivilege": true
+          "timeout": "{configuration:/startupTimeoutSeconds}"
         },
-        "EMQX_CONF1": "{configuration:/replaceConfigurationFiles}",
-        "EMQX_CONF2": "{configuration:/mergeConfigurationFiles}",
         "setEnv": {
           "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}\\logs",
@@ -102,16 +98,12 @@
       },
       "Lifecycle": {
         "install": {
-          "script": "cp {artifacts:decompressedPath}/emqx/emqx/plugins {work:path}",
-          "requiresPrivilege": true
+          "script": "cp {artifacts:decompressedPath}/emqx/emqx/plugins {work:path}"
         },
         "startup": {
           "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/aws_greengrass_emqx_auth-1.0.0/aws_greengrass_emqx_auth-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
-          "timeout": "{configuration:/startupTimeoutSeconds}",
-          "requiresPrivilege": true
+          "timeout": "{configuration:/startupTimeoutSeconds}"
         },
-        "EMQX_CONF1": "{configuration:/replaceConfigurationFiles}",
-        "EMQX_CONF2": "{configuration:/mergeConfigurationFiles}",
         "setEnv": {
           "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
           "EMQX_LOG__DIR": "{work:path}/logs",
