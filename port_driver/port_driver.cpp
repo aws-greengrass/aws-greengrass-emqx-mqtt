@@ -144,8 +144,8 @@ struct packer {
     std::unique_ptr<std::string> strResult = {};
     std::shared_ptr<Aws::Crt::JsonView> jsonViewResult = {};
     std::stack<ErlDrvTermData> spec;
-    std::vector<std::shared_ptr<double>> numbers;
-    std::vector<std::shared_ptr<std::string>> strings;
+    std::vector<std::shared_ptr<double *>> numbers;
+    std::vector<std::shared_ptr<std::string *>> strings;
     DriverContext *context;
     ErlDrvTermData result = ATOMS.fail;
     char returnCode = RETURN_CODE_UNEXPECTED;
