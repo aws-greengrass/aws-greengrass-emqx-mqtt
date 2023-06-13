@@ -299,16 +299,8 @@ static void generate_result_from_string(packer *pack, const std::string &str, bo
     pack->spec.push(binary ? ERL_DRV_BUF2BINARY : ERL_DRV_STRING);
 }
 
-static void generate_result_from_string(packer *pack, const std::string &str) {
-    generate_result_from_string(pack, str, false);
-}
-
 static void generate_result_from_json_view_binary(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     generate_result_from_string(pack, std::string(view->AsString()), true);
-}
-
-static void generate_result_from_json_view_string(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    generate_result_from_string(pack, std::string(view->AsString()), false);
 }
 
 static void generate_result_from_json_view_null(packer *pack) { pack->spec.push(ERL_DRV_NIL); }
