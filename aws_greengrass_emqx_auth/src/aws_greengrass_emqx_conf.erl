@@ -10,6 +10,8 @@
 -export([start/0, stop/0]).
 -export([listen_for_update_requests/1, request_update/0]).
 
+-export([update_configuration_from_ipc/0]).
+
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
 
