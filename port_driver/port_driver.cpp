@@ -162,7 +162,7 @@ struct packer {
 // where result can be any erlang term.
 //
 // see https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-static void generate_async_spec(ErlDrvTermData port, packer *pack, std::function<void(packer *)> result_writer) {
+static void generate_async_spec(ErlDrvTermData port, packer *pack, const std::function<void(packer *)> &result_writer) {
     pack->spec.push(3);
     pack->spec.push(ERL_DRV_TUPLE);
     pack->spec.push(2);
@@ -274,17 +274,17 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void generate_result_from_json_view_bool(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_bool(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     pack->spec.push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
     pack->spec.push(ERL_DRV_ATOM);
 }
 
-static void generate_result_from_json_view_integer(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_integer(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
     pack->spec.push(ERL_DRV_INT);
 }
 
-static void generate_result_from_json_view_float(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_float(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     auto ptr = std::make_shared<double>(view->AsDouble());
     pack->numbers.emplace_back(ptr);
     pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr.get()));
@@ -303,19 +303,19 @@ static void generate_result_from_string(packer *pack, std::string str) {
     generate_result_from_string(pack, str, false);
 }
 
-static void generate_result_from_json_view_binary(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_binary(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     generate_result_from_string(pack, std::string(view->AsString()), true);
 }
 
-static void generate_result_from_json_view_string(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_string(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     generate_result_from_string(pack, std::string(view->AsString()), false);
 }
 
-static void generate_result_from_json_view_null(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_null(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     pack->spec.push(ERL_DRV_NIL);
 }
 
-static void generate_result_from_json_view_value(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_value(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     if (view->IsBool()) {
         generate_result_from_json_view_bool(pack, view);
         return;
@@ -343,9 +343,11 @@ static void generate_result_from_json_view_value(packer *pack, std::shared_ptr<A
 }
 
 // TODO refactor all the json stuff into a class
-static void generate_result_from_json_view(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view);
+static void generate_result_from_json_view(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view);
 
-static void generate_result_from_json_list(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void
+generate_result_from_json_list(packer *pack,
+                               const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
     auto items = view->AsArray();
     auto num_items = items.size();
     pack->spec.push(num_items);
@@ -356,14 +358,16 @@ static void generate_result_from_json_list(packer *pack, std::shared_ptr<Aws::Cr
     }
 }
 
-static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void
+generate_result_from_json_view_object(packer *pack,
+                                      const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
     auto objs = view->GetAllObjects();
 
     auto num_keys = objs.size();
     pack->spec.push(num_keys);
     pack->spec.push(ERL_DRV_MAP);
 
-    for (auto child : objs) {
+    for (const auto &child : objs) {
         auto key = child.first;
         auto value = child.second;
         generate_result_from_json_view(pack, std::make_shared<Aws::Crt::JsonView>(value));
@@ -371,7 +375,9 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
     }
 }
 
-static void generate_result_from_json_view(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void
+generate_result_from_json_view(packer *pack,
+                               const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
     if (view->IsObject()) {
         generate_result_from_json_view_object(pack, view);
     }
@@ -383,7 +389,7 @@ static void generate_result_from_json_view(packer *pack, std::shared_ptr<Aws::Cr
 }
 
 static void generate_result_from_packer(packer *pack) {
-    if (!pack->jsonViewResult || !pack->jsonViewResult.get()->IsObject()) {
+    if (!pack->jsonViewResult || !pack->jsonViewResult->IsObject()) {
         // empty map
         pack->spec.push(0);
         pack->spec.push(ERL_DRV_MAP);
@@ -405,8 +411,8 @@ static void write_empty_map_to_port(DriverContext *context, const char return_co
 }
 
 static void write_output(ErlDrvTermData port, packer *pack) {
-    int spec_size = pack->spec.size();
-    ErlDrvTermData *spec = new ErlDrvTermData[spec_size];
+    auto spec_size = pack->spec.size();
+    auto *spec = new ErlDrvTermData[spec_size];
     defer { delete[] spec; };
 
     for (int i = 0; i < spec_size; i++) {
