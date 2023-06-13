@@ -5,7 +5,7 @@
 
 -module(port_driver_integration).
 
--export([start/0, stop/0, init/2]).
+-export([start/0, stop/0, init/2, execute_callback/1]).
 -export([get_auth_token/2
   , on_client_check_acl/4
   , verify_client_certificate/1
@@ -101,7 +101,7 @@ loop(Port, Inflight, Counter, FunMap) ->
       Fun = maps:get(EventType, FunMap, fun empty/0),
       %% perform the callback asynchronously, otherwise this loop will deadlock
       %% if the caller calls into port_driver_integration
-      spawn_link(Fun),
+      spawn_link(?MODULE, execute_callback, [Fun]),
       loop(Port, Inflight, Counter, FunMap);
     {call, Caller, Msg, async} ->
       RequestId = counters:get(Counter, 1),
@@ -140,6 +140,12 @@ loop(Port, Inflight, Counter, FunMap) ->
     {'EXIT', Port, Reason} ->
       logger:error("Port terminated ~p", [Reason]),
       exit(port_terminated)
+  end.
+
+execute_callback(Fun) ->
+  try Fun()
+  catch
+    Error:Reason:Stacktrace -> logger:error("Callback failed, error=~p, reason=~p, stacktrace=~p", [Error, Reason, Stacktrace])
   end.
 
 -spec(get_auth_token(string, string) -> {ok, any()} | {error, atom()}).
