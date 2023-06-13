@@ -11,7 +11,7 @@
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
 void ConfigurationUpdatesHandler::OnStreamEvent(
-    GG::ConfigurationUpdateEvents *response) { // NOLINT(misc-unused-parameters)
+    GG::ConfigurationUpdateEvents *response) {
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
     if (response->GetConfigurationUpdateEvent().has_value() &&
         response->GetConfigurationUpdateEvent()->GetKeyPath().has_value() &&
