@@ -15,7 +15,7 @@ void ConfigurationUpdatesHandler::OnStreamEvent(
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
     if (response->GetConfigurationUpdateEvent().has_value() &&
         response->GetConfigurationUpdateEvent()->GetKeyPath().has_value() &&
-        response->GetConfigurationUpdateEvent()->GetKeyPath()->size() > 0 &&
+        !response->GetConfigurationUpdateEvent()->GetKeyPath()->empty() &&
         std::string(response->GetConfigurationUpdateEvent()->GetKeyPath().value()[0]) ==
             aws::greengrass::emqx::localOverrideNamespace) {
         callback->operator()();
