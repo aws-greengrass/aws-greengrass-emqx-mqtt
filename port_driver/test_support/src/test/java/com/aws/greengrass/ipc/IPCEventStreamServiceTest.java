@@ -42,8 +42,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 class IPCEventStreamServiceTest {
     private IPCEventStreamService ipcEventStreamService;
@@ -223,12 +225,15 @@ class IPCEventStreamServiceTest {
                                 Thread.sleep(1_000);
                             } catch (InterruptedException ignored) {
                             }
+                            List<String> keyPath = new ArrayList<>();
+                            keyPath.add("localOverride");
+                            keyPath.add("test");
                             sendStreamEvent(
                                     new ConfigurationUpdateEvents()
                                             .withConfigurationUpdateEvent(
                                                     new ConfigurationUpdateEvent()
-                                                            .withComponentName(request.getComponentName())
-                                                            .withKeyPath(request.getKeyPath())))
+                                                            .withComponentName("aws.greengrass.clientdevices.mqtt.EMQX")
+                                                            .withKeyPath(keyPath)))
                                     .whenComplete((a, b) -> print("sent_config_update"));
                         }).start();
                         return new SubscribeToConfigurationUpdateResponse();
