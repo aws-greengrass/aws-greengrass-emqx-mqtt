@@ -291,7 +291,7 @@ static void generate_result_from_json_view_float(packer *pack, const std::shared
     pack->spec.push(ERL_DRV_FLOAT);
 }
 
-static void generate_result_from_string(packer *pack, std::string str, bool binary) {
+static void generate_result_from_string(packer *pack, const std::string &str, bool binary) {
     auto ptr = std::make_shared<std::string>(str);
     pack->strings.emplace_back(ptr);
     pack->spec.push(ptr->length());
@@ -299,7 +299,7 @@ static void generate_result_from_string(packer *pack, std::string str, bool bina
     pack->spec.push(binary ? ERL_DRV_BUF2BINARY : ERL_DRV_STRING);
 }
 
-static void generate_result_from_string(packer *pack, std::string str) {
+static void generate_result_from_string(packer *pack, const std::string &str) {
     generate_result_from_string(pack, str, false);
 }
 
@@ -311,9 +311,7 @@ static void generate_result_from_json_view_string(packer *pack, const std::share
     generate_result_from_string(pack, std::string(view->AsString()), false);
 }
 
-static void generate_result_from_json_view_null(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    pack->spec.push(ERL_DRV_NIL);
-}
+static void generate_result_from_json_view_null(packer *pack) { pack->spec.push(ERL_DRV_NIL); }
 
 static void generate_result_from_json_view_value(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     if (view->IsBool()) {
@@ -337,7 +335,7 @@ static void generate_result_from_json_view_value(packer *pack, const std::shared
     }
 
     if (view->IsNull()) {
-        generate_result_from_json_view_null(pack, view);
+        generate_result_from_json_view_null(pack);
         return;
     }
 }
@@ -345,9 +343,7 @@ static void generate_result_from_json_view_value(packer *pack, const std::shared
 // TODO refactor all the json stuff into a class
 static void generate_result_from_json_view(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view);
 
-static void
-generate_result_from_json_list(packer *pack,
-                               const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
+static void generate_result_from_json_list(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     auto items = view->AsArray();
     auto num_items = items.size();
     pack->spec.push(num_items);
@@ -358,9 +354,7 @@ generate_result_from_json_list(packer *pack,
     }
 }
 
-static void
-generate_result_from_json_view_object(packer *pack,
-                                      const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
+static void generate_result_from_json_view_object(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     auto objs = view->GetAllObjects();
 
     auto num_keys = objs.size();
@@ -375,9 +369,7 @@ generate_result_from_json_view_object(packer *pack,
     }
 }
 
-static void
-generate_result_from_json_view(packer *pack,
-                               const std::shared_ptr<Aws::Crt::JsonView> &view) { // NOLINT(misc-no-recursion)
+static void generate_result_from_json_view(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
     if (view->IsObject()) {
         generate_result_from_json_view_object(pack, view);
     }
@@ -411,7 +403,7 @@ static void write_empty_map_to_port(DriverContext *context, const char return_co
 }
 
 static void write_output(ErlDrvTermData port, packer *pack) {
-    auto spec_size = pack->spec.size();
+    auto spec_size = static_cast<int>(pack->spec.size());
     auto *spec = new ErlDrvTermData[spec_size];
     defer { delete[] spec; };
 
