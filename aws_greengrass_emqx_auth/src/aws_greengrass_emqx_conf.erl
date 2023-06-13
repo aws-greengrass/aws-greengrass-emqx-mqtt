@@ -8,6 +8,8 @@
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 -export([load/0]).
 
+-export([update_configuration_from_ipc/0]).
+
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
 
@@ -84,3 +86,25 @@ set_env(Conf) ->
   application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
   UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, RootConfig, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
   application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates).
+
+%% Retrieve Greengrass configuration via GetConfiguration IPC call,
+%% and update emqx override configuration with the result.
+update_configuration_from_ipc() ->
+  case port_driver_integration:get_configuration() of
+    {ok, Conf} -> update_configuration(Conf);
+    {error, Err} -> logger:error("Unable to get configuration, err=~p", [Err])
+  end.
+
+update_configuration(Conf) ->
+  update_configuration(Conf, maps:keys(Conf)).
+
+update_configuration(_, []) ->
+  ok;
+update_configuration(Conf, [Key | Rest]) ->
+  ConfPath = [Key],
+  case catch emqx_conf:update(ConfPath, maps:get(Key, Conf), #{rawconf_with_defaults => true, override_to => local}) of
+    {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
+    {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
+    Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
+  end,
+  update_configuration(Conf, Rest).
