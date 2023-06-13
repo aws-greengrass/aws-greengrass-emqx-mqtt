@@ -99,7 +99,9 @@ loop(Port, Inflight, Counter, FunMap) ->
     % handle event type from C++ by finding a registered callback (if any)
     {Port, event, EventType} ->
       Fun = maps:get(EventType, FunMap, fun empty/0),
-      Fun(),
+      %% perform the callback asynchronously, otherwise this loop will deadlock
+      %% if the caller calls into port_driver_integration
+      spawn_link(Fun),
       loop(Port, Inflight, Counter, FunMap);
     {call, Caller, Msg, async} ->
       RequestId = counters:get(Counter, 1),
