@@ -15,16 +15,12 @@ start(_StartType, _StartArgs) ->
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
   load_config(),
   port_driver_integration:start(),
-  port_driver_integration:subscribe_to_configuration_updates(fun on_configuration_update/0),
-  logger:info("Get Configuration Test: ~p", [port_driver_integration:get_configuration()]),
+  port_driver_integration:subscribe_to_configuration_updates(fun aws_greengrass_emqx_conf:update_configuration_from_ipc/0),
+  aws_greengrass_emqx_conf:update_configuration_from_ipc(),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
-
-on_configuration_update() ->
-  %% TODO get configuration and set emqx config
-  logger:info("Configuration update received").
 
 load_config() ->
   case aws_greengrass_emqx_conf:load() of
