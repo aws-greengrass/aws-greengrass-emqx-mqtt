@@ -274,24 +274,52 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+static void generate_result_from_json_view_bool(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    pack->spec.push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
+    pack->spec.push(ERL_DRV_ATOM);
+}
+
+static void generate_result_from_json_view_integer(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
+    pack->spec.push(ERL_DRV_INT);
+}
+
+static void generate_result_from_json_view_float(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    auto ptr = std::make_shared<double>(view->AsDouble());
+    pack->numbers.emplace_back(ptr);
+    pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr.get()));
+    pack->spec.push(ERL_DRV_FLOAT);
+}
+
+static void generate_result_from_string(packer *pack, std::string str) {
+    auto ptr = std::make_shared<std::string>(str);
+    pack->strings.emplace_back(ptr);
+    pack->spec.push(ptr->length());
+    pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
+    pack->spec.push(ERL_DRV_STRING);
+}
+
+static void generate_result_from_json_view_string(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    generate_result_from_string(pack, std::string(view->AsString()));
+}
+
+static void generate_result_from_json_view_null(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    pack->spec.push(ERL_DRV_NIL);
+}
+
+static void generate_result_from_json_view_value(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
     if (view->IsBool()) {
-        pack->spec.push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
-        pack->spec.push(ERL_DRV_ATOM);
+        generate_result_from_json_view_bool(pack, view);
         return;
     }
 
     if (view->IsIntegerType()) {
-        pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
-        pack->spec.push(ERL_DRV_INT);
+        generate_result_from_json_view_integer(pack, view);
         return;
     }
 
     if (view->IsFloatingPointType()) {
-        auto ptr = std::make_shared<double>(view->AsDouble());
-        pack->numbers.emplace_back(ptr);
-        pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr.get()));
-        pack->spec.push(ERL_DRV_FLOAT);
+        generate_result_from_json_view_float(pack, view);
         return;
     }
 
@@ -301,20 +329,17 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
     }
 
     if (view->IsString()) {
-        // TODO binary instead because we don't know if it's an atom or not
-        auto ptr = std::make_shared<std::string>(view->AsString());
-        pack->strings.emplace_back(ptr);
-        pack->spec.push(ptr->length());
-        pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
-        pack->spec.push(ERL_DRV_STRING);
+        generate_result_from_json_view_string(pack, view);
         return;
     }
 
     if (view->IsNull()) {
-        pack->spec.push(ERL_DRV_NIL);
+        generate_result_from_json_view_null(pack, view);
         return;
     }
+}
 
+static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
     if (view->IsObject()) {
         auto objs = view->GetAllObjects();
 
@@ -325,15 +350,11 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
         for (auto child : objs) {
             auto key = child.first;
             auto value = child.second;
-
             generate_result_from_json_view_object(pack, std::make_shared<Aws::Crt::JsonView>(value));
-
-            auto ptr = std::make_shared<std::string>(key);
-            pack->strings.emplace_back(ptr);
-            pack->spec.push(ptr->length());
-            pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
-            pack->spec.push(ERL_DRV_STRING); // TODO binary
+            generate_result_from_string(pack, std::string(key)); // TODO binary
         }
+    } else {
+        generate_result_from_json_view_value(pack, view);
     }
 }
 
