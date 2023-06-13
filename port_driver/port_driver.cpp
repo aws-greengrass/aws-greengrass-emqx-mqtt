@@ -11,7 +11,6 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
-#include <stack>
 #include <string>
 
 using DriverContext = struct {
@@ -32,8 +31,6 @@ struct atoms {
     ErlDrvTermData event;
     ErlDrvTermData certificate_update;
     ErlDrvTermData configuration_update;
-    ErlDrvTermData bool_true;
-    ErlDrvTermData bool_false;
 };
 static struct atoms ATOMS {};
 static const char *CONSOLE = "console";
@@ -103,8 +100,6 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { //
     ATOMS.certificate_update = driver_mk_atom(const_cast<char *>("certificate_update"));
     ATOMS.configuration_update = driver_mk_atom(const_cast<char *>("configuration_update"));
     ATOMS.event = driver_mk_atom(const_cast<char *>("event"));
-    ATOMS.bool_true = driver_mk_atom(const_cast<char *>("true"));
-    ATOMS.bool_false = driver_mk_atom(const_cast<char *>("false"));
 
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
     auto *context = reinterpret_cast<DriverContext *>(driver_alloc(sizeof(DriverContext)));
@@ -142,45 +137,11 @@ struct packer {
     std::unique_ptr<char[]> resource = {};
     std::unique_ptr<char[]> operation = {};
     std::unique_ptr<std::string> strResult = {};
-    std::shared_ptr<Aws::Crt::JsonView> jsonViewResult = {};
-    std::stack<ErlDrvTermData> spec;
-    std::vector<std::shared_ptr<double>> numbers;
-    std::vector<std::shared_ptr<std::string>> strings;
     DriverContext *context;
     ErlDrvTermData result = ATOMS.fail;
     char returnCode = RETURN_CODE_UNEXPECTED;
     EI_LONGLONG requestId;
 };
-
-// Convenience function to generate async result data that will be consumed
-// by the Greengrass EMQX Auth Plugin.
-//
-// The following Erlang term will be generated,
-//
-//  {port, request_id, {data, [return_code, result]}}
-//
-// where result can be any erlang term.
-//
-// see https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-static void generate_async_spec(ErlDrvTermData port, packer *pack, const std::function<void(packer *)> &result_writer) {
-    pack->spec.push(3);
-    pack->spec.push(ERL_DRV_TUPLE);
-    pack->spec.push(2);
-    pack->spec.push(ERL_DRV_TUPLE);
-    pack->spec.push(2);
-    pack->spec.push(ERL_DRV_LIST);
-
-    result_writer(pack);
-
-    pack->spec.push(static_cast<ErlDrvTermData>(pack->returnCode));
-    pack->spec.push(ERL_DRV_INT);
-    pack->spec.push(ATOMS.data);
-    pack->spec.push(ERL_DRV_ATOM);
-    pack->spec.push(reinterpret_cast<ErlDrvTermData>(&pack->requestId));
-    pack->spec.push(ERL_DRV_INT64);
-    pack->spec.push(port);
-    pack->spec.push(ERL_DRV_PORT);
-}
 
 static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom) {
     auto port = driver_mk_port(context->port);
@@ -236,6 +197,31 @@ static void write_async_string_to_port(DriverContext *context, EI_LONGLONG reque
     }
 }
 
+static void write_async_binary_to_port(DriverContext *context, EI_LONGLONG requestId, const std::string &result,
+                                       const char returnCode) {
+    auto port = driver_mk_port(context->port);
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer,
+    // return_binary]}} Request ID in this case is a pointer to stack memory, but that's fine because
+    // erl_drv_output_term copies the data immediately into the Erlang heap.
+
+    // clang-format off
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT,   port,
+            ERL_DRV_INT64,  reinterpret_cast<ErlDrvTermData>(&requestId),
+            ERL_DRV_ATOM,   ATOMS.data,
+            ERL_DRV_INT,    static_cast<ErlDrvTermData>(returnCode),
+            ERL_DRV_BUF2BINARY, reinterpret_cast<ErlDrvTermData>(result.c_str()),   result.length(),
+            ERL_DRV_LIST,   2,
+            ERL_DRV_TUPLE,  2,
+            ERL_DRV_TUPLE,  3
+    };
+    // clang-format on
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting async string term");
+    }
+}
+
 static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, const char return_code) {
     auto port = driver_mk_port(context->port);
 
@@ -274,151 +260,27 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
-static void generate_result_from_json_view_bool(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    pack->spec.push(view->AsBool() ? ATOMS.bool_true : ATOMS.bool_false);
-    pack->spec.push(ERL_DRV_ATOM);
-}
-
-static void generate_result_from_json_view_integer(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    pack->spec.push(static_cast<ErlDrvTermData>(view->AsInteger()));
-    pack->spec.push(ERL_DRV_INT);
-}
-
-static void generate_result_from_json_view_float(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    auto ptr = std::make_shared<double>(view->AsDouble());
-    pack->numbers.emplace_back(ptr);
-    pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr.get()));
-    pack->spec.push(ERL_DRV_FLOAT);
-}
-
-static void generate_result_from_string(packer *pack, const std::string &str, bool binary) {
-    auto ptr = std::make_shared<std::string>(str);
-    pack->strings.emplace_back(ptr);
-    pack->spec.push(ptr->length());
-    pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
-    pack->spec.push(binary ? ERL_DRV_BUF2BINARY : ERL_DRV_STRING);
-}
-
-static void generate_result_from_json_view_binary(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    generate_result_from_string(pack, std::string(view->AsString()), true);
-}
-
-static void generate_result_from_json_view_null(packer *pack) { pack->spec.push(ERL_DRV_NIL); }
-
-static void generate_result_from_json_view_value(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    if (view->IsBool()) {
-        generate_result_from_json_view_bool(pack, view);
-        return;
-    }
-
-    if (view->IsIntegerType()) {
-        generate_result_from_json_view_integer(pack, view);
-        return;
-    }
-
-    if (view->IsFloatingPointType()) {
-        generate_result_from_json_view_float(pack, view);
-        return;
-    }
-
-    if (view->IsString()) {
-        generate_result_from_json_view_binary(pack, view);
-        return;
-    }
-
-    if (view->IsNull()) {
-        generate_result_from_json_view_null(pack);
-        return;
-    }
-}
-
-// TODO refactor all the json stuff into a class
-static void generate_result_from_json_view(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view);
-
-static void generate_result_from_json_list(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    auto items = view->AsArray();
-    auto num_items = items.size();
-    pack->spec.push(num_items);
-    pack->spec.push(ERL_DRV_LIST);
-
-    for (auto item : items) {
-        generate_result_from_json_view(pack, std::make_shared<Aws::Crt::JsonView>(item));
-    }
-}
-
-static void generate_result_from_json_view_object(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    auto objs = view->GetAllObjects();
-
-    auto num_keys = objs.size();
-    pack->spec.push(num_keys);
-    pack->spec.push(ERL_DRV_MAP);
-
-    for (const auto &child : objs) {
-        auto key = child.first;
-        auto value = child.second;
-        generate_result_from_json_view(pack, std::make_shared<Aws::Crt::JsonView>(value));
-        generate_result_from_string(pack, std::string(key), true);
-    }
-}
-
-static void generate_result_from_json_view(packer *pack, const std::shared_ptr<Aws::Crt::JsonView> &view) {
-    if (view->IsObject()) {
-        generate_result_from_json_view_object(pack, view);
-    }
-    if (view->IsListType()) {
-        generate_result_from_json_list(pack, view);
-    } else {
-        generate_result_from_json_view_value(pack, view);
-    }
-}
-
-static void generate_result_from_packer(packer *pack) {
-    if (!pack->jsonViewResult || !pack->jsonViewResult->IsObject()) {
-        // empty map
-        pack->spec.push(0);
-        pack->spec.push(ERL_DRV_MAP);
-        return;
-    }
-    generate_result_from_json_view(pack, pack->jsonViewResult);
-}
-
-static void write_empty_map_to_port(DriverContext *context, const char return_code) {
-    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, {data, [return code integer, empty map]}}
+static void write_binary_to_port(DriverContext *context, const std::string &result, const char returnCode) {
     auto port = driver_mk_port(context->port);
-    ErlDrvTermData spec[] = {ERL_DRV_PORT,  port, ERL_DRV_ATOM, ATOMS.data, ERL_DRV_INT,   (ErlDrvTermData)return_code,
-                             ERL_DRV_MAP,   0,    ERL_DRV_LIST, 2,          ERL_DRV_TUPLE, 2,
-                             ERL_DRV_TUPLE, 2};
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, result binary]}}
+
+    // clang-format off
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT,   port,
+            ERL_DRV_ATOM,   ATOMS.data,
+            ERL_DRV_INT,    static_cast<ErlDrvTermData>(returnCode),
+            ERL_DRV_BUF2BINARY, reinterpret_cast<ErlDrvTermData>(result.c_str()),   result.length(),
+            ERL_DRV_LIST,   2,
+            ERL_DRV_TUPLE,  2,
+            ERL_DRV_TUPLE,  2
+    };
+    // clang-format on
+
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting empty map result");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting string result");
     }
-}
-
-static void write_output(ErlDrvTermData port, packer *pack) {
-    auto spec_size = static_cast<int>(pack->spec.size());
-    auto *spec = new ErlDrvTermData[spec_size];
-    defer { delete[] spec; };
-
-    for (int i = 0; i < spec_size; i++) {
-        spec[i] = pack->spec.top();
-        pack->spec.pop();
-    }
-
-    if (erl_drv_output_term(port, spec, spec_size) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Driver output failed");
-    }
-}
-
-static void write_async_json_view_response(packer *pack) {
-    auto port = driver_mk_port(pack->context->port);
-    generate_async_spec(port, pack, generate_result_from_packer);
-    write_output(port, pack);
-}
-
-static void write_async_json_view_response_and_free(void *buf) {
-    auto *pack = reinterpret_cast<packer *>(buf);
-    defer { delete pack; };
-    write_async_json_view_response(pack);
 }
 
 static void write_async_atom_response_and_free(void *buf) {
@@ -435,6 +297,14 @@ static void write_async_string_response_and_free(void *buf) {
     defer { delete pack; };
 
     write_async_string_to_port(pack->context, pack->requestId, *(pack->strResult), pack->returnCode);
+}
+
+static void write_async_binary_response_and_free(void *buf) {
+    auto *pack = reinterpret_cast<packer *>(buf);
+
+    defer { delete pack; };
+
+    write_async_binary_to_port(pack->context, pack->requestId, *(pack->strResult), pack->returnCode);
 }
 
 static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
@@ -680,15 +550,14 @@ static void get_configuration(void *buf) {
     auto config = pack->context->cda_integration->get_configuration();
 
     if (std::holds_alternative<int>(config)) {
-        pack->jsonViewResult = std::unique_ptr<Aws::Crt::JsonView>{};
         pack->returnCode = RETURN_CODE_FAILED_OP;
         return;
     }
 
-    if (std::holds_alternative<std::unique_ptr<Aws::Crt::JsonView>>(config)) {
-        pack->jsonViewResult = std::move(std::get<std::unique_ptr<Aws::Crt::JsonView>>(config));
+    if (std::holds_alternative<std::string>(config)) {
+        pack->strResult = std::make_unique<std::string>(std::get<std::string>(config));
     } else {
-        pack->jsonViewResult = std::unique_ptr<Aws::Crt::JsonView>{};
+        pack->strResult = {};
     }
 
     pack->returnCode = RETURN_CODE_SUCCESS;
@@ -697,7 +566,7 @@ static void get_configuration(void *buf) {
 static void handle_get_configuration(DriverContext *context, char *buff, int index) {
     char return_code = RETURN_CODE_UNEXPECTED;
 
-    defer { write_empty_map_to_port(context, return_code); };
+    defer { write_binary_to_port(context, "", return_code); };
 
     auto *packed = new packer{
         .context = context,
@@ -707,7 +576,7 @@ static void handle_get_configuration(DriverContext *context, char *buff, int ind
         return;
     }
 
-    driver_async(context->port, nullptr, &get_configuration, packed, &write_async_json_view_response_and_free);
+    driver_async(context->port, nullptr, &get_configuration, packed, &write_async_binary_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
