@@ -291,20 +291,24 @@ static void generate_result_from_json_view_float(packer *pack, std::shared_ptr<A
     pack->spec.push(ERL_DRV_FLOAT);
 }
 
-static void generate_result_from_string(packer *pack, std::string str) {
+static void generate_result_from_string(packer *pack, std::string str, bool binary) {
     auto ptr = std::make_shared<std::string>(str);
     pack->strings.emplace_back(ptr);
     pack->spec.push(ptr->length());
     pack->spec.push(reinterpret_cast<ErlDrvTermData>(ptr->c_str()));
-    pack->spec.push(ERL_DRV_STRING);
+    pack->spec.push(binary ? ERL_DRV_BUF2BINARY : ERL_DRV_STRING);
 }
 
-static void generate_result_from_binary(packer *Pack, std::string str) {
-    // TODO
+static void generate_result_from_string(packer *pack, std::string str) {
+    generate_result_from_string(pack, str, false);
+}
+
+static void generate_result_from_json_view_binary(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
+    generate_result_from_string(pack, std::string(view->AsString()), true);
 }
 
 static void generate_result_from_json_view_string(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
-    generate_result_from_string(pack, std::string(view->AsString()));
+    generate_result_from_string(pack, std::string(view->AsString()), false);
 }
 
 static void generate_result_from_json_view_null(packer *pack, std::shared_ptr<Aws::Crt::JsonView> view) {
@@ -328,7 +332,7 @@ static void generate_result_from_json_view_value(packer *pack, std::shared_ptr<A
     }
 
     if (view->IsString()) {
-        generate_result_from_json_view_string(pack, view);
+        generate_result_from_json_view_binary(pack, view);
         return;
     }
 
@@ -363,7 +367,7 @@ static void generate_result_from_json_view_object(packer *pack, std::shared_ptr<
         auto key = child.first;
         auto value = child.second;
         generate_result_from_json_view(pack, std::make_shared<Aws::Crt::JsonView>(value));
-        generate_result_from_string(pack, std::string(key)); // TODO binary
+        generate_result_from_string(pack, std::string(key), true);
     }
 }
 
