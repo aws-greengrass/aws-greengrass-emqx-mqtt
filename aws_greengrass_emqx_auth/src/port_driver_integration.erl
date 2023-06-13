@@ -154,7 +154,7 @@ request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
 
 subscribe_to_configuration_updates(Callback) ->
-  register_fun(certificate_update, Callback),
+  register_fun(configuration_update, Callback),
   call_port({?SUBSCRIBE_TO_CONFIGURATION_UPDATES}).
 
 get_configuration() ->
