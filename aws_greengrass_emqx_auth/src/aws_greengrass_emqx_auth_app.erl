@@ -13,22 +13,14 @@
 
 start(_StartType, _StartArgs) ->
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
-  load_config(),
+  aws_greengrass_emqx_conf:start(),
   port_driver_integration:start(),
-  port_driver_integration:subscribe_to_configuration_updates(fun aws_greengrass_emqx_conf:update_configuration_from_ipc/0),
-  aws_greengrass_emqx_conf:update_configuration_from_ipc(),
+  port_driver_integration:subscribe_to_configuration_updates(fun aws_greengrass_emqx_conf:request_update/0),
+  aws_greengrass_emqx_conf:request_update(),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),
   {ok, Sup}.
-
-load_config() ->
-  case aws_greengrass_emqx_conf:load() of
-    {error, _} = Err ->
-      logger:error("Failed to load plugin configuration: ~p", [Err]),
-      exit(Err);
-    Ok -> Ok
-  end.
 
 enable_cert_verification() ->
   case aws_greengrass_emqx_conf:auth_mode() of
@@ -45,5 +37,6 @@ enable_cert_verification() ->
   end.
 
 stop(_State) ->
+  aws_greengrass_emqx_conf:stop(),
   aws_greengrass_emqx_auth:unload(),
   port_driver_integration:stop().
