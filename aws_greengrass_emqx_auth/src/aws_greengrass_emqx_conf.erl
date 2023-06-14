@@ -5,8 +5,6 @@
 
 -module(aws_greengrass_emqx_conf).
 
-%%-include_lib("emqx/jiffy/c_src/jiffy.h").
-
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -export([start/0, stop/0]).
@@ -86,8 +84,7 @@ update_configuration_from_ipc() ->
   end.
 
 update_configuration(Conf) when is_binary(Conf) ->
-  logger:info("received binary map: ~p", [Conf]),
-  logger:info("decoded: ~p", [jiffy:decode(Conf)]);
+  update_configuration(jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]));
 update_configuration(Conf) ->
   update_configuration(Conf, maps:keys(Conf)).
 
