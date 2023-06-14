@@ -218,7 +218,7 @@ static void write_async_binary_to_port(DriverContext *context, EI_LONGLONG reque
     };
     // clang-format on
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting async string term");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting async binary term");
     }
 }
 
@@ -279,7 +279,7 @@ static void write_binary_to_port(DriverContext *context, const std::string &resu
     // clang-format on
 
     if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting string result");
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting binary result");
     }
 }
 
