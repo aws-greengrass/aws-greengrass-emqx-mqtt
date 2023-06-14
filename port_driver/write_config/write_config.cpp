@@ -152,8 +152,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
 
     // Write customer-provided values to CWD
     // const std::filesystem::path BASE_PATH = std::filesystem::current_path();
-    const char *original_data_dir = std::getenv(EMQX_DATA_DIR_ENV_VAR);
-    const std::filesystem::path data_dir(original_data_dir);
+    const std::filesystem::path data_dir(std::getenv(EMQX_DATA_DIR_ENV_VAR));
     auto file_path = data_dir / LOCAL_CONF_FILE;
 
     // Try to create the directories as needed, ignoring errors
