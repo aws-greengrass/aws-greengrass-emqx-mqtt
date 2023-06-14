@@ -83,6 +83,8 @@ update_configuration_from_ipc() ->
     Error
   end.
 
+update_configuration(Conf) when is_binary(Conf) ->
+  update_configuration(jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]));
 update_configuration(Conf) ->
   update_configuration(Conf, maps:keys(Conf)).
 
