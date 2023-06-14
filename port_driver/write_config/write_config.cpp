@@ -6,6 +6,7 @@
 #include "../common.h"
 #include "../defer.h"
 #include "cda_integration.h"
+#include "config.h"
 #include <array>
 #include <fstream>
 #include <memory>
@@ -18,46 +19,7 @@ static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
-
-static const char *REPLACE_CONFIG_NAMESPACE = "replaceConfigurationFiles";
-static const char *MERGE_CONFIG_NAMESPACE = "mergeConfigurationFiles";
-
-static const char *EMQX_CONF_FILE = "etc/emqx.conf";
-static const std::array<std::string, 33> allowed_files = {
-    "data/loaded_plugins",
-    "data/loaded_modules",
-    EMQX_CONF_FILE,
-    "etc/acl.conf",
-    "etc/psk.txt",
-    "etc/ssl_dist.conf",
-    "etc/plugins/aws_greengrass_emqx_auth.conf",
-    "etc/plugins/emqx_auth_http.conf",
-    "etc/plugins/emqx_auth_jwt.conf",
-    "etc/plugins/emqx_auth_ldap.conf",
-    "etc/plugins/emqx_auth_mnesia.conf",
-    "etc/plugins/emqx_auth_mongo.conf",
-    "etc/plugins/emqx_auth_mysql.conf",
-    "etc/plugins/emqx_auth_pgsql.conf",
-    "etc/plugins/emqx_auth_redis.conf",
-    "etc/plugins/emqx_bridge_mqtt.conf",
-    "etc/plugins/emqx_coap.conf",
-    "etc/plugins/emqx_dashboard.conf",
-    "etc/plugins/emqx_exhook.conf",
-    "etc/plugins/emqx_exproto.conf",
-    "etc/plugins/emqx_lua_hook.conf",
-    "etc/plugins/emqx_lwm2m.conf",
-    "etc/plugins/emqx_management.conf",
-    "etc/plugins/emqx_prometheus.conf",
-    "etc/plugins/emqx_psk_file.conf",
-    "etc/plugins/emqx_recon.conf",
-    "etc/plugins/emqx_retainer.conf",
-    "etc/plugins/emqx_rule_engine.conf",
-    "etc/plugins/emqx_sasl.conf",
-    "etc/plugins/emqx_sn.conf",
-    "etc/plugins/emqx_stomp.conf",
-    "etc/plugins/emqx_telemetry.conf",
-    "etc/plugins/emqx_web_hook.conf",
-};
+static const char *LOCAL_CONF_FILE = "configs/local-override.conf";
 
 static struct aws_logger our_logger {};
 
@@ -161,8 +123,8 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     return response->GetValue().value();
 }
 
-int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_namespace) {
-    auto config_value = get_emqx_configuration(ipc, config_namespace);
+int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
+    auto config_value = get_emqx_configuration(ipc, aws::greengrass::emqx::localOverrideNamespace.c_str());
     // If we couldn't get the configuration due to an error and need to exit, then exit with the
     // exit code from get_emqx_configuration.
     if (holds_alternative<int>(config_value)) {
@@ -173,7 +135,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
     if (config_view.IsNull()) {
         LOG_I(WRITE_CONFIG_SUBJECT,
               "Configuration value /%s was null. This is not a problem, but no configuration changes in /%s will apply",
-              config_namespace, config_namespace);
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 0;
     }
     if (!config_view.IsObject()) {
@@ -181,74 +144,33 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc, const char *config_n
               "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
               "by updating the deployment with "
               "\"RESET\":[\"/%s\"]",
-              config_namespace, config_namespace, config_namespace);
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str(),
+              aws::greengrass::emqx::localOverrideNamespace.c_str());
         return 1;
     }
 
-    const bool shouldAppend = config_namespace == MERGE_CONFIG_NAMESPACE;
-
     // Write customer-provided values to CWD
-    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
+    const std::filesystem::path data_dir(std::getenv(EMQX_DATA_DIR_ENV_VAR));
+    auto file_path = data_dir / LOCAL_CONF_FILE;
+
+    // Try to create the directories as needed, ignoring errors
+    std::filesystem::create_directories(file_path.parent_path());
+
+    // Open file for writing. Will create file if it doesn't exist.
+    std::ofstream::openmode open_mode = std::ofstream::out;
+    auto out_path = std::ofstream(file_path, open_mode);
+    defer { out_path.close(); };
+
     // Configuration is in the form of
-    // {"file/path": "file contents\n another line of file contents"}
-    // For us to write the customer provided values into a config file, we must recognize the file path
-    // from the JSON key as one of our supported paths in allowed_files. If the key is not in allowed_files
-    // we will log that it is unknown, and then continue. This helps with security so that we are not writing
-    // arbitrary files. If the user's provided value is not a string, then we will log that fact, but we will keep
-    // going
-    for (const auto &item : config_view.GetAllObjects()) {
-        const auto possible_file_path = item.first;
-        const auto customer_config_file_contents = item.second;
-        if (customer_config_file_contents.IsString()) {
-            if (std::find(allowed_files.begin(), allowed_files.end(), possible_file_path.c_str()) ==
-                allowed_files.end()) {
-                LOG_W(WRITE_CONFIG_SUBJECT, "Unknown file %s. Configuration from /%s/%s will not be applied",
-                      possible_file_path.c_str(), config_namespace, possible_file_path.c_str());
-                continue;
-            }
+    // {"localOverride": {"listeners": {"ssl": {"default": ...}}}}
+    // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
+    // We then replace the contents of local-override.conf with the user provided config. We do not check if the
+    // config is valid, this is handled by EMQx.
+    Aws::Crt::String output = config_view.WriteReadable();
+    LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
+    out_path << output << std::endl;
 
-            // replace config namespace does not allow etc/emqx.conf. Fail if it is provided here.
-            if (!shouldAppend && possible_file_path == EMQX_CONF_FILE) {
-                LOG_E(WRITE_CONFIG_SUBJECT, "Unable to replace %s. Please specify %s value overrides in %s and not %s",
-                      possible_file_path.c_str(), possible_file_path.c_str(), MERGE_CONFIG_NAMESPACE,
-                      REPLACE_CONFIG_NAMESPACE);
-                return 1;
-            }
-
-            auto strVal = customer_config_file_contents.AsString();
-            auto file_path = BASE_PATH / possible_file_path.c_str();
-            // try to create the directories as needed, ignoring errors
-            std::filesystem::create_directories(file_path.parent_path());
-
-            std::ofstream::openmode open_mode = std::ofstream::out;
-            if (shouldAppend) {
-                // enable append mode
-                open_mode |= std::ofstream::app;
-                LOG_I(WRITE_CONFIG_SUBJECT, "Applying configuration value overrides to %s", possible_file_path.c_str());
-            } else {
-                LOG_W(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", possible_file_path.c_str());
-            }
-            // Open file for writing. Will create file if it doesn't exist.
-            auto out_path = std::ofstream(file_path, open_mode);
-            defer { out_path.close(); };
-            if (shouldAppend) {
-                // Immediately add a new line so that user's contents definitely come in a line after the existing
-                // values
-                out_path << std::endl;
-            }
-            out_path << strVal << std::endl;
-        } else if (customer_config_file_contents.IsNull()) {
-            LOG_I(WRITE_CONFIG_SUBJECT, "Value of /%s/%s was null. The file will not be modified", config_namespace,
-                  possible_file_path.c_str());
-        } else {
-            LOG_E(WRITE_CONFIG_SUBJECT,
-                  "Value of /%s/%s was not a string. Configuration from /%s/%s will not be applied. Fix this by "
-                  "updating the deployment with \"RESET\":[\"/%s/%s\"]",
-                  config_namespace, possible_file_path.c_str(), config_namespace, possible_file_path.c_str(),
-                  config_namespace, possible_file_path.c_str());
-            return 1;
-        }
-    }
     return 0;
 }
 
@@ -272,13 +194,12 @@ int main() {
         return 1;
     }
 
-    // Get user config for the replace and then merge. Merge will be applied on top of replace if
-    // the same file is specified in both sections for some reason.
-    for (const char *config_namespace : {REPLACE_CONFIG_NAMESPACE, MERGE_CONFIG_NAMESPACE}) {
-        const int ret = read_config_and_update_files(ipc, config_namespace);
-        if (ret != 0) {
-            return ret;
-        }
+    // Get user config for local-override. The config will be appended to EMQx's
+    // local-override.conf. This can be updated to include cluster-override
+    // in the future.
+    const int ret = read_config_and_update_files(ipc);
+    if (ret != 0) {
+        return ret;
     }
     return 0;
 }
