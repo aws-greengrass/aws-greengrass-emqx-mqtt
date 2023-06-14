@@ -5,13 +5,14 @@
 
 -module(port_driver_integration).
 
--export([start/0, stop/0, init/2]).
+-export([start/0, stop/0, init/2, execute_callback/1]).
 -export([get_auth_token/2
   , on_client_check_acl/4
   , verify_client_certificate/1
   , register_fun/2
   , request_certificates/0
   , subscribe_to_configuration_updates/1
+  , get_configuration/0
 ]).
 
 %% OPERATIONS
@@ -20,6 +21,7 @@
 -define(VERIFY_CLIENT_CERTIFICATE, 5).
 -define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
 -define(SUBSCRIBE_TO_CONFIGURATION_UPDATES, 7).
+-define(GET_CONFIGURATION, 8).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -97,7 +99,9 @@ loop(Port, Inflight, Counter, FunMap) ->
     % handle event type from C++ by finding a registered callback (if any)
     {Port, event, EventType} ->
       Fun = maps:get(EventType, FunMap, fun empty/0),
-      Fun(),
+      %% perform the callback asynchronously, otherwise this loop will deadlock
+      %% if the caller calls into port_driver_integration
+      spawn_link(?MODULE, execute_callback, [Fun]),
       loop(Port, Inflight, Counter, FunMap);
     {call, Caller, Msg, async} ->
       RequestId = counters:get(Counter, 1),
@@ -138,6 +142,12 @@ loop(Port, Inflight, Counter, FunMap) ->
       exit(port_terminated)
   end.
 
+execute_callback(Fun) ->
+  try Fun()
+  catch
+    Error:Reason:Stacktrace -> logger:error("Callback failed, error=~p, reason=~p, stacktrace=~p", [Error, Reason, Stacktrace])
+  end.
+
 -spec(get_auth_token(string, string) -> {ok, any()} | {error, atom()}).
 get_auth_token(ClientId, CertPem) ->
   call_port({?GET_CLIENT_DEVICE_AUTH_TOKEN, ClientId, CertPem}, async).
@@ -152,8 +162,11 @@ request_certificates() ->
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
 
 subscribe_to_configuration_updates(Callback) ->
-  register_fun(certificate_update, Callback),
+  register_fun(configuration_update, Callback),
   call_port({?SUBSCRIBE_TO_CONFIGURATION_UPDATES}).
+
+get_configuration() ->
+  call_port({?GET_CONFIGURATION}, async).
 
 register_fun(Atom, Fun) ->
   greengrass_port_driver ! {register_fun, Atom, Fun}.

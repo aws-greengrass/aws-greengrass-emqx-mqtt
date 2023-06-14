@@ -130,18 +130,6 @@ EXPORTED void drv_stop(ErlDrvData handle) {
     aws_logger_clean_up(&our_logger);
 }
 
-static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom) {
-    auto port = driver_mk_port(context->port);
-
-    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
-    // The follow code encodes this Erlang term: {Port, event, event atom}
-
-    ErlDrvTermData spec[] = {ERL_DRV_PORT, port, ERL_DRV_ATOM, ATOMS.event, ERL_DRV_ATOM, eventAtom, ERL_DRV_TUPLE, 3};
-    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
-        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting atom event");
-    }
-}
-
 struct packer {
     std::unique_ptr<char[]> client_id = {};
     std::unique_ptr<char[]> pem = {};
@@ -154,6 +142,18 @@ struct packer {
     char returnCode = RETURN_CODE_UNEXPECTED;
     EI_LONGLONG requestId;
 };
+
+static void send_event_to_port(DriverContext *context, ErlDrvTermData eventAtom) {
+    auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, event, event atom}
+
+    ErlDrvTermData spec[] = {ERL_DRV_PORT, port, ERL_DRV_ATOM, ATOMS.event, ERL_DRV_ATOM, eventAtom, ERL_DRV_TUPLE, 3};
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting atom event");
+    }
+}
 
 static void write_async_atom_to_port(DriverContext *context, EI_LONGLONG requestId, ErlDrvTermData result,
                                      const char returnCode) {
@@ -197,6 +197,31 @@ static void write_async_string_to_port(DriverContext *context, EI_LONGLONG reque
     }
 }
 
+static void write_async_binary_to_port(DriverContext *context, EI_LONGLONG requestId, const std::string &result,
+                                       const char returnCode) {
+    auto port = driver_mk_port(context->port);
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, request id integer, {data, [return code integer,
+    // return_binary]}} Request ID in this case is a pointer to stack memory, but that's fine because
+    // erl_drv_output_term copies the data immediately into the Erlang heap.
+
+    // clang-format off
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT,   port,
+            ERL_DRV_INT64,  reinterpret_cast<ErlDrvTermData>(&requestId),
+            ERL_DRV_ATOM,   ATOMS.data,
+            ERL_DRV_INT,    static_cast<ErlDrvTermData>(returnCode),
+            ERL_DRV_BUF2BINARY, reinterpret_cast<ErlDrvTermData>(result.c_str()),   result.length(),
+            ERL_DRV_LIST,   2,
+            ERL_DRV_TUPLE,  2,
+            ERL_DRV_TUPLE,  3
+    };
+    // clang-format on
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting async binary term");
+    }
+}
+
 static void write_atom_to_port(DriverContext *context, ErlDrvTermData result, const char return_code) {
     auto port = driver_mk_port(context->port);
 
@@ -235,6 +260,29 @@ static void write_string_to_port(DriverContext *context, const std::string &resu
     }
 }
 
+static void write_binary_to_port(DriverContext *context, const std::string &result, const char returnCode) {
+    auto port = driver_mk_port(context->port);
+
+    // https://www.erlang.org/doc/man/erl_driver.html#erl_drv_output_term
+    // The follow code encodes this Erlang term: {Port, {data, [return code integer, result binary]}}
+
+    // clang-format off
+    ErlDrvTermData spec[] = {
+            ERL_DRV_PORT,   port,
+            ERL_DRV_ATOM,   ATOMS.data,
+            ERL_DRV_INT,    static_cast<ErlDrvTermData>(returnCode),
+            ERL_DRV_BUF2BINARY, reinterpret_cast<ErlDrvTermData>(result.c_str()),   result.length(),
+            ERL_DRV_LIST,   2,
+            ERL_DRV_TUPLE,  2,
+            ERL_DRV_TUPLE,  2
+    };
+    // clang-format on
+
+    if (erl_drv_output_term(port, spec, sizeof(spec) / sizeof(spec[0])) < 0) {
+        LOG_E(PORT_DRIVER_SUBJECT, "Failed outputting binary result");
+    }
+}
+
 static void write_async_atom_response_and_free(void *buf) {
     auto *pack = reinterpret_cast<packer *>(buf);
 
@@ -249,6 +297,14 @@ static void write_async_string_response_and_free(void *buf) {
     defer { delete pack; };
 
     write_async_string_to_port(pack->context, pack->requestId, *(pack->strResult), pack->returnCode);
+}
+
+static void write_async_binary_response_and_free(void *buf) {
+    auto *pack = reinterpret_cast<packer *>(buf);
+
+    defer { delete pack; };
+
+    write_async_binary_to_port(pack->context, pack->requestId, *(pack->strResult), pack->returnCode);
 }
 
 static std::unique_ptr<char[]> decode_string(char *buff, int *index) {
@@ -486,6 +542,44 @@ void handle_configuration_update_subscription(DriverContext *context) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
+static void get_configuration(void *buf) {
+    auto *pack = reinterpret_cast<packer *>(buf);
+
+    LOG_D(PORT_DRIVER_SUBJECT, "Handling get_configuration request");
+
+    auto config = pack->context->cda_integration->get_configuration();
+
+    if (std::holds_alternative<int>(config)) {
+        pack->returnCode = RETURN_CODE_FAILED_OP;
+        return;
+    }
+
+    if (std::holds_alternative<std::string>(config)) {
+        pack->strResult = std::make_unique<std::string>(std::get<std::string>(config));
+    } else {
+        pack->strResult = {};
+    }
+
+    pack->returnCode = RETURN_CODE_SUCCESS;
+}
+
+static void handle_get_configuration(DriverContext *context, char *buff, int index) {
+    char return_code = RETURN_CODE_UNEXPECTED;
+
+    defer { write_binary_to_port(context, "", return_code); };
+
+    auto *packed = new packer{
+        .context = context,
+    };
+    // Decode the request ID which is used to identify the caller back in Erlang
+    if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
+        return;
+    }
+
+    driver_async(context->port, nullptr, &get_configuration, packed, &write_async_binary_response_and_free);
+    return_code = RETURN_CODE_ASYNC;
+}
+
 static void handle_unknown_op(DriverContext *context) {
     write_atom_to_port(context, ATOMS.unknown, RETURN_CODE_UNKNOWN_OP);
 }
@@ -549,6 +643,10 @@ void drv_output(ErlDrvData handle, ErlIOVec *erlIoVec) {
     case SUBSCRIBE_TO_CONFIGURATION_UPDATES:
         LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CONFIGURATION_UPDATES")
         handle_configuration_update_subscription(context);
+        break;
+    case GET_CONFIGURATION:
+        LOG_I(PORT_DRIVER_SUBJECT, "GET_CONFIGURATION")
+        handle_get_configuration(context, buff, index);
         break;
     default:
         LOG_E(PORT_DRIVER_SUBJECT, "Unknown operation: %lu", operation);

@@ -51,8 +51,7 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
-std::variant<int, std::monostate, std::unique_ptr<Aws::Crt::JsonView>>
-ClientDeviceAuthIntegration::get_configuration() {
+std::variant<int, std::monostate, std::string> ClientDeviceAuthIntegration::get_configuration() {
     auto getConfigOperation = greengrassIpcWrapper.getIPCClient().NewGetConfiguration();
     if (!getConfigOperation) {
         LOG_E(GET_CONFIG_SUBJECT, FAILED_OPERATION_FMT, GET_CONFIGURATION_OP);
@@ -75,6 +74,17 @@ ClientDeviceAuthIntegration::get_configuration() {
     }
 
     auto result = GG::GetConfigurationResult(resultFuture.get());
+
+    if (result.GetOperationError() != nullptr &&
+        result.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
+        LOG_I(
+            CDA_INTEG_SUBJECT,
+            "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
+            aws::greengrass::emqx::localOverrideNamespace.c_str(),
+            aws::greengrass::emqx::localOverrideNamespace.c_str());
+        return std::monostate();
+    }
+
     auto resultType = result.GetResultType();
     if (resultType != OPERATION_RESPONSE) {
         handle_response_error(GET_CONFIGURATION_OP, resultType, result.GetOperationError());
@@ -110,7 +120,7 @@ ClientDeviceAuthIntegration::get_configuration() {
         return 1;
     }
 
-    return std::make_unique<Aws::Crt::JsonView>(config_view);
+    return std::string(config_view.WriteCompact());
 }
 
 ConfigurationSubscribeStatus

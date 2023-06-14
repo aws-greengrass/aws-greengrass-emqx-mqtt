@@ -10,10 +10,15 @@
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
-void ConfigurationUpdatesHandler::OnStreamEvent(
-    GG::ConfigurationUpdateEvents *response) { // NOLINT(misc-unused-parameters)
+void ConfigurationUpdatesHandler::OnStreamEvent(GG::ConfigurationUpdateEvents *response) {
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
-    callback->operator()();
+    if (response->GetConfigurationUpdateEvent().has_value() &&
+        response->GetConfigurationUpdateEvent()->GetKeyPath().has_value() &&
+        !response->GetConfigurationUpdateEvent()->GetKeyPath()->empty() &&
+        std::string(response->GetConfigurationUpdateEvent()->GetKeyPath().value()[0]) ==
+            aws::greengrass::emqx::localOverrideNamespace) {
+        callback->operator()();
+    }
 }
 
 bool ConfigurationUpdatesHandler::OnStreamError(OperationError *error) {
@@ -37,8 +42,6 @@ ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std:
     }
 
     GG::SubscribeToConfigurationUpdateRequest request;
-    request.SetKeyPath({Aws::Crt::String(aws::greengrass::emqx::localOverrideNamespace)});
-
     auto activate = operation->Activate(request, nullptr);
     activate.wait();
 
