@@ -19,8 +19,7 @@ static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
-
-static const char *LOCAL_CONF_FILE = "data/configs/local-override.conf";
+static const char *LOCAL_CONF_FILE = "configs/local-override.conf";
 
 static struct aws_logger our_logger {};
 
@@ -152,8 +151,10 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     }
 
     // Write customer-provided values to CWD
-    const std::filesystem::path BASE_PATH = std::filesystem::current_path();
-    auto file_path = BASE_PATH / LOCAL_CONF_FILE;
+    // const std::filesystem::path BASE_PATH = std::filesystem::current_path();
+    const char *original_data_dir = std::getenv(EMQX_DATA_DIR_ENV_VAR);
+    const std::filesystem::path data_dir(original_data_dir);
+    auto file_path = data_dir / LOCAL_CONF_FILE;
 
     // Try to create the directories as needed, ignoring errors
     std::filesystem::create_directories(file_path.parent_path());
