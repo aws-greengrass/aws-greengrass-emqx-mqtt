@@ -33,7 +33,6 @@ struct atoms {
     ErlDrvTermData configuration_update;
 };
 static struct atoms ATOMS {};
-static const char *CONSOLE = "console";
 static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__CONSOLE_HANDLER__LEVEL";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
