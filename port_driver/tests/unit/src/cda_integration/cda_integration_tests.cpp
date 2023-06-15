@@ -224,7 +224,9 @@ TEST_F(CDAIntegrationTester, CDAIntegrationGetConfigurationTest) {
     EXPECT_EQ(command, "get_configuration");
 
     SendCommand("set with_empty");
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(cda_integ->get_configuration()));
+    auto result = cda_integ->get_configuration();
+    EXPECT_TRUE(std::holds_alternative<std::unique_ptr<std::string>>(result));
+    EXPECT_EQ(std::get<std::unique_ptr<std::string>>(result).get(), "{}");
     command = NextCommand();
     EXPECT_EQ(command, "get_configuration");
 }
