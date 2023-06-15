@@ -100,7 +100,7 @@ WORKDIR /build
 
 COPY --from=build-base /build/bin bin
 COPY --from=emqx /build/emqx/ emqx
-COPY --from=plugin /build/emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0/aws_greengrass_emqx_auth-1.0.0 emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0/aws_greengrass_emqx_auth-1.0.0
+COPY --from=plugin /build/emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0 emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0
 COPY THIRD-PARTY-LICENSES .
 COPY patches/emqx.cmd.diff patches/emqx.conf patches/emqx.diff patches/msvcr120.dll patches/acl.conf patches/
 COPY bin/package.py bin/build_emqx.py bin/
