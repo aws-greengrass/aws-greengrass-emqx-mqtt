@@ -135,13 +135,12 @@ USER emqx
 VOLUME ["/opt/emqx/log", "/opt/emqx/data"]
 
 # Set env variables for docker container
-ENV EMQX_LOG__DIR="/opt/emqx/log"
 ENV EMQX_NODE__DATA_DIR="/opt/emqx/data"
 ENV ORIG_EMQX_NODE__DATA_DIR="/opt/emqx/dataOrig"
 ENV EMQX_NODE__ETC_DIR="/opt/emqx/etc"
 ENV ORIG_EMQX_NODE__ETC_DIR="/opt/emqx/etcOrig"
-ENV EMQX_LISTENER__SSL__EXTERNAL__KEYFILE="/opt/emqx/data/key.pem"
-ENV EMQX_LISTENER__SSL__EXTERNAL__CERTFILE="/opt/emqx/data/cert.pem"
+ENV EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE="/opt/emqx/data/key.pem"
+ENV EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE="/opt/emqx/data/cert.pem"
 
 # emqx will occupy these port:
 # - 8883 port for MQTT(SSL)
