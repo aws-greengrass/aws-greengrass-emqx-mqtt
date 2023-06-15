@@ -84,7 +84,10 @@ update_configuration_from_ipc() ->
   end.
 
 update_configuration(Conf) when is_binary(Conf) ->
-  update_configuration(jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]));
+  case catch jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]) of
+    DecodedConf when is_map(DecodedConf) -> update_configuration(DecodedConf);
+    Err -> logger:warning("Unable to decode configuration: error=~p", [Err])
+  end;
 update_configuration(Conf) ->
   update_configuration(Conf, maps:keys(Conf)).
 
