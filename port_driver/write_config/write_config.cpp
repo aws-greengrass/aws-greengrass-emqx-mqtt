@@ -13,7 +13,7 @@
 #include <variant>
 
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
-static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
+static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__CONSOLE_HANDLER__LEVEL";
 static const char *ORIGINAL_EMQX_DATA_DIR_ENV_VAR = "ORIG_EMQX_NODE__DATA_DIR";
 static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
