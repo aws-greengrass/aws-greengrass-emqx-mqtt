@@ -53,9 +53,9 @@ FROM build-base as sdk
 
 WORKDIR /build
 
-COPY .gitmodules .gitmodules
-# TODO this breaks layer caching
-COPY .git .git
+RUN git init
+COPY .gitmodules .
+COPY aws-iot-device-sdk-cpp-v2 aws-iot-device-sdk-cpp-v2
 
 COPY --from=build-base /build/bin bin
 COPY bin/build_sdk.py bin
@@ -91,7 +91,6 @@ COPY --from=port-driver /build/_build/driver_lib _build/driver_lib
 COPY patches/msvcp140.dll patches/vcruntime140.dll patches/vcruntime140_1.dll patches/
 COPY aws_greengrass_emqx_auth aws_greengrass_emqx_auth
 COPY bin/build_plugin.py bin/package.py bin/
-COPY .git .git
 RUN python3 -u -m bin --plugin-only
 
 FROM build-base as package
