@@ -135,7 +135,6 @@ USER emqx
 VOLUME ["/opt/emqx/log", "/opt/emqx/data"]
 
 # Set env variables for docker container
-ENV EMQX_LOG__DIR="/opt/emqx/log"
 ENV EMQX_NODE__DATA_DIR="/opt/emqx/data"
 ENV ORIG_EMQX_NODE__DATA_DIR="/opt/emqx/dataOrig"
 ENV EMQX_NODE__ETC_DIR="/opt/emqx/etc"
