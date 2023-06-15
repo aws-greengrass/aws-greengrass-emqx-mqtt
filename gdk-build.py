@@ -8,6 +8,8 @@ COMPONENT_VERSION = 'NEXT_PATCH'
 TAG = 'aws-greengrass-emqx'
 IMAGE = f'{TAG}.amd64.tar.gz'
 
+ZIP_ARTIFACT = os.path.join('build', 'emqx.zip')
+
 RECIPES_DIR = os.path.join('greengrass-build', 'recipes')
 ARTIFACTS_DIR = os.path.join('greengrass-build', 'artifacts', COMPONENT_NAME, COMPONENT_VERSION)
 
@@ -15,7 +17,7 @@ if __name__ == '__main__':
     skip_cache = bool(os.getenv('SKIP_CACHE'))
     docker = bool(os.getenv('DOCKER'))
 
-    if not docker and (not os.path.exists('emqx/emqx.zip') or skip_cache):
+    if not docker and (not os.path.exists(ZIP_ARTIFACT) or skip_cache):
         import bin
         bin.main()
 
@@ -25,7 +27,7 @@ if __name__ == '__main__':
         subprocess.check_call(f'docker save {TAG} | gzip > {IMAGE}', shell=True)
 
     recipe_file = 'recipe-docker.json' if docker else 'recipe.json'
-    artifact = IMAGE if docker else os.path.join('build', 'emqx.zip')
+    artifact = IMAGE if docker else ZIP_ARTIFACT
 
     shutil.copy(recipe_file, RECIPES_DIR)
     shutil.copy(artifact, ARTIFACTS_DIR)
