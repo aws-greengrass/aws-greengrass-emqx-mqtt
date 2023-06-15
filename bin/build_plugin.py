@@ -66,7 +66,7 @@ def build_plugin(context) -> None:
         "functionality": [
             "AuthN", "AuthZ"
         ],
-        "git_ref": subprocess.check_output('git rev-parse HEAD', shell=True).decode('utf-8').strip(),
+        "git_ref": "",
         "metadata_vsn": "0.1.0",
         "name": context.auth_plugin_name,
         "rel_apps": [plugin_name_version],
