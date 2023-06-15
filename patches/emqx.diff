@@ -9,21 +9,3 @@
      echo "" >> "$TMP_ARG_FILE"
      echo "-pa \"${REL_DIR}/consolidated\"" >> "$TMP_ARG_FILE"
      ## read lines from generated vm.<time>.args file
-@@ -865,7 +865,7 @@
- tr_log_to_env() {
-     local log_to=${EMQX_LOG__TO:-undefined}
-     # unset because it's unknown to 5.0
--    unset EMQX_LOG__TO
-+    echo "skipping unset EMQX_LOG__TO"
-     case "${log_to}" in
-         console)
-             export EMQX_LOG__CONSOLE_HANDLER__ENABLE='true'
-@@ -894,7 +894,7 @@
- maybe_log_to_console() {
-     if [ "${EMQX_LOG__TO:-}" = 'default' ]; then
-         # want to use config file defaults, do nothing
--        unset EMQX_LOG__TO
-+        echo "skipping unset EMQX_LOG__TO"
-     else
-         tr_log_to_env
-         # ensure defaults
