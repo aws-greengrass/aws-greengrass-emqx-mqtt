@@ -51,7 +51,7 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
-std::variant<int, std::monostate, std::string> ClientDeviceAuthIntegration::get_configuration() {
+std::variant<int, std::monostate, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get_configuration() {
     auto getConfigOperation = greengrassIpcWrapper.getIPCClient().NewGetConfiguration();
     if (!getConfigOperation) {
         LOG_E(GET_CONFIG_SUBJECT, FAILED_OPERATION_FMT, GET_CONFIGURATION_OP);
@@ -120,7 +120,7 @@ std::variant<int, std::monostate, std::string> ClientDeviceAuthIntegration::get_
         return 1;
     }
 
-    return std::string(config_view.WriteCompact());
+    return std::make_unique<std::string>(config_view.WriteCompact());
 }
 
 ConfigurationSubscribeStatus

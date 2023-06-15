@@ -209,7 +209,7 @@ TEST_F(CDAIntegrationTester, CDAIntegrationVerifyIdentityTest) {
 
 TEST_F(CDAIntegrationTester, CDAIntegrationGetConfigurationTest) {
     SendCommand("set with_success");
-    EXPECT_TRUE(std::holds_alternative<std::string>(cda_integ->get_configuration()));
+    EXPECT_TRUE(std::holds_alternative<std::unique_ptr<std::string>>(cda_integ->get_configuration()));
     auto command = NextCommand();
     EXPECT_EQ(command, "get_configuration");
 

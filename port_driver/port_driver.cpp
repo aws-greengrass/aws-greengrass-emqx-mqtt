@@ -528,10 +528,10 @@ static void get_configuration(void *buf) {
         return;
     }
 
-    if (std::holds_alternative<std::string>(config)) {
-        pack->strResult = std::make_unique<std::string>(std::get<std::string>(config));
+    if (std::holds_alternative<std::unique_ptr<std::string>>(config)) {
+        pack->strResult = std::move(std::get<std::unique_ptr<std::string>>(config));
     } else {
-        pack->strResult = {};
+        pack->strResult = std::make_unique<std::string>("");
     }
 
     pack->returnCode = RETURN_CODE_SUCCESS;
