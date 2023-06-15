@@ -34,21 +34,13 @@ struct atoms {
 };
 static struct atoms ATOMS {};
 static const char *CONSOLE = "console";
-static const char *EMQX_LOG_TO_ENV_VAR = "EMQX_LOG__TO";
 static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__LEVEL";
-static const char *EMQX_LOG_ENV_VAR = "EMQX_LOG__DIR";
 static const char *EMQX_DATA_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
 
 static struct aws_logger our_logger {};
 
 EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { // NOLINT(readability-non-const-parameter)
-    const char *logLocation = std::getenv(EMQX_LOG_TO_ENV_VAR);
-    if (logLocation == nullptr) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
-        return ERL_DRV_ERROR_BADARG;
-    }
-
     aws_log_level awsLogLevel;
     const char *crtLogLevel = std::getenv(CRT_LOG_LEVEL_ENV_VAR); // Log level may be null or empty
     if (crtLogLevel != nullptr && strlen(crtLogLevel) != 0) {
@@ -60,28 +52,11 @@ EXPORTED ErlDrvData drv_start(ErlDrvPort port, [[maybe_unused]] char *buff) { //
         awsLogLevel = erlangStringToLogLevel(logLevel == nullptr ? "" : logLevel);
     }
 
-    if (std::string_view{CONSOLE} == logLocation) {
-        struct aws_logger_standard_options logger_options = {
-            .level = awsLogLevel,
-            .file = stderr,
-        };
-        aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
-    } else {
-        const char *logDir = std::getenv(EMQX_LOG_ENV_VAR);
-        if (logDir == nullptr) {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast, performance-no-int-to-ptr)
-            return ERL_DRV_ERROR_BADARG;
-        }
-        // try to create the log directories as needed, ignoring errors
-        std::filesystem::create_directories(logDir);
-        const std::filesystem::path logPath = std::filesystem::path(logDir).append("crt.log");
-        const auto *logPathStr = new std::string{logPath.string()};
-        struct aws_logger_standard_options logger_options = {
-            .level = awsLogLevel,
-            .filename = logPathStr->c_str(),
-        };
-        aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
-    }
+    struct aws_logger_standard_options logger_options = {
+        .level = awsLogLevel,
+        .file = stderr,
+    };
+    aws_logger_init_standard(&our_logger, aws_default_allocator(), &logger_options);
     aws_logger_set(&our_logger);
 
     LOG_I(PORT_DRIVER_SUBJECT, "Starting AWS Greengrass auth driver");

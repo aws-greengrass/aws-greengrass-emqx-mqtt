@@ -8,7 +8,7 @@
     "DefaultConfiguration": {
       "emqx": {
         "mqtt.max_packet_size": "268435455",
-        "log.console.enabled": "true",
+        "log.enabled": "true",
         "log.level": "debug",
         "listener.ssl.mtls.max_connections": "1024000",
         "listener.ssl.mtls.bind": "8883"
@@ -56,8 +56,6 @@
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
-          "EMQX_LOG__DIR": "{work:path}\\logs",
           "EMQX_PLUGINS__INSTALL_DIR": "{work:path}\\plugins",
           "EMQX_PLUGINS__STATES__1__NAME_VSN": "aws_greengrass_emqx_auth-1.0.0",
           "EMQX_PLUGINS__STATES__1__ENABLE": "true",
@@ -70,7 +68,7 @@
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CACERTFILE": "",
-          "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.console.enabled}",
+          "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.enabled}",
           "EMQX_LOG__CONSOLE_HANDLER__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
           "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
@@ -105,8 +103,6 @@
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_LOG__TO": "{configuration:/emqx/log.to}",
-          "EMQX_LOG__DIR": "{work:path}/logs",
           "EMQX_PLUGINS__INSTALL_DIR": "{work:path}/plugins",
           "EMQX_PLUGINS__STATES__1__NAME_VSN": "aws_greengrass_emqx_auth-1.0.0",
           "EMQX_PLUGINS__STATES__1__ENABLE": "true",
@@ -119,7 +115,7 @@
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}/data/key.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}/data/cert.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CACERTFILE": "",
-          "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.console.enabled}",
+          "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.enabled}",
           "EMQX_LOG__CONSOLE_HANDLER__LEVEL": "{configuration:/emqx/log.level}",
           "EMQX_MQTT__MAX_PACKET_SIZE": "{configuration:/emqx/mqtt.max_packet_size}",
           "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
