@@ -153,7 +153,7 @@ clear_plugin_conf() ->
 
 validate_plugin_conf(Conf) ->
   try
-    {_, CheckedConf} = hocon_tconf:map_translate(aws_greengrass_emqx_auth_schema, Conf, #{return_plain => true, format => map}),
+    {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, Conf, #{return_plain => true, format => map}),
     emqx_map_lib:unsafe_atom_key_map(CheckedConf)
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
