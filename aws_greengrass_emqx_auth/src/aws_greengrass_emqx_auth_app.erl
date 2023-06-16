@@ -13,10 +13,8 @@
 
 start(_StartType, _StartArgs) ->
   {ok, Sup} = aws_greengrass_emqx_auth_sup:start_link(),
-  aws_greengrass_emqx_conf:start(),
   port_driver_integration:start(),
-  port_driver_integration:subscribe_to_configuration_updates(fun aws_greengrass_emqx_conf:request_update/0),
-  aws_greengrass_emqx_conf:request_update(),
+  aws_greengrass_emqx_conf:start(),
   enable_cert_verification(),
   aws_greengrass_emqx_certs:load(),
   aws_greengrass_emqx_auth:load(application:get_all_env()),

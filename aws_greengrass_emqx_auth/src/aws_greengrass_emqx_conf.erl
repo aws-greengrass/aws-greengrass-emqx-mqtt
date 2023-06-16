@@ -10,13 +10,13 @@
 -export([start/0, stop/0]).
 -export([listen_for_update_requests/1, request_update/0]).
 
--export([update_configuration_from_ipc/0]).
-
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
 
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
+-define(OVERRIDE_TYPE, local).
+-define(CONF_OPTS, #{override_to => ?OVERRIDE_TYPE}).
 -define(ENV_APP, aws_greengrass_emqx_auth).
 -define(UPDATE_PROC, greengrass_config_update_listener).
 
@@ -42,13 +42,17 @@ use_greengrass_managed_certificates() ->
   application:get_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
 %%--------------------------------------------------------------------
-%% Config Loading
+%% Config Update Listener
 %%--------------------------------------------------------------------
 
+%% Subscribe to configuration updates and perform a one time configuration update.
 start() ->
   spawn(?MODULE, listen_for_update_requests, [self()]),
   receive
-    initialized -> ok
+    initialized ->
+      request_update(),
+      %% TODO wait for completion!
+      ok
   end.
 
 stop() ->
@@ -61,6 +65,7 @@ request_update() ->
 
 listen_for_update_requests(Caller) ->
   register(?UPDATE_PROC, self()),
+  port_driver_integration:subscribe_to_configuration_updates(fun request_update/0),
   Caller ! initialized,
   do_listen_for_update_requests().
 
@@ -68,47 +73,83 @@ do_listen_for_update_requests() ->
   receive
     update ->
       logger:info("Config update request received"),
-      update_configuration_from_ipc(),
+      update_conf_from_ipc(),
       do_listen_for_update_requests();
     stop -> ok
   end.
 
-update_configuration_from_ipc() ->
+%%--------------------------------------------------------------------
+%% Update Config
+%%--------------------------------------------------------------------
+
+update_conf_from_ipc() ->
   case port_driver_integration:get_configuration() of
   {ok, Conf} ->
-    update_configuration(Conf),
+    update_conf(Conf),
     ok;
   {error, Err} = Error ->
     logger:error("Unable to get configuration, err=~p", [Err]),
     Error
   end.
 
-update_configuration(Conf) when is_binary(Conf) ->
-  case catch jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]) of
-    DecodedConf when is_map(DecodedConf) -> update_configuration(DecodedConf);
-    Err -> logger:warning("Unable to decode configuration: error=~p", [Err])
+update_conf(NewConf) when is_binary(NewConf) ->
+  case decode_conf(NewConf) of
+    {error, Err} -> logger:warning("Unable to decode configuration, skipping config update:  ~p", [Err]);
+    DecodedConf -> update_conf(DecodedConf)
   end;
-update_configuration(Conf) ->
-  update_configuration(Conf, maps:keys(Conf)).
+update_conf(NewConf) ->
+  ExistingConf =
+    case get_override_conf() of
+      undefined -> #{};
+      BadConf when is_list(BadConf) ->
+        logger:warning("Unexpected list format found when retrieving existing configuration, treating as empty"),
+        #{};
+      Conf -> Conf
+    end,
+  update_conf(ExistingConf, NewConf).
 
-update_configuration(_, []) ->
-  ok;
-update_configuration(Conf, [Key | Rest]) when Key == "aws_greengrass_emqx_auth"; Key == <<"aws_greengrass_emqx_auth">> ->
-  PluginConf = maps:filter(fun(K, _) -> K == Key end, Conf),
-  update_plugin_config(PluginConf),
-  update_configuration(Conf, Rest);
-update_configuration(Conf, [Key | Rest]) ->
-  ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, Conf), #{rawconf_with_defaults => true, override_to => local}) of
-    {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
-    {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
-    Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
+decode_conf(Conf) when is_binary(Conf) ->
+  case catch jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]) of
+    DecodedConf when is_map(DecodedConf) -> DecodedConf;
+    Err -> {error, Err}
+  end.
+
+update_conf(ExistingConf, NewConf) ->
+  BinaryExistingConf = emqx_map_lib:binary_key_map(ExistingConf),
+  BinaryNewConf = emqx_map_lib:binary_key_map(NewConf),
+
+  %% update greengrass plugin configuration
+  ExistingPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryExistingConf, #{}),
+  NewPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryNewConf, #{}),
+  logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
+  try update_plugin_conf(ExistingPluginConf, NewPluginConf)
+  catch
+    PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
   end,
-  update_configuration(Conf, Rest).
 
-update_plugin_config(Conf) ->
-  CheckedConf = validate_plugin_conf(Conf),
+  %% update emqx override configuration
+  ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryExistingConf),
+  NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
+  logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
+  try update_override_conf(ExistingOverrideConf, NewOverrideConf)
+  catch
+    OverrideUpdateErr -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateErr])
+  end.
+
+%%--------------------------------------------------------------------
+%% Update Plugin Config
+%%--------------------------------------------------------------------
+
+%% TODO trigger actions on config change
+update_plugin_conf(_, #{} = NewConf) when map_size(NewConf) == 0 ->
+  clear_plugin_conf();
+update_plugin_conf(_, NewConf) ->
+  CheckedConf = validate_plugin_conf(NewConf),
   update_plugin_env(CheckedConf).
+
+clear_plugin_conf() ->
+  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
+  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
 validate_plugin_conf(Conf) ->
   try
@@ -127,3 +168,55 @@ update_plugin_env(Conf) ->
   UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, RootConfig, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
   application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]).
+
+%%--------------------------------------------------------------------
+%% Update EMQX Override Config
+%%--------------------------------------------------------------------
+
+update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
+  clear_override_conf(ExistingConf);
+update_override_conf(ExistingConf, NewConf) ->
+  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, NewConf) end, maps:keys(ExistingConf)),
+  clear_override_conf(KeysToClear),
+  update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
+
+update_override_conf(_, _, []) ->
+  ok;
+update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
+  ConfPath = [Key],
+  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), ?CONF_OPTS) of
+    {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
+    {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
+    Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
+  end,
+  update_override_conf(ExistingConf, NewConf, Rest).
+
+clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
+  %% we must remove leaf configs because EMQX does not allow use to remove root configs.
+  for_each_conf(ExistingConf, fun remove_override_conf/1).
+
+remove_override_conf([]) ->
+  ok;
+remove_override_conf(Path) when is_list(Path) ->
+  case catch emqx_conf:remove(Path, ?CONF_OPTS) of
+    {ok, _} -> logger:info("Removed ~p config", [Path]);
+    {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
+    Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
+  end.
+
+get_override_conf() ->
+  emqx_config:read_override_conf(?CONF_OPTS).
+
+for_each_conf(Conf, Func) ->
+  for_each_conf([], Conf, Func).
+for_each_conf(Path, Conf, Func) ->
+  if
+    map_size(Conf) == 0 -> Func(Path);
+    true -> maps:foreach(
+      fun(K, V) ->
+        if
+          is_map(V) -> for_each_conf(Path ++ [K], V, Func);
+          true -> Func(Path ++ [K])
+        end
+      end, Conf)
+  end.
