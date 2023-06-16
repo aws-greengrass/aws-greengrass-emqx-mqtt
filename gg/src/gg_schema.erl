@@ -2,7 +2,7 @@
 %%  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
--module(aws_greengrass_emqx_auth_schema).
+-module(gg_schema).
 
 -include_lib("hocon/include/hoconsc.hrl").
 -include_lib("typerefl/include/types.hrl").
@@ -15,6 +15,7 @@
   fields/1
 ]).
 
+%% TODO rename?
 namespace() -> "aws_greengrass_emqx_auth".
 
 roots() -> [{"aws_greengrass_emqx_auth", ?HOCON(?R_REF("aws_greengrass_emqx_auth"), #{translate_to => ["aws_greengrass_emqx_auth"]})}].

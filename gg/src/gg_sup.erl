@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(aws_greengrass_emqx_auth_sup).
+-module(gg_sup).
 
 -behaviour(supervisor).
 

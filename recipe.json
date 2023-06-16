@@ -45,15 +45,12 @@
         "os": "windows"
       },
       "Lifecycle": {
-        "install": {
-          "script": "robocopy {artifacts:decompressedPath}\\emqx\\emqx\\plugins {work:path}\\plugins /E /NFL /NDL /NJH /NJS /nc /ns /np"
-        },
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\gg-1.0.0\\gg-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_PLUGINS__INSTALL_DIR": "{work:path}\\plugins",
+          "EMQX_PLUGINS__INSTALL_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins",
           "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\data",
           "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
@@ -90,7 +87,7 @@
           "script": "cp {artifacts:decompressedPath}/emqx/emqx/plugins {work:path}"
         },
         "startup": {
-          "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/aws_greengrass_emqx_auth-1.0.0/aws_greengrass_emqx_auth-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
+          "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/gg-1.0.0/gg-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
