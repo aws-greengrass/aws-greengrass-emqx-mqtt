@@ -192,17 +192,27 @@ update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
   update_override_conf(ExistingConf, NewConf, Rest).
 
 clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
-  clear_override_conf(maps:keys(ExistingConf));
+  %% we must remove leaf configs because EMQX does not allow use to remove root configs.
+  for_each_conf(ExistingConf, clear_override_conf);
 clear_override_conf([]) ->
   ok;
-clear_override_conf([Key | Rest]) ->
-  %% resetting because emqx does not allow us to remove root configs
-  case catch emqx_conf:reset([Key], ?CONF_OPTS) of
-    {ok, _} -> logger:info("Removed ~p config", [Key]);
-    {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Key, RemoveError]);
-    Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Key, Err])
-  end,
-  clear_override_conf(Rest).
+clear_override_conf(Path) when is_list(Path) ->
+  case catch emqx_conf:remove(Path, ?CONF_OPTS) of
+    {ok, _} -> logger:info("Removed ~p config", [Path]);
+    {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
+    Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
+  end.
+
+for_each_conf(Conf, Func) ->
+  for_each_conf([], Conf, Func).
+for_each_conf(Path, Conf, Func) ->
+  if
+    map_size(Conf) == 0 -> Func(Path);
+    true -> maps:foreach(
+      fun(K, V) ->
+        for_each_conf(Path ++ [K], V, Func)
+      end, Conf)
+  end.
 
 get_override_conf() ->
   emqx_config:read_override_conf(?CONF_OPTS).
