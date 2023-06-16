@@ -92,7 +92,10 @@ update_conf_from_ipc() ->
   end.
 
 update_conf(NewConf) when is_binary(NewConf) ->
-  update_conf(decode_conf(NewConf));
+  case decode_conf(NewConf) of
+    {error, Err} -> logger:warning("Unable to decode configuration, skipping config update:  ~p", [Err]);
+    DecodedConf -> update_conf(DecodedConf)
+  end;
 update_conf(NewConf) ->
   ExistingConf =
     case get_override_conf() of
