@@ -84,6 +84,7 @@ update_configuration_from_ipc() ->
   end.
 
 try_update_configuration(Conf) ->
+  clear_configuration(),
   try update_configuration(Conf)
   catch
     Err -> logger:warning("Unable to update configuration: ~p", [Err])
@@ -98,7 +99,7 @@ update_configuration(Conf) ->
   update_configuration(Conf, maps:keys(Conf)).
 
 update_configuration(#{}, _) ->
-  clear_configuration();
+  ok;
 update_configuration(_, []) ->
   ok;
 update_configuration(Conf, [Key | Rest]) when Key == "aws_greengrass_emqx_auth"; Key == <<"aws_greengrass_emqx_auth">> ->
