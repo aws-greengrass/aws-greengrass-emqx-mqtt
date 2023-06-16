@@ -122,7 +122,7 @@ update_conf(ExistingConf, NewConf) ->
   NewPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryNewConf, #{}),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
-    Err -> logger:warning("Unable to update plugin configuration: ~p", [Err])
+    PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
   end,
 
   %% update emqx override configuration
@@ -130,7 +130,7 @@ update_conf(ExistingConf, NewConf) ->
   NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
-    Err -> logger:warning("Unable to update emqx override configuration: ~p", [Err])
+    OverrideUpdateErr -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateErr])
   end.
 
 %%--------------------------------------------------------------------
@@ -140,7 +140,7 @@ update_conf(ExistingConf, NewConf) ->
 %% TODO trigger actions on config change
 update_plugin_conf(_, #{}) ->
   clear_plugin_conf();
-update_plugin_conf(ExistingConf, NewConf) ->
+update_plugin_conf(_, NewConf) ->
   CheckedConf = validate_plugin_conf(NewConf),
   update_plugin_env(CheckedConf).
 
