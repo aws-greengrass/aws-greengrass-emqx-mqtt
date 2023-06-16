@@ -523,18 +523,12 @@ static void get_configuration(void *buf) {
 
     auto config = pack->context->cda_integration->get_configuration();
 
-    if (std::holds_alternative<int>(config)) {
-        pack->returnCode = RETURN_CODE_FAILED_OP;
-        return;
-    }
-
     if (std::holds_alternative<std::unique_ptr<std::string>>(config)) {
         pack->strResult = std::move(std::get<std::unique_ptr<std::string>>(config));
+        pack->returnCode = RETURN_CODE_SUCCESS;
     } else {
-        pack->strResult = std::make_unique<std::string>("");
+        pack->returnCode = RETURN_CODE_FAILED_OP;
     }
-
-    pack->returnCode = RETURN_CODE_SUCCESS;
 }
 
 static void handle_get_configuration(DriverContext *context, char *buff, int index) {

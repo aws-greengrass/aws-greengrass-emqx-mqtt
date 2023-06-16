@@ -71,7 +71,7 @@ class ClientDeviceAuthIntegration {
 
     ConfigurationSubscribeStatus subscribe_to_configuration_updates(std::unique_ptr<std::function<void()>> callback);
 
-    std::variant<int, std::monostate, std::unique_ptr<std::string>> get_configuration();
+    std::variant<int, std::unique_ptr<std::string>> get_configuration();
 
     CertSubscribeUpdateStatus
     subscribeToCertUpdates(std::unique_ptr<std::filesystem::path> basePath,
