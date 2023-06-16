@@ -170,7 +170,8 @@ update_plugin_env(Conf) ->
 update_override_conf(ExistingConf, #{}) ->
   clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
-  %% TODO remove confs
+  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, maps:keys(NewConf)) end, maps:keys(ExistingConf)),
+  clear_override_conf(KeysToClear),
   update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
 
 update_override_conf(_, _, []) ->
