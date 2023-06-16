@@ -15,6 +15,7 @@
 
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
+-define(OVERRIDE_TYPE, local).
 -define(ENV_APP, aws_greengrass_emqx_auth).
 -define(UPDATE_PROC, greengrass_config_update_listener).
 
@@ -176,7 +177,7 @@ update_override_conf(_, _, []) ->
   ok;
 update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
   ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), #{rawconf_with_defaults => true, override_to => local}) of
+  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), #{rawconf_with_defaults => true, override_to => ?OVERRIDE_TYPE}) of
     {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
     {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
     Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
@@ -188,8 +189,8 @@ clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
 clear_override_conf([]) ->
   ok;
 clear_override_conf([Key | Rest]) ->
-  emqx_conf:remove(Key, #{rawconf_with_defaults => true, override_to => local}),
+  emqx_conf:remove(Key, #{rawconf_with_defaults => true, override_to => ?OVERRIDE_TYPE}),
   clear_override_conf(Rest).
 
 get_override_conf() ->
-  emqx_config:read_override_conf(#{override_to => local}).
+  emqx_config:read_override_conf(#{override_to => ?OVERRIDE_TYPE}).
