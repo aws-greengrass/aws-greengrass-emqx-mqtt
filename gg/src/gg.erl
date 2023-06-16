@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(aws_greengrass_emqx_auth).
+-module(gg).
 
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("emqx/include/emqx_hooks.hrl").
@@ -57,7 +57,7 @@ unhook(HookPoint, MFA) ->
 -spec(execute_auth_hook(function()) -> ?CONTINUE_HOOK_CHAIN | {?STOP_HOOK_CHAIN, {error, any()} | #{result => ?AUTHZ_DENY}}).
 execute_auth_hook(Hook) ->
   case catch Hook() of
-    Result -> handle_auth_hook_result(aws_greengrass_emqx_conf:auth_mode(), Result)
+    Result -> handle_auth_hook_result(gg_conf:auth_mode(), Result)
   end.
 
 handle_auth_hook_result(_, {ok, _} = AuthNSuccess) ->
@@ -87,7 +87,7 @@ on_client_connect(ConnInfo, Props, _Env) ->
   handle_connect(ConnInfo, Props, _Env).
 
 handle_connect(ConnInfo, Props, _Env) ->
-  handle_connect(aws_greengrass_emqx_conf:auth_mode(), ConnInfo, Props, _Env).
+  handle_connect(gg_conf:auth_mode(), ConnInfo, Props, _Env).
 
 handle_connect(bypass, _, Props, _) ->
   {?CONTINUE_HOOK_CHAIN, Props};
@@ -119,7 +119,7 @@ authenticate(ClientId) ->
 
 -spec(authenticate(AuthToken :: any() | {error, _}, ClientId :: any(), CertPem :: any()) -> {ok, any()} | {error, any()}).
 authenticate(undefined, ClientId, CertPem) ->
-  authenticate(port_driver_integration:get_auth_token(ClientId, CertPem), ClientId, CertPem);
+  authenticate(gg_port_driver:get_auth_token(ClientId, CertPem), ClientId, CertPem);
 authenticate({error, Err}, ClientId, _) ->
   logger:error("Client(~s) not authenticated. Error:~p", [ClientId, Err]),
   {error, ?AUTHN_FAILURE};
@@ -201,7 +201,7 @@ is_authorized(Retries, ClientId, Resource, Action) ->
   is_authorized(Retries, get(?AUTH_TOKEN), ClientId, Resource, Action).
 
 is_authorized(Retries, AuthToken, ClientId, Resource, Action) ->
-  is_authorized(port_driver_integration:on_client_check_acl(ClientId, AuthToken, Resource, Action), Retries, AuthToken, ClientId, Resource, Action).
+  is_authorized(gg_port_driver:on_client_check_acl(ClientId, AuthToken, Resource, Action), Retries, AuthToken, ClientId, Resource, Action).
 
 is_authorized({ok, authorized}, _, _, _, _, _) ->
   ?AUTHORIZED;

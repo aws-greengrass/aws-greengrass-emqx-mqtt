@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(tls_custom_certificate_verification).
+-module(gg_tls).
 
 -include_lib("emqx/include/emqx.hrl").
 -include_lib("public_key/include/public_key.hrl").
@@ -16,7 +16,7 @@
 %% NOTE: this will require a restart of the emqx listener.
 -spec(enable(atom) -> ok | {error, any()}).
 enable(ListenerName) ->
-  case aws_greengrass_emqx_listeners:put_verify_fun(ssl, ListenerName, fun custom_verify/3) of
+  case gg_listeners:put_verify_fun(ssl, ListenerName, fun custom_verify/3) of
     ok ->
       logger:info("Custom certificate verification enabled on listener ~p:~p", [ssl, ListenerName]);
     {error, Err} -> {error, Err}
@@ -47,7 +47,7 @@ custom_verify(OtpCert, Reason, UserState) ->
   {valid, UserState :: term()} | {fail, Reason :: term()}).
 verify_client_certificate(OtpCert, UserState) ->
   CertPem = otpcert_to_pem(OtpCert),
-  case port_driver_integration:verify_client_certificate(CertPem) of
+  case gg_port_driver:verify_client_certificate(CertPem) of
     {ok, valid} ->
       logger:debug("Client certificate is valid: ~p", [CertPem]),
       {valid, UserState};

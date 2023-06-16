@@ -46,7 +46,7 @@
       },
       "Lifecycle": {
         "startup": {
-          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\aws_greengrass_emqx_auth-1.0.0\\aws_greengrass_emqx_auth-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
+          "script": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins\\gg-1.0.0\\gg-1.0.0\\priv\\write_config.exe && {artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
@@ -84,7 +84,7 @@
       },
       "Lifecycle": {
         "startup": {
-          "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/aws_greengrass_emqx_auth-1.0.0/aws_greengrass_emqx_auth-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
+          "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/gg-1.0.0/gg-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {

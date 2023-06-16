@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(aws_greengrass_emqx_conf).
+-module(gg_conf).
 
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
@@ -65,7 +65,7 @@ request_update() ->
 
 listen_for_update_requests(Caller) ->
   register(?UPDATE_PROC, self()),
-  port_driver_integration:subscribe_to_configuration_updates(fun request_update/0),
+  gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
   Caller ! initialized,
   do_listen_for_update_requests().
 
@@ -83,7 +83,7 @@ do_listen_for_update_requests() ->
 %%--------------------------------------------------------------------
 
 update_conf_from_ipc() ->
-  case port_driver_integration:get_configuration() of
+  case gg_port_driver:get_configuration() of
   {ok, Conf} ->
     update_conf(Conf),
     ok;

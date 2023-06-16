@@ -1,13 +1,13 @@
 %%  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 %%  SPDX-License-Identifier: Apache-2.0
 
-{application, aws_greengrass_emqx_auth,
+{application, gg,
   [{description, "EMQ X Plugin for Greengrass Client Device Auth"},
     {vsn, "1.0.0"},
     {modules, []},
-    {registered, [aws_greengrass_emqx_auth_sup]},
+    {registered, [gg_sup]},
     {applications, [kernel, stdlib]},
-    {mod, {aws_greengrass_emqx_auth_app, []}},
+    {mod, {gg_app, []}},
     {env, []},
     {licenses, ["Apache-2.0"]},
     {maintainers, ["AWS IoT Greengrass"]},

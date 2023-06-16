@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(port_driver_integration).
+-module(gg_port_driver).
 
 -export([start/0, stop/0, init/2, execute_callback/1]).
 -export([get_auth_token/2
@@ -28,9 +28,9 @@
 -define(RETURN_CODE_ASYNC, 100).
 
 start() ->
-  Dir = case code:priv_dir(aws_greengrass_emqx_auth) of
+  Dir = case code:priv_dir(gg) of
           {error, bad_name} ->
-            case code:which(aws_greengrass_emqx_auth) of
+            case code:which(gg) of
               Filename when is_list(Filename) ->
                 filename:join(
                   [filename:dirname(Filename), "../priv"]);
@@ -45,7 +45,9 @@ start() ->
   case erl_ddll:load_driver(Dir, Port) of
     ok -> ok;
     {error, already_loaded} -> ok;
-    _ -> exit({error, could_not_load_driver})
+    LoadErr ->
+      logger:error("Could not load driver: ~p", [LoadErr]),
+      exit({error, could_not_load_driver})
   end,
   logger:debug("Loaded port_driver"),
 

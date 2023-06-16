@@ -3,10 +3,14 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(aws_greengrass_emqx_auth_SUITE).
+%% TODO: Remove CLI code
 
--compile(export_all).
+-module(gg_cli_demo).
 
-all() -> [].
+-export([cmd/1]).
 
-groups() -> [].
+cmd(["arg1", "arg2"]) ->
+  emqx_ctl:print("ok");
+
+cmd(_) ->
+  emqx_ctl:usage([{"cmd arg1 arg2", "cmd demo"}]).
