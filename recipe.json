@@ -83,15 +83,12 @@
         "os": "linux"
       },
       "Lifecycle": {
-        "install": {
-          "script": "cp {artifacts:decompressedPath}/emqx/emqx/plugins {work:path}"
-        },
         "startup": {
           "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/gg-1.0.0/gg-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_PLUGINS__INSTALL_DIR": "{work:path}/plugins",
+          "EMQX_PLUGINS__INSTALL_DIR": "{artifacts:decompressedPath}/emqx/emqx/plugins",
           "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}/emqx/emqx/data",
           "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}/emqx/emqx/etc",
           "EMQX_NODE__DATA_DIR": "{work:path}/data",
