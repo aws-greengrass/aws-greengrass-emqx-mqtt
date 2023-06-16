@@ -26,7 +26,7 @@ class Context:
         self.no_sdk = False
         # constants
         self.cmake_build_type = 'RelWithDebInfo'
-        self.auth_plugin_name = 'aws_greengrass_emqx_auth'
+        self.auth_plugin_name = 'gg'
         self.auth_plugin_version = '1.0.0'  # TODO get this dynamically
         self.original_path = os.path.abspath(os.getcwd())
         # not available until emqx has been built

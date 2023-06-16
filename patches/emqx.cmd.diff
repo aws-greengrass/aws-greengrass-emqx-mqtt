@@ -33,7 +33,7 @@
  
 +:: [greengrass patch start]
 +:: Ensure erlang has the right dlls
-+@set greengrass_auth_plugin_bin_dir=%rel_root_dir%\plugins\aws_greengrass_emqx_auth-1.0.0\aws_greengrass_emqx_auth-1.0.0\priv
++@set greengrass_auth_plugin_bin_dir=%rel_root_dir%\plugins\gg-1.0.0\gg-1.0.0\priv
 +@set PATH=%greengrass_auth_plugin_bin_dir%;%PATH%
 +:: [greengrass patch end]
 +
