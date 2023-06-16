@@ -76,11 +76,17 @@ do_listen_for_update_requests() ->
 update_configuration_from_ipc() ->
   case port_driver_integration:get_configuration() of
   {ok, Conf} ->
-    update_configuration(Conf),
+    try_update_configuration(Conf),
     ok;
   {error, Err} = Error ->
     logger:error("Unable to get configuration, err=~p", [Err]),
     Error
+  end.
+
+try_update_configuration(Conf) ->
+  try update_configuration(Conf)
+  catch
+    Err -> logger:warning("Unable to update configuration: ~p", [Err])
   end.
 
 update_configuration(Conf) when is_binary(Conf) ->
@@ -91,6 +97,8 @@ update_configuration(Conf) when is_binary(Conf) ->
 update_configuration(Conf) ->
   update_configuration(Conf, maps:keys(Conf)).
 
+update_configuration(#{}, _) ->
+  clear_configuration();
 update_configuration(_, []) ->
   ok;
 update_configuration(Conf, [Key | Rest]) when Key == "aws_greengrass_emqx_auth"; Key == <<"aws_greengrass_emqx_auth">> ->
@@ -106,6 +114,24 @@ update_configuration(Conf, [Key | Rest]) ->
   end,
   update_configuration(Conf, Rest).
 
+get_conf() ->
+  emqx_config:read_override_conf(#{override_to => local}).
+
+clear_configuration() ->
+  reset_plugin_conf(),
+  case get_conf() of
+    undefined -> ok;
+    BadConf when is_list(BadConf) -> logger:warning("Config in unexpected list format, config not cleared");
+    Conf -> clear_configuration(maps:keys(Conf))
+  end.
+clear_configuration([]) ->
+  ok;
+clear_configuration([Key | Rest]) when Key == "aws_greengrass_emqx_auth"; Key == <<"aws_greengrass_emqx_auth">> ->
+  clear_configuration(Rest);
+clear_configuration([Key | Rest]) ->
+  emqx_conf:remove(Key, #{rawconf_with_defaults => true, override_to => local}),
+  clear_configuration(Rest).
+
 update_plugin_config(Conf) ->
   CheckedConf = validate_plugin_conf(Conf),
   update_plugin_env(CheckedConf).
@@ -117,6 +143,10 @@ validate_plugin_conf(Conf) ->
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
+
+reset_plugin_conf() ->
+  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
+  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
 update_plugin_env(Conf) ->
   %% TODO find a more dynamic way
