@@ -22,12 +22,13 @@ def build_emqx(context):
     subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
 
     print("Setting up EMQ X plugin checkout symlink")
+    # TODO do we need this symlink anymore for 5.x?
     try:
         # Remove existing symlink (if any) before linking
-        os.remove(f"{context.original_path}/emqx/apps/aws_greengrass_emqx_auth")
+        os.remove(f"{context.original_path}/emqx/apps/gg")
     except FileNotFoundError:
         pass
-    os.symlink(context.original_path, f"{context.original_path}/emqx/apps/aws_greengrass_emqx_auth",
+    os.symlink(context.original_path, f"{context.original_path}/emqx/apps/gg",
                target_is_directory=True)
 
     # Since 5.0.22, peercert was removed from EMQX plugin hooks.

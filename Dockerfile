@@ -89,7 +89,7 @@ COPY --from=build-base /build/bin bin
 COPY --from=emqx /build/emqx/rebar3 emqx/rebar3
 COPY --from=port-driver /build/_build/driver_lib _build/driver_lib
 COPY patches/msvcp140.dll patches/vcruntime140.dll patches/vcruntime140_1.dll patches/
-COPY aws_greengrass_emqx_auth aws_greengrass_emqx_auth
+COPY gg gg
 COPY bin/build_plugin.py bin/package.py bin/
 RUN python3 -u -m bin --plugin-only
 
@@ -99,7 +99,7 @@ WORKDIR /build
 
 COPY --from=build-base /build/bin bin
 COPY --from=emqx /build/emqx/ emqx
-COPY --from=plugin /build/emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0 emqx/_build/emqx/rel/emqx/plugins/aws_greengrass_emqx_auth-1.0.0
+COPY --from=plugin /build/emqx/_build/emqx/rel/emqx/plugins/gg-1.0.0 emqx/_build/emqx/rel/emqx/plugins/gg-1.0.0
 COPY THIRD-PARTY-LICENSES .
 COPY patches/emqx.cmd.diff patches/emqx.conf patches/emqx.diff patches/msvcr120.dll patches/acl.conf patches/
 COPY bin/package.py bin/build_emqx.py bin/

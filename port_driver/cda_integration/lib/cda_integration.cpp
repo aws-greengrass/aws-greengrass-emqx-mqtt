@@ -51,7 +51,7 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
-std::variant<int, std::monostate, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get_configuration() {
+std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get_configuration() {
     auto getConfigOperation = greengrassIpcWrapper.getIPCClient().NewGetConfiguration();
     if (!getConfigOperation) {
         LOG_E(GET_CONFIG_SUBJECT, FAILED_OPERATION_FMT, GET_CONFIGURATION_OP);
@@ -82,7 +82,7 @@ std::variant<int, std::monostate, std::unique_ptr<std::string>> ClientDeviceAuth
             "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
             aws::greengrass::emqx::localOverrideNamespace.c_str(),
             aws::greengrass::emqx::localOverrideNamespace.c_str());
-        return std::monostate();
+        return std::make_unique<std::string>("{}");
     }
 
     auto resultType = result.GetResultType();
@@ -96,7 +96,7 @@ std::variant<int, std::monostate, std::unique_ptr<std::string>> ClientDeviceAuth
               "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
               aws::greengrass::emqx::localOverrideNamespace.c_str(),
               aws::greengrass::emqx::localOverrideNamespace.c_str());
-        return std::monostate();
+        return std::make_unique<std::string>("{}");
     }
     auto response = result.GetOperationResponse()->GetValue().value();
 
@@ -106,7 +106,7 @@ std::variant<int, std::monostate, std::unique_ptr<std::string>> ClientDeviceAuth
               "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
               aws::greengrass::emqx::localOverrideNamespace.c_str(),
               aws::greengrass::emqx::localOverrideNamespace.c_str());
-        return std::monostate();
+        return std::make_unique<std::string>("{}");
     }
 
     if (!config_view.IsObject()) {

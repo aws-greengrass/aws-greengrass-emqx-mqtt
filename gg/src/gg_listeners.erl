@@ -3,7 +3,7 @@
 %%  SPDX-License-Identifier: Apache-2.0
 %%--------------------------------------------------------------------
 
--module(aws_greengrass_emqx_listeners).
+-module(gg_listeners).
 
 -export([put_verify_fun/3]).
 
