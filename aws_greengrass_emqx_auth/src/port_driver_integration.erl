@@ -45,7 +45,9 @@ start() ->
   case erl_ddll:load_driver(Dir, Port) of
     ok -> ok;
     {error, already_loaded} -> ok;
-    _ -> exit({error, could_not_load_driver})
+    LoadErr ->
+      logger:error("Could not load driver: ~p", [LoadErr]),
+      exit({error, could_not_load_driver})
   end,
   logger:debug("Loaded port_driver"),
 
