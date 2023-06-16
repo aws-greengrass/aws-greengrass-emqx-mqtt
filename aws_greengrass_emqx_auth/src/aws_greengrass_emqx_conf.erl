@@ -16,6 +16,7 @@
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -define(OVERRIDE_TYPE, local).
+-define(CONF_OPTS, #{override_to => ?OVERRIDE_TYPE}).
 -define(ENV_APP, aws_greengrass_emqx_auth).
 -define(UPDATE_PROC, greengrass_config_update_listener).
 
@@ -120,6 +121,7 @@ update_conf(ExistingConf, NewConf) ->
   %% update greengrass plugin configuration
   ExistingPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryExistingConf, #{}),
   NewPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryNewConf, #{}),
+  logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
     PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
@@ -128,6 +130,7 @@ update_conf(ExistingConf, NewConf) ->
   %% update emqx override configuration
   ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryExistingConf),
   NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
+  logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
     OverrideUpdateErr -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateErr])
@@ -138,7 +141,7 @@ update_conf(ExistingConf, NewConf) ->
 %%--------------------------------------------------------------------
 
 %% TODO trigger actions on config change
-update_plugin_conf(_, #{}) ->
+update_plugin_conf(_, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_plugin_conf();
 update_plugin_conf(_, NewConf) ->
   CheckedConf = validate_plugin_conf(NewConf),
@@ -170,11 +173,10 @@ update_plugin_env(Conf) ->
 %% Update EMQX Override Config
 %%--------------------------------------------------------------------
 
-update_override_conf(ExistingConf, #{}) ->
+update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
   KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, NewConf) end, maps:keys(ExistingConf)),
-  logger:debug("Updating override config: ExistingConf=~p, NewConf=~p, ConfToRemove=~p", [ExistingConf, NewConf, KeysToClear]),
   clear_override_conf(KeysToClear),
   update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
 
@@ -182,7 +184,7 @@ update_override_conf(_, _, []) ->
   ok;
 update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
   ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), #{rawconf_with_defaults => true, override_to => ?OVERRIDE_TYPE}) of
+  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), ?CONF_OPTS) of
     {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
     {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
     Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
@@ -194,8 +196,13 @@ clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
 clear_override_conf([]) ->
   ok;
 clear_override_conf([Key | Rest]) ->
-  emqx_conf:remove(Key, #{rawconf_with_defaults => true, override_to => ?OVERRIDE_TYPE}),
+  %% resetting because emqx does not allow us to remove root configs
+  case catch emqx_conf:reset([Key], ?CONF_OPTS) of
+    {ok, _} -> logger:info("Removed ~p config", [Key]);
+    {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Key, RemoveError]);
+    Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Key, Err])
+  end,
   clear_override_conf(Rest).
 
 get_override_conf() ->
-  emqx_config:read_override_conf(#{override_to => ?OVERRIDE_TYPE}).
+  emqx_config:read_override_conf(?CONF_OPTS).
