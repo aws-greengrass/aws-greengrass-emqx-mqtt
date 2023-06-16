@@ -173,7 +173,8 @@ update_plugin_env(Conf) ->
 update_override_conf(ExistingConf, #{}) ->
   clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
-  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, maps:keys(NewConf)) end, maps:keys(ExistingConf)),
+  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, NewConf) end, maps:keys(ExistingConf)),
+  logger:debug("Updating override config: ExistingConf=~p, NewConf=~p, ConfToRemove=~p", [ExistingConf, NewConf, KeysToClear]),
   clear_override_conf(KeysToClear),
   update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
 
