@@ -210,7 +210,10 @@ for_each_conf(Path, Conf, Func) ->
     map_size(Conf) == 0 -> Func(Path);
     true -> maps:foreach(
       fun(K, V) ->
-        for_each_conf(Path ++ [K], V, Func)
+        if
+          is_map(V) -> for_each_conf(Path ++ [K], V, Func);
+          true -> Func(Path ++ [K])
+        end
       end, Conf)
   end.
 
