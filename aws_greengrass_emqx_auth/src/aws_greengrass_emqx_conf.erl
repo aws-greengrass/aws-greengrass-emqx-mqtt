@@ -126,7 +126,7 @@ update_conf(ExistingConf, NewConf) ->
   end,
 
   %% update emqx override configuration
-  ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, get_override_conf()),
+  ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryExistingConf),
   NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
