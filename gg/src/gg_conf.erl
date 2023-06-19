@@ -176,8 +176,8 @@ update_plugin_env(Conf) ->
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
-  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, NewConf) end, maps:keys(ExistingConf)),
-  clear_override_conf(KeysToClear),
+  MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
+  clear_override_conf(MapToClear),
   update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
 
 update_override_conf(_, _, []) ->
