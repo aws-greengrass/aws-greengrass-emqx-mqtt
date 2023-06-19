@@ -21,8 +21,8 @@
 -define(UPDATE_PROC, greengrass_config_update_listener).
 
 %% config keys
--define(KEY_AUTH_MODE, auth_mode).
--define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, use_greengrass_managed_certificates).
+-define(KEY_AUTH_MODE, <<"auth_mode">>).
+-define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"use_greengrass_managed_certificates">>).
 
 %% default config values
 -define(DEFAULT_AUTH_MODE, enabled).
@@ -161,7 +161,7 @@ validate_plugin_conf(Conf) ->
 
 update_plugin_env(Conf) ->
   %% TODO find a more dynamic way
-  RootConfig = maps:get(aws_greengrass_emqx_auth, Conf),
+  RootConfig = maps:get(<<"aws_greengrass_emqx_auth">>, Conf),
   AuthMode = maps:get(?KEY_AUTH_MODE, RootConfig, ?DEFAULT_AUTH_MODE),
   application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_AUTH_MODE], AuthMode]),
