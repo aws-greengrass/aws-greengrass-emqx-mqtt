@@ -53,9 +53,9 @@ FROM build-base as sdk
 
 WORKDIR /build
 
-RUN git init
-COPY .gitmodules .
-COPY aws-iot-device-sdk-cpp-v2 aws-iot-device-sdk-cpp-v2
+COPY .gitmodules .gitmodules
+# TODO this breaks layer caching
+COPY .git .git
 
 COPY --from=build-base /build/bin bin
 COPY bin/build_sdk.py bin
