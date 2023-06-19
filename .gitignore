@@ -15,4 +15,3 @@ __pycache__/
 .vscode
 .DS_STORE
 /port_driver/cmake-build-debug/
-aws-greengrass-emqx.amd64.tar.gz

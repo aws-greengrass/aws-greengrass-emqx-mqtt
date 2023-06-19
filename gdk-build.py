@@ -2,32 +2,39 @@ import shutil
 import os.path
 import subprocess
 
+# Run docker/zip build command, regardless if artifact exists already
+FORCE = bool(os.getenv('FORCE'))
+# Build docker image
+DOCKER = bool(os.getenv('DOCKER'))
+
 COMPONENT_NAME = 'aws.greengrass.clientdevices.mqtt.EMQX'
 COMPONENT_VERSION = 'NEXT_PATCH'
-
-TAG = 'aws-greengrass-emqx'
-IMAGE = f'{TAG}.amd64.tar.gz'
-
-ZIP_ARTIFACT = os.path.join('build', 'emqx.zip')
 
 RECIPES_DIR = os.path.join('greengrass-build', 'recipes')
 ARTIFACTS_DIR = os.path.join('greengrass-build', 'artifacts', COMPONENT_NAME, COMPONENT_VERSION)
 
-if __name__ == '__main__':
-    skip_cache = bool(os.getenv('SKIP_CACHE'))
-    docker = bool(os.getenv('DOCKER'))
+ZIP_ARTIFACT = os.path.join('build', 'emqx.zip')
 
-    if not docker and (not os.path.exists(ZIP_ARTIFACT) or skip_cache):
+TAG = 'aws-greengrass-emqx'
+IMAGE = f'{TAG}.amd64.tar.gz'
+IMAGE_FILE = os.path.join(ARTIFACTS_DIR, IMAGE)
+
+
+def build_zip() -> None:
+    if not os.path.exists(ZIP_ARTIFACT) or FORCE:
         import bin
         bin.main()
+    shutil.copy('recipe.json', RECIPES_DIR)
+    shutil.copy(ZIP_ARTIFACT, ARTIFACTS_DIR)
 
-    if docker and (not os.path.exists(IMAGE) or skip_cache):
-        subprocess.check_call(f'docker build{" --no-cache" if skip_cache else ""} . -t {TAG}', shell=True)
+
+def build_docker() -> None:
+    if not os.path.exists(IMAGE_FILE) or FORCE:
+        subprocess.check_call(f'docker build . -t {TAG}', shell=True)
         # TODO make more system independent
-        subprocess.check_call(f'docker save {TAG} | gzip > {IMAGE}', shell=True)
+        subprocess.check_call(f'docker save {TAG} | gzip > {IMAGE_FILE}', shell=True)
+    shutil.copy('recipe-docker.json', RECIPES_DIR)
 
-    recipe_file = 'recipe-docker.json' if docker else 'recipe.json'
-    artifact = IMAGE if docker else ZIP_ARTIFACT
 
-    shutil.copy(recipe_file, RECIPES_DIR)
-    shutil.copy(artifact, ARTIFACTS_DIR)
+if __name__ == '__main__':
+    build_docker() if DOCKER else build_zip()
