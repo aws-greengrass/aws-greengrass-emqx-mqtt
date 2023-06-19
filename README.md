@@ -27,26 +27,6 @@ Run `python3 -u -m bin` in order to build everything. The built EMQX will be in 
 - Use `--test-only` to only rebuild and test the EMQX auth plugin. Must perform a full build first.
 - Use `--no-sdk` to skip building the AWS IoT Device SDK for C++.
 
-#### GDK
-
-To build and package EMQX using the [Greengrass Development Kit CLI(https://github.com/aws-greengrass/aws-greengrass-gdk-cli), 
-run:
-```
-gdk component build
-```
-
-To build and package as a Docker image instead, provide the `DOCKER` environment variable:
-```
-DOCKER=yes gdk component build
-```
-
-To publish the component, run:
-```
-gdk component publish
-```
-This will create a new private component version of `aws.greengrass.clientdevices.mqtt.EMQX` in your AWS account.
-
-
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
