@@ -119,8 +119,8 @@ update_conf(ExistingConf, NewConf) ->
   BinaryNewConf = emqx_map_lib:binary_key_map(NewConf),
 
   %% update greengrass plugin configuration
-  ExistingPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryExistingConf, #{}),
-  NewPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryNewConf, #{}),
+  ExistingPluginConf = map_with_root_key(BinaryExistingConf, <<"aws_greengrass_emqx_auth">>),
+  NewPluginConf = map_with_root_key(BinaryNewConf, <<"aws_greengrass_emqx_auth">>),
   logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
@@ -128,8 +128,8 @@ update_conf(ExistingConf, NewConf) ->
   end,
 
   %% update emqx override configuration
-  ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryExistingConf),
-  NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
+  ExistingOverrideConf = map_without_root_key(BinaryExistingConf, <<"aws_greengrass_emqx_auth">>),
+  NewOverrideConf = map_without_root_key(BinaryNewConf, <<"aws_greengrass_emqx_auth">>),
   logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
@@ -220,3 +220,9 @@ for_each_conf(Path, Conf, Func) ->
         end
       end, Conf)
   end.
+
+map_with_root_key(Conf, Key) ->
+  maps:filter(fun(K, _) -> K == Key end, Conf).
+
+map_without_root_key(Conf, Key) ->
+  maps:filter(fun(K, _) -> K =/= Key end, Conf).
