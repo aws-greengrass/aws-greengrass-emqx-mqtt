@@ -13,7 +13,7 @@ ARTIFACTS_DIR = os.path.join('greengrass-build', 'artifacts', COMPONENT_NAME, CO
 
 ZIP_ARTIFACT = os.path.join('build', 'emqx.zip')
 
-TAG = 'aws-greengrass-emqx'
+TAG = 'aws-greengrass-emqx:amd64'
 IMAGE_FILE = os.path.join(ARTIFACTS_DIR, f'{TAG}.amd64.tar.gz')
 
 
