@@ -21,8 +21,9 @@
 -define(UPDATE_PROC, greengrass_config_update_listener).
 
 %% config keys
--define(KEY_AUTH_MODE, auth_mode).
--define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, use_greengrass_managed_certificates).
+-define(KEY_ROOT, <<"aws_greengrass_emqx_auth">>).
+-define(KEY_AUTH_MODE, <<"auth_mode">>).
+-define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"use_greengrass_managed_certificates">>).
 
 %% default config values
 -define(DEFAULT_AUTH_MODE, enabled).
@@ -119,8 +120,8 @@ update_conf(ExistingConf, NewConf) ->
   BinaryNewConf = emqx_map_lib:binary_key_map(NewConf),
 
   %% update greengrass plugin configuration
-  ExistingPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryExistingConf, #{}),
-  NewPluginConf = maps:get(<<"aws_greengrass_emqx_auth">>, BinaryNewConf, #{}),
+  ExistingPluginConf = map_with_root_key(BinaryExistingConf, ?KEY_ROOT),
+  NewPluginConf = map_with_root_key(BinaryNewConf, ?KEY_ROOT),
   logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
@@ -128,8 +129,8 @@ update_conf(ExistingConf, NewConf) ->
   end,
 
   %% update emqx override configuration
-  ExistingOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryExistingConf),
-  NewOverrideConf = maps:filter(fun(K, _) -> K =/= <<"aws_greengrass_emqx_auth">> end, BinaryNewConf),
+  ExistingOverrideConf = map_without_root_key(BinaryExistingConf, ?KEY_ROOT),
+  NewOverrideConf = map_without_root_key(BinaryNewConf, ?KEY_ROOT),
   logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
@@ -154,14 +155,14 @@ clear_plugin_conf() ->
 validate_plugin_conf(Conf) ->
   try
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, Conf, #{return_plain => true, format => map}),
-    emqx_map_lib:unsafe_atom_key_map(CheckedConf)
+    emqx_map_lib:binary_key_map(CheckedConf)
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
 
 update_plugin_env(Conf) ->
   %% TODO find a more dynamic way
-  RootConfig = maps:get(aws_greengrass_emqx_auth, Conf),
+  RootConfig = maps:get(?KEY_ROOT, Conf),
   AuthMode = maps:get(?KEY_AUTH_MODE, RootConfig, ?DEFAULT_AUTH_MODE),
   application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_AUTH_MODE], AuthMode]),
@@ -176,8 +177,8 @@ update_plugin_env(Conf) ->
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
-  KeysToClear = lists:filter(fun(Key) -> not maps:is_key(Key, NewConf) end, maps:keys(ExistingConf)),
-  clear_override_conf(KeysToClear),
+  MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
+  clear_override_conf(MapToClear),
   update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
 
 update_override_conf(_, _, []) ->
@@ -220,3 +221,9 @@ for_each_conf(Path, Conf, Func) ->
         end
       end, Conf)
   end.
+
+map_with_root_key(Conf, Key) ->
+  maps:filter(fun(K, _) -> K == Key end, Conf).
+
+map_without_root_key(Conf, Key) ->
+  maps:filter(fun(K, _) -> K =/= Key end, Conf).
