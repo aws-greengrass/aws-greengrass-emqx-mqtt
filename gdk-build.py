@@ -30,7 +30,6 @@ def build_docker() -> None:
 
 
 if __name__ == '__main__':
-    if not DOCKER_ONLY:
-        build_zip()
+    build_zip()
     build_docker()
     shutil.copy('recipe.json', RECIPES_DIR)
