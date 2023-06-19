@@ -8,7 +8,8 @@
     "DefaultConfiguration": {
       "emqx": {
         "log.enabled": "true",
-        "log.level": "debug"
+        "log.level": "debug",
+        "listener.ssl.mtls.bind": "8883"
       },
       "accessControl": {
         "aws.greengrass.clientdevices.Auth": {
@@ -55,6 +56,7 @@
           "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_NODE__ETC_DIR": "{work:path}\\etc",
+          "EMQX_LISTENERS__SSL__MTLS__BIND": "{configuration:/emqx/listener.ssl.mtls.bind}",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
           "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.enabled}",
@@ -83,36 +85,31 @@
         "os": "linux"
       },
       "Lifecycle": {
-        "startup": {
-          "script": "{artifacts:decompressedPath}/emqx/emqx/plugins/gg-1.0.0/gg-1.0.0/priv/write_config && {artifacts:decompressedPath}/emqx/emqx/bin/emqx console",
-          "timeout": "{configuration:/startupTimeoutSeconds}"
+        "install": {
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "script": "docker rmi aws-greengrass-emqx:amd64\ndocker load --input {artifacts:path}/aws-greengrass-emqx.amd64.tar.gz"
         },
-        "setEnv": {
-          "EMQX_PLUGINS__INSTALL_DIR": "{artifacts:decompressedPath}/emqx/emqx/plugins",
-          "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}/emqx/emqx/data",
-          "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}/emqx/emqx/etc",
-          "EMQX_NODE__DATA_DIR": "{work:path}/data",
-          "EMQX_NODE__ETC_DIR": "{work:path}/etc",
-          "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}/data/key.pem",
-          "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}/data/cert.pem",
-          "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.enabled}",
-          "EMQX_LOG__CONSOLE_HANDLER__LEVEL": "{configuration:/emqx/log.level}",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}"
+        "startup": {
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "timeout": "{configuration:/startupTimeoutSeconds}",
+          "script": "docker run --rm --name emqx -p {configuration:/emqx/listener.ssl.mtls.bind}:{configuration:/emqx/listener.ssl.mtls.bind} -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e SVCUID -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e EMQX_LISTENERS__SSL__MTLS__BIND -e EMQX_LOG__CONSOLE_HANDLER__ENABLE -e EMQX_LOG__CONSOLE_HANDLER__LEVEL -e CRT_LOG_LEVEL -e IPC_TIMEOUT_SECONDS -e RESTART_IDENTIFIER aws-greengrass-emqx:amd64",
+          "setEnv": {
+            "EMQX_LISTENERS__SSL__MTLS__BIND": "{configuration:/emqx/listener.ssl.mtls.bind}",
+            "EMQX_LOG__CONSOLE_HANDLER__ENABLE": "{configuration:/emqx/log.enabled}",
+            "EMQX_LOG__CONSOLE_HANDLER__LEVEL": "{configuration:/emqx/log.level}",
+            "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
+            "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
+            "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+          }
         },
         "shutdown": {
-          "script": "{artifacts:decompressedPath}/emqx/emqx/bin/emqx stop"
+          "requiresPrivilege": "{configuration:/requiresPrivilege}",
+          "script": "docker stop emqx"
         }
       },
       "Artifacts": [
         {
-          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
-          "Unarchive": "ZIP",
-          "Permission": {
-            "Read": "OWNER",
-            "Execute": "OWNER"
-          }
+          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/aws-greengrass-emqx.amd64.tar.gz"
         }
       ]
     }
