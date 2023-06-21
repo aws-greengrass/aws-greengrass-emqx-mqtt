@@ -15,8 +15,8 @@ start(_StartType, _StartArgs) ->
   {ok, Sup} = gg_sup:start_link(),
   gg_port_driver:start(),
   gg_conf:start(),
-  enable_cert_verification(),
   gg_certs:load(),
+  enable_cert_verification(),
   gg:load(application:get_all_env()),
   {ok, Sup}.
 

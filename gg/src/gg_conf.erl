@@ -24,7 +24,7 @@
 -define(KEY_ROOT, <<"aws_greengrass_emqx_auth">>).
 -define(KEY_AUTH_MODE, <<"auth_mode">>).
 -define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"use_greengrass_managed_certificates">>).
-
+-define(NORMALIZE_MAP, fun emqx_utils_maps:binary_key_map/1). %% configs like authentication only work with binary keys
 %% default config values
 -define(DEFAULT_AUTH_MODE, enabled).
 -define(DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES, true).
@@ -115,13 +115,13 @@ decode_conf(Conf) when is_binary(Conf) ->
     Err -> {error, Err}
   end.
 
-update_conf(ExistingConf, NewConf) ->
-  BinaryExistingConf = emqx_map_lib:binary_key_map(ExistingConf),
-  BinaryNewConf = emqx_map_lib:binary_key_map(NewConf),
+update_conf(Existing, New) ->
+  ExistingConf = ?NORMALIZE_MAP(Existing),
+  NewConf = ?NORMALIZE_MAP(New),
 
   %% update greengrass plugin configuration
-  ExistingPluginConf = map_with_root_key(BinaryExistingConf, ?KEY_ROOT),
-  NewPluginConf = map_with_root_key(BinaryNewConf, ?KEY_ROOT),
+  ExistingPluginConf = map_with_root_key(ExistingConf, ?KEY_ROOT),
+  NewPluginConf = map_with_root_key(NewConf, ?KEY_ROOT),
   logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
@@ -129,8 +129,8 @@ update_conf(ExistingConf, NewConf) ->
   end,
 
   %% update emqx override configuration
-  ExistingOverrideConf = map_without_root_key(BinaryExistingConf, ?KEY_ROOT),
-  NewOverrideConf = map_without_root_key(BinaryNewConf, ?KEY_ROOT),
+  ExistingOverrideConf = map_without_root_key(ExistingConf, ?KEY_ROOT),
+  NewOverrideConf = map_without_root_key(NewConf, ?KEY_ROOT),
   logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
@@ -155,7 +155,7 @@ clear_plugin_conf() ->
 validate_plugin_conf(Conf) ->
   try
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, Conf, #{return_plain => true, format => map}),
-    emqx_map_lib:binary_key_map(CheckedConf)
+    ?NORMALIZE_MAP(CheckedConf)
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
@@ -194,7 +194,13 @@ update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
 
 clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
   %% we must remove leaf configs because EMQX does not allow use to remove root configs.
-  for_each_conf(ExistingConf, fun remove_override_conf/1).
+  for_each_conf(ExistingConf, fun remove_override_conf_path/1).
+
+remove_override_conf_path([]) ->
+  ok;
+remove_override_conf_path(Path) ->
+  remove_override_conf(Path),
+  remove_override_conf_path(lists:droplast(Path)).
 
 remove_override_conf([]) ->
   ok;
