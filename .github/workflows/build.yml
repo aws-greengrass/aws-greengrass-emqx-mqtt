@@ -98,7 +98,8 @@ jobs:
         with:
           path: |
             emqx
-          key: cache-emqx-5.0.22-${{ matrix.os }}
+          # TODO use commit as cache key
+          key: cache-emqx-5.1.0-${{ matrix.os }}
 
       - name: Build EMQX
         if: steps.cache-emqx-restore.outputs.cache-hit != 'true'
