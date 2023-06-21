@@ -60,7 +60,9 @@ COPY .git .git
 COPY --from=build-base /build/bin bin
 COPY bin/build_sdk.py bin
 
-RUN python3 -u -m bin --sdk-only
+RUN \
+    --mount=type=cache,target=/build/_build_sdk \
+    python3 -u -m bin --sdk-only
 
 FROM build-base as emqx
 
@@ -69,7 +71,9 @@ WORKDIR /build
 COPY --from=build-base /build/bin bin
 COPY emqx.commit .
 COPY bin/build_emqx.py bin
-RUN python3 -u -m bin --emqx-only
+RUN \
+    --mount=type=cache,target=/build/emqx \
+    python3 -u -m bin --emqx-only
 
 FROM build-base as port-driver
 
