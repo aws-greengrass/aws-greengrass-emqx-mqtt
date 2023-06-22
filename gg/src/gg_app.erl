@@ -15,8 +15,8 @@ start(_StartType, _StartArgs) ->
   {ok, Sup} = gg_sup:start_link(),
   gg_port_driver:start(),
   gg_conf:start(),
+  gg_certs:request_certificates(),
   enable_cert_verification(),
-  gg_certs:load(),
   gg:load(application:get_all_env()),
   {ok, Sup}.
 
@@ -25,7 +25,7 @@ enable_cert_verification() ->
     bypass ->
       logger:info("Skipping custom cert verification");
     _ ->
-      case gg_tls:enable(mtls) of
+      case gg_tls:enable(default) of
         ok ->
           logger:info("Custom cert verification enabled");
         {error, Reason} ->

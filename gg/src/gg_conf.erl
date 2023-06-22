@@ -8,23 +8,26 @@
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -export([start/0, stop/0]).
--export([listen_for_update_requests/1, request_update/0]).
+-export([listen_for_update_requests/1, do_listen_for_update_requests/1, request_update/0]).
 
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
 
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
+-define(INITIAL_CONF_TIMEOUT_MILLIS, 30000).
+
 -define(OVERRIDE_TYPE, local).
 -define(CONF_OPTS, #{override_to => ?OVERRIDE_TYPE}).
 -define(ENV_APP, aws_greengrass_emqx_auth).
--define(UPDATE_PROC, greengrass_config_update_listener).
+-define(UPDATE_PROC, gg_conf_listen_for_updates).
+-define(CONF_UPDATE, conf_updated).
 
 %% config keys
 -define(KEY_ROOT, <<"aws_greengrass_emqx_auth">>).
 -define(KEY_AUTH_MODE, <<"auth_mode">>).
 -define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"use_greengrass_managed_certificates">>).
-
+-define(NORMALIZE_MAP, fun emqx_utils_maps:binary_key_map/1). %% configs like authentication only work with binary keys
 %% default config values
 -define(DEFAULT_AUTH_MODE, enabled).
 -define(DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES, true).
@@ -50,10 +53,9 @@ use_greengrass_managed_certificates() ->
 start() ->
   spawn(?MODULE, listen_for_update_requests, [self()]),
   receive
-    initialized ->
-      request_update(),
-      %% TODO wait for completion!
-      ok
+    ?CONF_UPDATE -> ok
+  after ?INITIAL_CONF_TIMEOUT_MILLIS ->
+    exit({error, "Timed out waiting for initial configuration"})
   end.
 
 stop() ->
@@ -64,18 +66,18 @@ stop() ->
 request_update() ->
   ?UPDATE_PROC ! update.
 
-listen_for_update_requests(Caller) ->
-  register(?UPDATE_PROC, self()),
+listen_for_update_requests(NotifyPID) ->
+  ListenPID = spawn(?MODULE, do_listen_for_update_requests, [NotifyPID]),
+  register(?UPDATE_PROC, ListenPID),
   gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
-  Caller ! initialized,
-  do_listen_for_update_requests().
+  request_update().
 
-do_listen_for_update_requests() ->
+do_listen_for_update_requests(NotifyPID) ->
   receive
     update ->
       logger:info("Config update request received"),
-      update_conf_from_ipc(),
-      do_listen_for_update_requests();
+      update_conf_from_ipc(NotifyPID),
+      do_listen_for_update_requests(NotifyPID);
     stop -> ok
   end.
 
@@ -83,10 +85,11 @@ do_listen_for_update_requests() ->
 %% Update Config
 %%--------------------------------------------------------------------
 
-update_conf_from_ipc() ->
+update_conf_from_ipc(NotifyPID) ->
   case gg_port_driver:get_configuration() of
   {ok, Conf} ->
     update_conf(Conf),
+    NotifyPID ! ?CONF_UPDATE,
     ok;
   {error, Err} = Error ->
     logger:error("Unable to get configuration, err=~p", [Err]),
@@ -115,13 +118,13 @@ decode_conf(Conf) when is_binary(Conf) ->
     Err -> {error, Err}
   end.
 
-update_conf(ExistingConf, NewConf) ->
-  BinaryExistingConf = emqx_map_lib:binary_key_map(ExistingConf),
-  BinaryNewConf = emqx_map_lib:binary_key_map(NewConf),
+update_conf(Existing, New) ->
+  ExistingConf = ?NORMALIZE_MAP(Existing),
+  NewConf = ?NORMALIZE_MAP(New),
 
   %% update greengrass plugin configuration
-  ExistingPluginConf = map_with_root_key(BinaryExistingConf, ?KEY_ROOT),
-  NewPluginConf = map_with_root_key(BinaryNewConf, ?KEY_ROOT),
+  ExistingPluginConf = map_with_root_key(ExistingConf, ?KEY_ROOT),
+  NewPluginConf = map_with_root_key(NewConf, ?KEY_ROOT),
   logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
   try update_plugin_conf(ExistingPluginConf, NewPluginConf)
   catch
@@ -129,8 +132,8 @@ update_conf(ExistingConf, NewConf) ->
   end,
 
   %% update emqx override configuration
-  ExistingOverrideConf = map_without_root_key(BinaryExistingConf, ?KEY_ROOT),
-  NewOverrideConf = map_without_root_key(BinaryNewConf, ?KEY_ROOT),
+  ExistingOverrideConf = map_without_root_key(ExistingConf, ?KEY_ROOT),
+  NewOverrideConf = map_without_root_key(NewConf, ?KEY_ROOT),
   logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
   try update_override_conf(ExistingOverrideConf, NewOverrideConf)
   catch
@@ -155,7 +158,7 @@ clear_plugin_conf() ->
 validate_plugin_conf(Conf) ->
   try
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, Conf, #{return_plain => true, format => map}),
-    emqx_map_lib:binary_key_map(CheckedConf)
+    ?NORMALIZE_MAP(CheckedConf)
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
@@ -194,7 +197,13 @@ update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
 
 clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
   %% we must remove leaf configs because EMQX does not allow use to remove root configs.
-  for_each_conf(ExistingConf, fun remove_override_conf/1).
+  for_each_conf(ExistingConf, fun remove_override_conf_path/1).
+
+remove_override_conf_path([]) ->
+  ok;
+remove_override_conf_path(Path) ->
+  remove_override_conf(Path),
+  remove_override_conf_path(lists:droplast(Path)).
 
 remove_override_conf([]) ->
   ok;

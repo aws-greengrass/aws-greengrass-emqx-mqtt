@@ -19,7 +19,7 @@ static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
-static const char *LOCAL_CONF_FILE = "configs/local-override.conf";
+static const char *LOCAL_CONF_FILE = "configs/cluster.hocon";
 
 static struct aws_logger our_logger {};
 
@@ -165,7 +165,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Configuration is in the form of
     // {"localOverride": {"listeners": {"ssl": {"default": ...}}}}
     // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
-    // We then replace the contents of local-override.conf with the user provided config. We do not check if the
+    // We then replace the contents of the override file with the user provided config. We do not check if the
     // config is valid, this is handled by EMQx.
     Aws::Crt::String output = config_view.WriteReadable();
     LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
@@ -194,8 +194,8 @@ int main() {
         return 1;
     }
 
-    // Get user config for local-override. The config will be appended to EMQx's
-    // local-override.conf. This can be updated to include cluster-override
+    // Get user config for the override file. The config will be appended to EMQx's
+    // override file. This can be updated to include cluster-override
     // in the future.
     const int ret = read_config_and_update_files(ipc);
     if (ret != 0) {
