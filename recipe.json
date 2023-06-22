@@ -9,7 +9,7 @@
       "emqx": {
         "log.enabled": "true",
         "log.level": "debug",
-        "listener.ssl.mtls.bind": "8883"
+        "listener.ssl.default.bind": "8883"
       },
       "accessControl": {
         "aws.greengrass.clientdevices.Auth": {
@@ -56,9 +56,9 @@
           "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
           "EMQX_NODE__DATA_DIR": "{work:path}\\data",
           "EMQX_NODE__ETC_DIR": "{work:path}\\etc",
-          "EMQX_LISTENERS__SSL__MTLS__BIND": "{configuration:/emqx/listener.ssl.mtls.bind}",
-          "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
-          "EMQX_LISTENERS__SSL__MTLS__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
+          "EMQX_LISTENERS__SSL__DEFAULT__BIND": "{configuration:/emqx/listener.ssl.default.bind}",
+          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE": "{work:path}\\data\\key.pem",
+          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE": "{work:path}\\data\\cert.pem",
           "EMQX_LOG__CONSOLE__ENABLE": "{configuration:/emqx/log.enabled}",
           "EMQX_LOG__CONSOLE__LEVEL": "{configuration:/emqx/log.level}",
           "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
@@ -92,9 +92,9 @@
         "startup": {
           "requiresPrivilege": "{configuration:/requiresPrivilege}",
           "timeout": "{configuration:/startupTimeoutSeconds}",
-          "script": "docker run --rm --name emqx -p {configuration:/emqx/listener.ssl.mtls.bind}:{configuration:/emqx/listener.ssl.mtls.bind} -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e SVCUID -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e EMQX_LISTENERS__SSL__MTLS__BIND -e EMQX_LOG__CONSOLE__ENABLE -e EMQX_LOG__CONSOLE__LEVEL -e CRT_LOG_LEVEL -e IPC_TIMEOUT_SECONDS -e RESTART_IDENTIFIER aws-greengrass-emqx:amd64",
+          "script": "docker run --rm --name emqx -p {configuration:/emqx/listener.ssl.default.bind}:{configuration:/emqx/listener.ssl.default.bind} -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e SVCUID -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e EMQX_LISTENERS__SSL__DEFAULT__BIND -e EMQX_LOG__CONSOLE__ENABLE -e EMQX_LOG__CONSOLE__LEVEL -e CRT_LOG_LEVEL -e IPC_TIMEOUT_SECONDS -e RESTART_IDENTIFIER aws-greengrass-emqx:amd64",
           "setEnv": {
-            "EMQX_LISTENERS__SSL__MTLS__BIND": "{configuration:/emqx/listener.ssl.mtls.bind}",
+            "EMQX_LISTENERS__SSL__DEFAULT__BIND": "{configuration:/emqx/listener.ssl.default.bind}",
             "EMQX_LOG__CONSOLE__ENABLE": "{configuration:/emqx/log.enabled}",
             "EMQX_LOG__CONSOLE__LEVEL": "{configuration:/emqx/log.level}",
             "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
