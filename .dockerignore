@@ -1,6 +1,5 @@
 build/
 _build/
-_build_sdk/
 .github
 .vscode
 .idea
