@@ -26,7 +26,7 @@ enable_cert_verification() ->
     bypass ->
       logger:info("Skipping custom cert verification");
     _ ->
-      case gg_tls:enable(mtls) of
+      case gg_tls:enable(default) of
         ok ->
           logger:info("Custom cert verification enabled");
         {error, Reason} ->
