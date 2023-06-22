@@ -67,11 +67,10 @@ request_update() ->
   ?UPDATE_PROC ! update.
 
 listen_for_update_requests(NotifyPID) ->
-  register(?UPDATE_PROC, self()),
-  gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
   ListenPID = spawn(?MODULE, do_listen_for_update_requests, [NotifyPID]),
   register(?UPDATE_PROC, ListenPID),
-  spawn(?MODULE, request_update, []).
+  gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
+  request_update().
 
 do_listen_for_update_requests(NotifyPID) ->
   receive
