@@ -5,23 +5,34 @@
 
 -module(gg_certs).
 
--export([load/0]).
+-export([request_certificates/0]).
 
-load() ->
-  case gg_conf:use_greengrass_managed_certificates() of
-    true ->
-      gg_port_driver:register_fun(certificate_update, fun cleanPemCache/0),
-      %% Subscribe to certificate updates. On update,
-      %% the certificate and its private key are written
-      %% to the EMQX component work directory. The EMQX
-      %% ssl listener is configured to read these files.
-      gg_port_driver:request_certificates();
-    false ->
-      ok
-  end.
+-define(CERT_LOAD_TIMEOUT_MILLIS, 300000). %% 5 minutes
 
-cleanPemCache() ->
+-define(REQUEST_CERTS_PROC, gg_request_certificates).
+-define(CERTS_UPDATED, certs_updated).
+
+%% Request that CDA generate server certificates for EMQX to use.
+%% On completion of this function, certificates will be written
+%% to the EMQX component work directory, where the EMQX ssl listener
+%% is configured to read certs from.
+request_certificates() ->
+  request_certificates(gg_conf:use_greengrass_managed_certificates()).
+request_certificates(Enabled) when Enabled == true ->
+  register(?REQUEST_CERTS_PROC, self()),
+  gg_port_driver:register_fun(certificate_update, fun on_cert_update/0),
+  gg_port_driver:request_certificates(),
+  receive
+    ?CERTS_UPDATED -> ok
+  after ?CERT_LOAD_TIMEOUT_MILLIS ->
+    exit({error, "Timed out waiting for requested server certificates"})
+  end;
+request_certificates(Enabled) when Enabled == false ->
+  ok.
+
+on_cert_update() ->
   case catch emqx_mgmt:clean_pem_cache_all() of
-    ok -> logger:info("Finished cleaning pem cache!");
-    _ -> logger:error("Failed to clean PEM cache!")
-  end.
+    ok -> logger:info("PEM cache cleared");
+    Err -> logger:warning("Unable to clear PEM cache: ~p", [Err])
+  end,
+  ?REQUEST_CERTS_PROC ! ?CERTS_UPDATED.
