@@ -15,8 +15,7 @@ start(_StartType, _StartArgs) ->
   {ok, Sup} = gg_sup:start_link(),
   gg_port_driver:start(),
   gg_conf:start(),
-  %% TODO race condition, cert loading is async and we need them before restarting ssl listener
-  gg_certs:load(),
+  gg_certs:request_certificates(),
   enable_cert_verification(),
   gg:load(application:get_all_env()),
   {ok, Sup}.
