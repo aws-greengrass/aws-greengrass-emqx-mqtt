@@ -8,17 +8,20 @@
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -export([start/0, stop/0]).
--export([listen_for_update_requests/1, request_update/0]).
+-export([listen_for_update_requests/1, do_listen_for_update_requests/1, request_update/0]).
 
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
 
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
+-define(INITIAL_CONF_TIMEOUT_MILLIS, 30000).
+
 -define(OVERRIDE_TYPE, local).
 -define(CONF_OPTS, #{override_to => ?OVERRIDE_TYPE}).
 -define(ENV_APP, aws_greengrass_emqx_auth).
--define(UPDATE_PROC, greengrass_config_update_listener).
+-define(UPDATE_PROC, gg_conf_listen_for_updates).
+-define(CONF_UPDATE, conf_updated).
 
 %% config keys
 -define(KEY_ROOT, <<"aws_greengrass_emqx_auth">>).
@@ -50,10 +53,9 @@ use_greengrass_managed_certificates() ->
 start() ->
   spawn(?MODULE, listen_for_update_requests, [self()]),
   receive
-    initialized ->
-      request_update(),
-      %% TODO wait for completion!
-      ok
+    ?CONF_UPDATE -> ok
+  after ?INITIAL_CONF_TIMEOUT_MILLIS ->
+    exit({error, "Timed out waiting for initial configuration"})
   end.
 
 stop() ->
@@ -64,18 +66,19 @@ stop() ->
 request_update() ->
   ?UPDATE_PROC ! update.
 
-listen_for_update_requests(Caller) ->
+listen_for_update_requests(NotifyPID) ->
   register(?UPDATE_PROC, self()),
   gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
-  Caller ! initialized,
-  do_listen_for_update_requests().
+  ListenPID = spawn(?MODULE, do_listen_for_update_requests, [NotifyPID]),
+  register(?UPDATE_PROC, ListenPID),
+  spawn(?MODULE, request_update, []).
 
-do_listen_for_update_requests() ->
+do_listen_for_update_requests(NotifyPID) ->
   receive
     update ->
       logger:info("Config update request received"),
-      update_conf_from_ipc(),
-      do_listen_for_update_requests();
+      update_conf_from_ipc(NotifyPID),
+      do_listen_for_update_requests(NotifyPID);
     stop -> ok
   end.
 
@@ -83,10 +86,11 @@ do_listen_for_update_requests() ->
 %% Update Config
 %%--------------------------------------------------------------------
 
-update_conf_from_ipc() ->
+update_conf_from_ipc(NotifyPID) ->
   case gg_port_driver:get_configuration() of
   {ok, Conf} ->
     update_conf(Conf),
+    NotifyPID ! ?CONF_UPDATE,
     ok;
   {error, Err} = Error ->
     logger:error("Unable to get configuration, err=~p", [Err]),
