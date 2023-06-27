@@ -113,7 +113,7 @@ update_conf(NewConf) ->
   update_conf(ExistingConf, NewConf).
 
 decode_conf(Conf) when is_binary(Conf) ->
-  case catch jiffy:decode(Conf, [return_maps, dedupe_keys, use_nil]) of
+  case catch jiffy:decode(Conf, [return_maps, dedupe_keys, {null_term, undefined}]) of
     DecodedConf when is_map(DecodedConf) -> DecodedConf;
     Err -> {error, Err}
   end.
