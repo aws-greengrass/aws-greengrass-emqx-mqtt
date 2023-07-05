@@ -19,7 +19,6 @@ static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
 static const char *EMQX_CONF_FILE = "emqx.conf";
-static const char *KEY_USE_BASE_GREENGRASS_EMQX_CONF = "useBaseGreengrassEmqxConfig";
 static const char *KEY_EMQX_CONFIG = "emqxConfig";
 
 static struct aws_logger our_logger {};
@@ -137,16 +136,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Try to create the directories as needed, ignoring errors
     std::filesystem::create_directories(emqx_conf.parent_path());
 
-    // If user wants to use emqx's config defaults, rather than greengrass', overwrite emqx.conf
-    auto append_config = true;
-    auto use_base_greengrass_emqx_conf = config_view.GetJsonObject(KEY_USE_BASE_GREENGRASS_EMQX_CONF);
-    if (!use_base_greengrass_emqx_conf.IsNull() && use_base_greengrass_emqx_conf.IsBool() &&
-        !use_base_greengrass_emqx_conf.AsBool()) {
-        append_config = false;
-    }
-
     // Open file for writing. Will create file if it doesn't exist.
-    std::ofstream::openmode open_mode = append_config ? std::ofstream::app : std::ofstream::out;
+    std::ofstream::openmode open_mode = std::ofstream::app;
     auto out_path = std::ofstream(emqx_conf, open_mode);
     defer { out_path.close(); };
 
@@ -170,24 +161,19 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
 
     Aws::Crt::String output = emqx_config.AsObject().WriteReadable();
 
-    if (append_config) {
-        out_path << output << std::endl;
-        LOG_I(WRITE_CONFIG_SUBJECT, "Appended customer config to %s", EMQX_CONF_FILE);
-    } else {
-        // trimming open and close braces before appending to emqx config.
-        // as seen during our testing, HOCON won't support multiple JSON docs in a single file.
-        auto opening_brace = output.find_first_of('{');
-        if (opening_brace != std::string::npos) {
-            output.erase(opening_brace);
-        }
-        auto closing_brace = output.find_first_of('}');
-        if (closing_brace != std::string::npos) {
-            output.erase(closing_brace);
-        }
-
-        out_path << output << std::endl;
-        LOG_I(WRITE_CONFIG_SUBJECT, "Overwrote %s with customer config", EMQX_CONF_FILE);
+    // trimming open and close braces before appending to emqx config.
+    // as seen during our testing, HOCON won't support multiple JSON docs in a single file.
+    auto opening_brace = output.find_first_of('{');
+    if (opening_brace != std::string::npos) {
+        output.erase(opening_brace);
     }
+    auto closing_brace = output.find_last_of('}');
+    if (closing_brace != std::string::npos) {
+        output.erase(closing_brace);
+    }
+    out_path << output << std::endl;
+    LOG_I(WRITE_CONFIG_SUBJECT, "Appended %s with customer config", EMQX_CONF_FILE);
+
     return 0;
 }
 

@@ -38,14 +38,5 @@ fields("gg") ->
           required => false,
           desc => "Use greengrass managed certificates"
         }
-      )},
-    {configUpdateMode,
-      ?HOCON(
-        hoconsc:enum([merge, override]),
-        #{
-          default => merge,
-          required => false,
-          desc => "Config update mode"
-        }
       )}
   ].

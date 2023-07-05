@@ -75,7 +75,9 @@ def package(context):
     print("Patching EMQ X")
     add = {
         "emqx/etc/acl.conf": "patches/acl.conf",
-        "emqx/etc/emqx.conf": "patches/emqx.conf"
+        "emqx/etc/emqx.conf": "patches/emqx.conf",
+        # used to fallback on secure defaults when configs are removed
+        "emqx/etc/gg.emqx.conf": "patches/emqx.conf"
     }
     # On Windows, bundle in msvc runtime 120
     if os.name == 'nt':
