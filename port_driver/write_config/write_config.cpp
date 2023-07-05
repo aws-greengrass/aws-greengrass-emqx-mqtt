@@ -105,15 +105,13 @@ std::variant<int, Aws::Crt::JsonView> get_emqx_configuration(GreengrassIPCWrappe
 
     auto *response = responseResult.GetOperationResponse();
     if (response == nullptr || !response->GetValue().has_value()) {
-        LOG_I(WRITE_CONFIG_SUBJECT,
-              "Component configuration missing. No configuration changes will apply");
+        LOG_I(WRITE_CONFIG_SUBJECT, "Component configuration missing. No configuration changes will apply");
         return 0;
     }
 
     auto view = response->GetValue().value().View();
     if (view.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT,
-              "Component configuration missing. No configuration changes will apply");
+        LOG_I(WRITE_CONFIG_SUBJECT, "Component configuration missing. No configuration changes will apply");
         return 0;
     }
     if (!view.IsObject()) {
@@ -142,7 +140,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // If user wants to use emqx's config defaults, rather than greengrass', overwrite emqx.conf
     auto append_config = true;
     auto use_base_greengrass_emqx_conf = config_view.GetJsonObject(KEY_USE_BASE_GREENGRASS_EMQX_CONF);
-    if (!use_base_greengrass_emqx_conf.IsNull() && use_base_greengrass_emqx_conf.IsBool() && !use_base_greengrass_emqx_conf.AsBool()) {
+    if (!use_base_greengrass_emqx_conf.IsNull() && use_base_greengrass_emqx_conf.IsBool() &&
+        !use_base_greengrass_emqx_conf.AsBool()) {
         append_config = false;
     }
 
@@ -156,14 +155,16 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // We do not check if the config is valid, this is handled by EMQx.
     auto emqx_config = config_view.GetJsonObject(KEY_EMQX_CONFIG);
     if (emqx_config.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT,
-              "Configuration /%s not present. Configuration from /%s will not be applied.", KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
+        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration /%s not present. Configuration from /%s will not be applied.",
+              KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
         return 0;
     }
 
     if (!emqx_config.IsObject()) {
         LOG_I(WRITE_CONFIG_SUBJECT,
-              "Configuration /%s is present, but not an object. Configuration from /%s will not be applied. Fix this by updating the deployment with \"RESET\"[\"%s\"]", KEY_EMQX_CONFIG, KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
+              "Configuration /%s is present, but not an object. Configuration from /%s will not be applied. Fix this "
+              "by updating the deployment with \"RESET\"[\"%s\"]",
+              KEY_EMQX_CONFIG, KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
         return 1;
     }
 
@@ -174,7 +175,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
         LOG_I(WRITE_CONFIG_SUBJECT, "Appended customer config to %s", EMQX_CONF_FILE);
     } else {
         // trimming open and close braces before appending to emqx config.
-        // as seen during our testing, HOCON won't support multiple JSON docs in a single file. 
+        // as seen during our testing, HOCON won't support multiple JSON docs in a single file.
         auto opening_brace = output.find_first_of('{');
         if (opening_brace != std::string::npos) {
             output.erase(opening_brace);

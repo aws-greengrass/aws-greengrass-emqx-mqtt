@@ -75,9 +75,7 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
 
     if (result.GetOperationError() != nullptr &&
         result.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
-        LOG_I(
-            CDA_INTEG_SUBJECT,
-            "Component configuration is not present. No configuration changes will apply");
+        LOG_I(CDA_INTEG_SUBJECT, "Component configuration is not present. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
 
@@ -88,16 +86,14 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
     }
 
     if (result.GetOperationResponse() == nullptr || !result.GetOperationResponse()->GetValue().has_value()) {
-        LOG_I(CDA_INTEG_SUBJECT,
-              "Component configuration is empty. No configuration changes will apply");
+        LOG_I(CDA_INTEG_SUBJECT, "Component configuration is empty. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
     auto response = result.GetOperationResponse()->GetValue().value();
 
     auto config_view = response.View();
     if (config_view.IsNull()) {
-        LOG_I(CDA_INTEG_SUBJECT,
-              "Component configuration is empty. No configuration changes will apply");
+        LOG_I(CDA_INTEG_SUBJECT, "Component configuration is empty. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
 
