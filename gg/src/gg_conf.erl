@@ -51,6 +51,23 @@ use_greengrass_managed_certificates() ->
   application:get_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
 %%--------------------------------------------------------------------
+%% Greengrass EMQX Defaults
+%%--------------------------------------------------------------------
+
+greengrass_emqx_default_conf() ->
+  application:get_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, #{}).
+
+load_greengrass_emqx_default_conf() ->
+  %% we know this is valid conf because it's also used in emqx.conf
+  case hocon:load(filename:join([emqx:etc_dir(), <<"gg.emqx.conf">>])) of
+    {ok, C} ->
+      Conf = ?NORMALIZE_MAP(C),
+      application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf),
+      ok;
+    {error, Err} -> {error, {unable_to_read_config, Err}}
+  end.
+
+%%--------------------------------------------------------------------
 %% Config Update Listener
 %%--------------------------------------------------------------------
 
@@ -91,7 +108,7 @@ do_listen_for_update_requests(NotifyPID) ->
   end.
 
 %%--------------------------------------------------------------------
-%% Update Config
+%% IPC Config Update Handler
 %%--------------------------------------------------------------------
 
 update_conf_from_ipc(NotifyPID) ->
@@ -112,7 +129,7 @@ update_conf(NewComponentConf) when is_binary(NewComponentConf) ->
   end;
 update_conf(NewComponentConf) ->
   ExistingOverrideConf =
-    case get_override_conf() of
+    case emqx_config:read_override_conf(?CONF_OPTS) of
       undefined -> #{};
       BadConf when is_list(BadConf) ->
         logger:warning("Unexpected list format found when retrieving existing configuration, treating as empty"),
@@ -138,9 +155,9 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
 
   NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf)),
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, NewOverrideConf]),
-  try update_override_conf(ExistingConf, NewOverrideConf)
-  catch
-    OverrideUpdateErr -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateErr])
+  case emqx_conf_cli:load_config(NewOverrideConf, merge) of
+    ok -> ok;
+    OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
 
 %%--------------------------------------------------------------------
@@ -174,74 +191,3 @@ update_plugin_env(ComponentConf) ->
   UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ComponentConf, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
   application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]).
-
-%%--------------------------------------------------------------------
-%% Update EMQX Override Config
-%%--------------------------------------------------------------------
-
-update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
-  clear_override_conf(ExistingConf);
-update_override_conf(ExistingConf, NewConf) ->
-  MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
-  clear_override_conf(MapToClear),
-  do_update_override_conf(NewConf, maps:keys(NewConf)).
-
-do_update_override_conf(_, []) ->
-  ok;
-do_update_override_conf(Conf, [Key | Rest]) ->
-  ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, Conf), ?CONF_OPTS) of
-    {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
-    {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
-    Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
-  end,
-  do_update_override_conf(Conf, Rest).
-
-clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
-  %% we must remove leaf configs because EMQX does not allow use to remove root configs.
-  for_each_conf(ExistingConf, fun remove_override_conf_path/1).
-
-remove_override_conf_path([]) ->
-  ok;
-remove_override_conf_path(Path) ->
-  remove_override_conf(Path),
-  remove_override_conf_path(lists:droplast(Path)).
-
-remove_override_conf([]) ->
-  ok;
-remove_override_conf(Path) when is_list(Path) ->
-  case catch emqx_conf:remove(Path, ?CONF_OPTS) of
-    {ok, _} -> logger:info("Removed ~p config", [Path]);
-    {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
-    Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
-  end.
-
-greengrass_emqx_default_conf() ->
-  application:get_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, #{}).
-
-load_greengrass_emqx_default_conf() ->
-  %% we know this is valid conf because it's also used in emqx.conf
-  case hocon:load(filename:join([emqx:etc_dir(), <<"gg.emqx.conf">>])) of
-    {ok, C} ->
-      Conf = ?NORMALIZE_MAP(C),
-      application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf),
-      ok;
-    {error, Err} -> {error, {unable_to_read_config, Err}}
-  end.
-
-get_override_conf() ->
-  emqx_config:read_override_conf(?CONF_OPTS).
-
-for_each_conf(Conf, Func) ->
-  for_each_conf([], Conf, Func).
-for_each_conf(Path, Conf, Func) ->
-  if
-    map_size(Conf) == 0 -> Func(Path);
-    true -> maps:foreach(
-      fun(K, V) ->
-        if
-          is_map(V) -> for_each_conf(Path ++ [K], V, Func);
-          true -> Func(Path ++ [K])
-        end
-      end, Conf)
-  end.
