@@ -141,11 +141,6 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Try to create the directories as needed, ignoring errors
     std::filesystem::create_directories(emqx_conf.parent_path());
 
-    // Open file for writing. Will create file if it doesn't exist.
-    std::ofstream::openmode open_mode = std::ofstream::app;
-    auto out_path = std::ofstream(emqx_conf, open_mode);
-    defer { out_path.close(); };
-
     // Configuration is in the form of
     // {"emqxConfig": {"listeners": {"ssl": {"default": ...}}}}
     // We do not check if the config is valid, this is handled by EMQx.
@@ -164,6 +159,12 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
         return 1;
     }
 
+    if (emqx_config.AsObject().GetAllObjects().empty()) {
+        LOG_I(WRITE_CONFIG_SUBJECT, "Configuration /%s is empty. Configuration from /%s will not be applied.",
+              KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
+        return 0;
+    }
+
     Aws::Crt::String output = emqx_config.AsObject().WriteReadable();
 
     // trimming open and close braces before appending to emqx config.
@@ -176,7 +177,14 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     if (closing_brace != std::string::npos) {
         output.erase(closing_brace);
     }
+
+    LOG_I(WRITE_CONFIG_SUBJECT, "Writing configuration to %s", emqx_conf.string());
+
+    // Open file for writing. Will create file if it doesn't exist.
+    auto out_path = std::ofstream(emqx_conf, std::ofstream::app);
+    defer { out_path.close(); };
     out_path << output << std::endl;
+
     LOG_I(WRITE_CONFIG_SUBJECT, "Appended %s with customer config", EMQX_CONF_FILE);
 
     return 0;
