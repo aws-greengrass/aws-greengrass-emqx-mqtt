@@ -195,11 +195,25 @@ update_override_conf(override, ExistingConf, #{} = NewConf) when map_size(NewCon
 
 update_override_conf(merge, ExistingConf, NewConf) ->
   MergedConf = hocon:deep_merge(ExistingConf, NewConf),
-  do_update_override_conf(MergedConf, maps:keys(MergedConf));
+  perform_if_different(MergedConf, ExistingConf, fun() -> do_update_override_conf(MergedConf, maps:keys(MergedConf)) end);
 update_override_conf(override, ExistingConf, NewConf) ->
-  MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
-  clear_override_conf(MapToClear),
-  do_update_override_conf(NewConf, maps:keys(NewConf)).
+  perform_if_different(ExistingConf, NewConf,
+    fun() ->
+      MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
+      clear_override_conf(MapToClear),
+      do_update_override_conf(NewConf, maps:keys(NewConf))
+    end
+  ).
+
+perform_if_different(OldMap, NewMap, Action) ->
+  case emqx_utils_maps:diff_maps(OldMap, NewMap) of
+    #{added := Added, removed := Removed, changed := Updated} when
+      map_size(Added) =/= 0,
+      map_size(Removed) =/= 0,
+      map_size(Updated) =/= 0
+    -> Action();
+    _ -> skip
+  end.
 
 do_update_override_conf(_, []) ->
   ok;
@@ -247,9 +261,3 @@ for_each_conf(Path, Conf, Func) ->
         end
       end, Conf)
   end.
-
-map_with_root_key(Conf, Key) ->
-  maps:filter(fun(K, _) -> K == Key end, Conf).
-
-map_without_root_key(Conf, Key) ->
-  maps:filter(fun(K, _) -> K =/= Key end, Conf).
