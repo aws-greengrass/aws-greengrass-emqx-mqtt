@@ -19,7 +19,9 @@ static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
 static const char *EMQX_ETC_DIR_ENV_VAR = "EMQX_NODE__ETC_DIR";
 static const char *GetConfigurationRequest = "GetConfigurationRequest";
-static const char *LOCAL_CONF_FILE = "configs/cluster.hocon";
+static const char *EMQX_CONF_FILE = "emqx.conf";
+static const char *KEY_USE_BASE_GREENGRASS_EMQX_CONF = "useBaseGreengrassEmqxConfig";
+static const char *KEY_EMQX_CONFIG = "emqxConfig";
 
 static struct aws_logger our_logger {};
 
@@ -78,11 +80,10 @@ void setup_logger() {
     aws_logger_set(&our_logger);
 }
 
-std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrapper &ipc, const char *config_key) {
+std::variant<int, Aws::Crt::JsonView> get_emqx_configuration(GreengrassIPCWrapper &ipc) {
     auto &client = ipc.getIPCClient();
     auto operation = client.NewGetConfiguration();
     GG::GetConfigurationRequest request;
-    request.SetKeyPath({config_key});
     auto activate = operation->Activate(request).get();
     if (!activate) {
         LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_ACTIVATION_FMT, GetConfigurationRequest,
@@ -97,80 +98,96 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
     }
     auto responseResult = GG::GetConfigurationResult(responseFuture.get());
     auto responseType = responseResult.GetResultType();
-    if (responseResult.GetOperationError() != nullptr &&
-        responseResult.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
-        LOG_I(
-            WRITE_CONFIG_SUBJECT,
-            "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
-            config_key, config_key);
-        return 0;
-    }
     if (responseType != OPERATION_RESPONSE) {
         ClientDeviceAuthIntegration::handle_response_error(GetConfigurationRequest, responseType,
                                                            responseResult.GetOperationError());
         return 1;
     }
 
-    // We now have the configuration
     auto *response = responseResult.GetOperationResponse();
     if (response == nullptr || !response->GetValue().has_value()) {
         LOG_I(WRITE_CONFIG_SUBJECT,
-              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
-              config_key, config_key);
+              "Component configuration missing. No configuration changes will apply");
         return 0;
     }
 
-    return response->GetValue().value();
+    auto view = response->GetValue().value().View();
+    if (view.IsNull()) {
+        LOG_I(WRITE_CONFIG_SUBJECT,
+              "Component configuration missing. No configuration changes will apply");
+        return 0;
+    }
+    if (!view.IsObject()) {
+        LOG_E(WRITE_CONFIG_SUBJECT, "Component configuration is not an object.");
+        return 1;
+    }
+    return view;
 }
 
 int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
-    auto config_value = get_emqx_configuration(ipc, aws::greengrass::emqx::localOverrideNamespace.c_str());
+    auto config_value = get_emqx_configuration(ipc);
     // If we couldn't get the configuration due to an error and need to exit, then exit with the
     // exit code from get_emqx_configuration.
     if (holds_alternative<int>(config_value)) {
         return get<int>(config_value);
     }
-    auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
-
-    if (config_view.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT,
-              "Configuration value /%s was null. This is not a problem, but no configuration changes in /%s will apply",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str());
-        return 0;
-    }
-    if (!config_view.IsObject()) {
-        LOG_E(WRITE_CONFIG_SUBJECT,
-              "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
-              "by updating the deployment with "
-              "\"RESET\":[\"/%s\"]",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str());
-        return 1;
-    }
+    auto config_view = get<Aws::Crt::JsonView>(config_value);
 
     // Write customer-provided values to CWD
-    const std::filesystem::path data_dir(std::getenv(EMQX_DATA_DIR_ENV_VAR));
-    auto file_path = data_dir / LOCAL_CONF_FILE;
+    const std::filesystem::path etc_dir(std::getenv(EMQX_ETC_DIR_ENV_VAR));
+    auto emqx_conf = etc_dir / EMQX_CONF_FILE;
 
     // Try to create the directories as needed, ignoring errors
-    std::filesystem::create_directories(file_path.parent_path());
+    std::filesystem::create_directories(emqx_conf.parent_path());
+
+    // If user wants to use emqx's config defaults, rather than greengrass', overwrite emqx.conf
+    auto append_config = true;
+    auto use_base_greengrass_emqx_conf = config_view.GetJsonObject(KEY_USE_BASE_GREENGRASS_EMQX_CONF);
+    if (!use_base_greengrass_emqx_conf.IsNull() && use_base_greengrass_emqx_conf.IsBool() && !use_base_greengrass_emqx_conf.AsBool()) {
+        append_config = false;
+    }
 
     // Open file for writing. Will create file if it doesn't exist.
-    std::ofstream::openmode open_mode = std::ofstream::out;
-    auto out_path = std::ofstream(file_path, open_mode);
+    std::ofstream::openmode open_mode = append_config ? std::ofstream::app : std::ofstream::out;
+    auto out_path = std::ofstream(emqx_conf, open_mode);
     defer { out_path.close(); };
 
     // Configuration is in the form of
-    // {"localOverride": {"listeners": {"ssl": {"default": ...}}}}
-    // We are looking up the "localOverride" key so we receive a JSON of the config starting from "{listeners: ...}"
-    // We then replace the contents of the override file with the user provided config. We do not check if the
-    // config is valid, this is handled by EMQx.
-    Aws::Crt::String output = config_view.WriteReadable();
-    LOG_I(WRITE_CONFIG_SUBJECT, "Replacing %s with customer provided override", LOCAL_CONF_FILE);
-    out_path << output << std::endl;
+    // {"emqxConfig": {"listeners": {"ssl": {"default": ...}}}}
+    // We do not check if the config is valid, this is handled by EMQx.
+    auto emqx_config = config_view.GetJsonObject(KEY_EMQX_CONFIG);
+    if (emqx_config.IsNull()) {
+        LOG_I(WRITE_CONFIG_SUBJECT,
+              "Configuration /%s not present. Configuration from /%s will not be applied.", KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
+        return 0;
+    }
 
+    if (!emqx_config.IsObject()) {
+        LOG_I(WRITE_CONFIG_SUBJECT,
+              "Configuration /%s is present, but not an object. Configuration from /%s will not be applied. Fix this by updating the deployment with \"RESET\"[\"%s\"]", KEY_EMQX_CONFIG, KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
+        return 1;
+    }
+
+    Aws::Crt::String output = emqx_config.AsObject().WriteReadable();
+
+    if (append_config) {
+        out_path << output << std::endl;
+        LOG_I(WRITE_CONFIG_SUBJECT, "Appended customer config to %s", EMQX_CONF_FILE);
+    } else {
+        // trimming open and close braces before appending to emqx config.
+        // as seen during our testing, HOCON won't support multiple JSON docs in a single file. 
+        auto opening_brace = output.find_first_of('{');
+        if (opening_brace != std::string::npos) {
+            output.erase(opening_brace);
+        }
+        auto closing_brace = output.find_first_of('}');
+        if (closing_brace != std::string::npos) {
+            output.erase(closing_brace);
+        }
+
+        out_path << output << std::endl;
+        LOG_I(WRITE_CONFIG_SUBJECT, "Overwrote %s with customer config", EMQX_CONF_FILE);
+    }
     return 0;
 }
 
