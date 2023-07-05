@@ -12,25 +12,32 @@
 
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
+-type(config_update_mode() :: merge | override).
 
 -export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -define(INITIAL_CONF_TIMEOUT_MILLIS, 30000).
 
--define(OVERRIDE_TYPE, local).
--define(CONF_OPTS, #{override_to => ?OVERRIDE_TYPE}).
+%% config keys
+-define(KEY_CONFIG_UPDATE_MODE, <<"configUpdateMode">>).
+-define(KEY_EMQX_CONFIG, <<"emqxConfig">>).
+-define(KEY_AUTH_MODE, <<"authMode">>).
+-define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"useGreengrassManagedCertificates">>).
+%% defaults
+-define(DEFAULT_CONFIG_UPDATE_MODE, merge).
+-define(DEFAULT_AUTH_MODE, enabled).
+-define(DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES, true).
+
+-define(SCHEMA_ROOT, <<"gg">>).
+
 -define(ENV_APP, aws_greengrass_emqx_auth).
+
+-define(CONF_OPTS, #{override_to => cluster}).
+
 -define(UPDATE_PROC, gg_conf_listen_for_updates).
 -define(CONF_UPDATE, conf_updated).
 
-%% config keys
--define(KEY_ROOT, <<"aws_greengrass_emqx_auth">>).
--define(KEY_AUTH_MODE, <<"auth_mode">>).
--define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"use_greengrass_managed_certificates">>).
 -define(NORMALIZE_MAP, fun emqx_utils_maps:binary_key_map/1). %% configs like authentication only work with binary keys
-%% default config values
--define(DEFAULT_AUTH_MODE, enabled).
--define(DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES, true).
 
 
 %%--------------------------------------------------------------------
@@ -44,6 +51,11 @@ auth_mode() ->
 -spec(use_greengrass_managed_certificates() -> use_greengrass_managed_certificates()).
 use_greengrass_managed_certificates() ->
   application:get_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
+
+-spec(config_update_mode() -> config_update_mode()).
+config_update_mode() ->
+  application:get_env(?ENV_APP, ?KEY_CONFIG_UPDATE_MODE, ?DEFAULT_CONFIG_UPDATE_MODE).
+
 
 %%--------------------------------------------------------------------
 %% Config Update Listener
@@ -96,13 +108,13 @@ update_conf_from_ipc(NotifyPID) ->
     Error
   end.
 
-update_conf(NewConf) when is_binary(NewConf) ->
-  case decode_conf(NewConf) of
+update_conf(NewComponentConf) when is_binary(NewComponentConf) ->
+  case decode_conf(NewComponentConf) of
     {error, Err} -> logger:warning("Unable to decode configuration, skipping config update:  ~p", [Err]);
     DecodedConf -> update_conf(DecodedConf)
   end;
-update_conf(NewConf) ->
-  ExistingConf =
+update_conf(NewComponentConf) ->
+  ExistingOverrideConf =
     case get_override_conf() of
       undefined -> #{};
       BadConf when is_list(BadConf) ->
@@ -110,7 +122,7 @@ update_conf(NewConf) ->
         #{};
       Conf -> Conf
     end,
-  update_conf(ExistingConf, NewConf).
+  update_conf(ExistingOverrideConf, NewComponentConf).
 
 decode_conf(Conf) when is_binary(Conf) ->
   case catch jiffy:decode(Conf, [return_maps, dedupe_keys, {null_term, undefined}]) of
@@ -118,24 +130,18 @@ decode_conf(Conf) when is_binary(Conf) ->
     Err -> {error, Err}
   end.
 
-update_conf(Existing, New) ->
-  ExistingConf = ?NORMALIZE_MAP(Existing),
-  NewConf = ?NORMALIZE_MAP(New),
+update_conf(ExistingOverrideConf, NewComponentConf) ->
+  ExistingConf = ?NORMALIZE_MAP(ExistingOverrideConf),
+  NewConf = ?NORMALIZE_MAP(NewComponentConf),
 
-  %% update greengrass plugin configuration
-  ExistingPluginConf = map_with_root_key(ExistingConf, ?KEY_ROOT),
-  NewPluginConf = map_with_root_key(NewConf, ?KEY_ROOT),
-  logger:debug("Updating plugin config: ExistingConf=~p, NewConf=~p", [ExistingPluginConf, NewPluginConf]),
-  try update_plugin_conf(ExistingPluginConf, NewPluginConf)
+  try update_plugin_conf(NewConf)
   catch
     PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
   end,
 
-  %% update emqx override configuration
-  ExistingOverrideConf = map_without_root_key(ExistingConf, ?KEY_ROOT),
-  NewOverrideConf = map_without_root_key(NewConf, ?KEY_ROOT),
-  logger:debug("Updating override config: ExistingConf=~p, NewConf=~p", [ExistingOverrideConf, NewOverrideConf]),
-  try update_override_conf(ExistingOverrideConf, NewOverrideConf)
+  NewOverrideConf = maps:get(?KEY_EMQX_CONFIG, NewConf),
+  logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, NewOverrideConf]),
+  try update_override_conf(ExistingConf, NewOverrideConf)
   catch
     OverrideUpdateErr -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateErr])
   end.
@@ -145,10 +151,10 @@ update_conf(Existing, New) ->
 %%--------------------------------------------------------------------
 
 %% TODO trigger actions on config change
-update_plugin_conf(_, #{} = NewConf) when map_size(NewConf) == 0 ->
+update_plugin_conf(#{} = NewComponentConf) when map_size(NewComponentConf) == 0 ->
   clear_plugin_conf();
-update_plugin_conf(_, NewConf) ->
-  CheckedConf = validate_plugin_conf(NewConf),
+update_plugin_conf(NewComponentConf) ->
+  CheckedConf = validate_plugin_conf(NewComponentConf),
   update_plugin_env(CheckedConf).
 
 clear_plugin_conf() ->
@@ -157,43 +163,54 @@ clear_plugin_conf() ->
 
 validate_plugin_conf(Conf) ->
   try
-    {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, Conf, #{return_plain => true, format => map}),
-    ?NORMALIZE_MAP(CheckedConf)
+    {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => Conf}, #{return_plain => true, format => map}),
+    maps:get(?SCHEMA_ROOT, ?NORMALIZE_MAP(CheckedConf))
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
 
-update_plugin_env(Conf) ->
+update_plugin_env(ComponentConf) ->
   %% TODO find a more dynamic way
-  RootConfig = maps:get(?KEY_ROOT, Conf),
-  AuthMode = maps:get(?KEY_AUTH_MODE, RootConfig, ?DEFAULT_AUTH_MODE),
+  AuthMode = maps:get(?KEY_AUTH_MODE, ComponentConf, ?DEFAULT_AUTH_MODE),
   application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_AUTH_MODE], AuthMode]),
-  UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, RootConfig, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
+  UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ComponentConf, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
   application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates),
-  logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]).
+  logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]),
+  ConfigUpdateMode = maps:get(?KEY_CONFIG_UPDATE_MODE, ComponentConf, ?DEFAULT_CONFIG_UPDATE_MODE),
+  application:set_env(?ENV_APP, ?KEY_CONFIG_UPDATE_MODE, ConfigUpdateMode),
+  logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_CONFIG_UPDATE_MODE], ConfigUpdateMode]).
 
 %%--------------------------------------------------------------------
 %% Update EMQX Override Config
 %%--------------------------------------------------------------------
 
-update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
-  clear_override_conf(ExistingConf);
 update_override_conf(ExistingConf, NewConf) ->
+  update_override_conf(config_update_mode(), ExistingConf, NewConf).
+
+update_override_conf(merge, _, #{} = NewConf) when map_size(NewConf) == 0 ->
+  ok;
+update_override_conf(override, ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
+  clear_override_conf(ExistingConf);
+
+update_override_conf(merge, ExistingConf, NewConf) ->
+  MergedConf = hocon:deep_merge(ExistingConf, NewConf),
+  do_update_override_conf(MergedConf, maps:keys(MergedConf));
+update_override_conf(override, ExistingConf, NewConf) ->
   MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
   clear_override_conf(MapToClear),
-  update_override_conf(ExistingConf, NewConf, maps:keys(NewConf)).
+  do_update_override_conf(NewConf, maps:keys(NewConf)).
 
-update_override_conf(_, _, []) ->
+do_update_override_conf(_, []) ->
   ok;
-update_override_conf(ExistingConf, NewConf, [Key | Rest]) ->
+do_update_override_conf(Conf, [Key | Rest]) ->
   ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, NewConf), ?CONF_OPTS) of
+  case catch emqx_conf:update(ConfPath, maps:get(Key, Conf), ?CONF_OPTS) of
     {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
     {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
     Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
   end,
-  update_override_conf(ExistingConf, NewConf, Rest).
+  do_update_override_conf(Conf, Rest).
 
 clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
   %% we must remove leaf configs because EMQX does not allow use to remove root configs.
