@@ -6,7 +6,6 @@
 #include "../common.h"
 #include "../defer.h"
 #include "cda_integration.h"
-#include "config.h"
 #include <array>
 #include <fstream>
 #include <memory>

@@ -4,21 +4,15 @@
  */
 
 #include "private/configuration_subscriber.h"
-#include "config.h"
 #include "logger.h"
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
+
 void ConfigurationUpdatesHandler::OnStreamEvent(GG::ConfigurationUpdateEvents *response) {
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
-    if (response->GetConfigurationUpdateEvent().has_value() &&
-        response->GetConfigurationUpdateEvent()->GetKeyPath().has_value() &&
-        !response->GetConfigurationUpdateEvent()->GetKeyPath()->empty() &&
-        std::string(response->GetConfigurationUpdateEvent()->GetKeyPath().value()[0]) ==
-            aws::greengrass::emqx::localOverrideNamespace) {
-        callback->operator()();
-    }
+    callback->operator()();
 }
 
 bool ConfigurationUpdatesHandler::OnStreamError(OperationError *error) {

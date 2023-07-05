@@ -9,7 +9,6 @@
 #include <variant>
 
 #include "cda_integration.h"
-#include "config.h"
 
 #define DEFAULT_TIMEOUT_SECONDS 5.0
 
@@ -59,7 +58,6 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
     }
 
     GG::GetConfigurationRequest request;
-    request.SetKeyPath({Aws::Crt::String(aws::greengrass::emqx::localOverrideNamespace)});
 
     auto activate = getConfigOperation->Activate(request).get();
     if (!activate) {
@@ -79,9 +77,7 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
         result.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
         LOG_I(
             CDA_INTEG_SUBJECT,
-            "Configuration /%s was not present. This is not a problem, but no configuration changes in /%s will apply",
-            aws::greengrass::emqx::localOverrideNamespace.c_str(),
-            aws::greengrass::emqx::localOverrideNamespace.c_str());
+            "Component configuration is not present. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
 
@@ -93,9 +89,7 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
 
     if (result.GetOperationResponse() == nullptr || !result.GetOperationResponse()->GetValue().has_value()) {
         LOG_I(CDA_INTEG_SUBJECT,
-              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str());
+              "Component configuration is empty. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
     auto response = result.GetOperationResponse()->GetValue().value();
@@ -103,20 +97,13 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
     auto config_view = response.View();
     if (config_view.IsNull()) {
         LOG_I(CDA_INTEG_SUBJECT,
-              "Configuration /%s was empty. This is not a problem, but no configuration changes in /%s will apply",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str());
+              "Component configuration is empty. No configuration changes will apply");
         return std::make_unique<std::string>("{}");
     }
 
     if (!config_view.IsObject()) {
         LOG_E(CDA_INTEG_SUBJECT,
-              "Configuration /%s was present, but not an object. Configuration from /%s will not be applied. Fix this "
-              "by updating the deployment with "
-              "\"RESET\":[\"/%s\"]",
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str(),
-              aws::greengrass::emqx::localOverrideNamespace.c_str());
+              "Component configuration is present, but not an object. Configuration will not be applied");
         return 1;
     }
 
