@@ -9,7 +9,8 @@
 
 #define SUBSCRIBE_TIMEOUT_SECONDS 10
 
-void ConfigurationUpdatesHandler::OnStreamEvent(GG::ConfigurationUpdateEvents *response) {
+void ConfigurationUpdatesHandler::OnStreamEvent(
+    GG::ConfigurationUpdateEvents *response) { // NOLINT(misc-unused-parameters)
     LOG_I(CONFIG_SUBSCRIBER_SUBJECT, "configurationUpdate stream event");
     callback->operator()();
 }
