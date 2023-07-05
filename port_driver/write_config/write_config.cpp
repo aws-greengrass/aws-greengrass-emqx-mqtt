@@ -96,6 +96,11 @@ std::variant<int, Aws::Crt::JsonView> get_emqx_configuration(GreengrassIPCWrappe
     }
     auto responseResult = GG::GetConfigurationResult(responseFuture.get());
     auto responseType = responseResult.GetResultType();
+    if (responseResult.GetOperationError() != nullptr &&
+        responseResult.GetOperationError()->GetModelName() == GG::ResourceNotFoundError::MODEL_NAME) {
+        LOG_I(WRITE_CONFIG_SUBJECT, "Component configuration is not present. Configuration changes will not apply");
+        return 0;
+    }
     if (responseType != OPERATION_RESPONSE) {
         ClientDeviceAuthIntegration::handle_response_error(GetConfigurationRequest, responseType,
                                                            responseResult.GetOperationError());
