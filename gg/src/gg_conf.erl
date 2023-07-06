@@ -153,7 +153,7 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
     PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
   end,
 
-  NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf)),
+  NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf, #{})),
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, NewOverrideConf]),
   case emqx_conf_cli:load_config(NewOverrideConf, merge) of
     ok -> ok;
