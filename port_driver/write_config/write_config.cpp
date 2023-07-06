@@ -78,7 +78,7 @@ void setup_logger() {
     aws_logger_set(&our_logger);
 }
 
-std::variant<int, Aws::Crt::JsonView> get_emqx_configuration(GreengrassIPCWrapper &ipc) {
+std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrapper &ipc) {
     auto &client = ipc.getIPCClient();
     auto operation = client.NewGetConfiguration();
     GG::GetConfigurationRequest request;
@@ -113,16 +113,7 @@ std::variant<int, Aws::Crt::JsonView> get_emqx_configuration(GreengrassIPCWrappe
         return 0;
     }
 
-    auto view = response->GetValue().value().View();
-    if (view.IsNull()) {
-        LOG_I(WRITE_CONFIG_SUBJECT, "Component configuration missing. No configuration changes will apply");
-        return 0;
-    }
-    if (!view.IsObject()) {
-        LOG_E(WRITE_CONFIG_SUBJECT, "Component configuration is not an object.");
-        return 1;
-    }
-    return view;
+    return response->GetValue().value();
 }
 
 int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
@@ -132,7 +123,15 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     if (holds_alternative<int>(config_value)) {
         return get<int>(config_value);
     }
-    auto config_view = get<Aws::Crt::JsonView>(config_value);
+    auto config_view = get<Aws::Crt::JsonObject>(config_value).View();
+    if (config_view.IsNull()) {
+        LOG_I(WRITE_CONFIG_SUBJECT, "Component configuration missing. No configuration changes will apply");
+        return 0;
+    }
+    if (!config_view.IsObject()) {
+        LOG_E(WRITE_CONFIG_SUBJECT, "Component configuration is not an object.");
+        return 8;
+    }
 
     // Write customer-provided values to CWD
     const std::filesystem::path etc_dir(std::getenv(EMQX_ETC_DIR_ENV_VAR));
@@ -144,8 +143,8 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Configuration is in the form of
     // {"emqxConfig": {"listeners": {"ssl": {"default": ...}}}}
     // We do not check if the config is valid, this is handled by EMQx.
-    auto emqx_config = config_view.GetJsonObject(KEY_EMQX_CONFIG);
-    if (emqx_config.IsNull()) {
+    auto emqx_config = config_view.AsObject().GetJsonObject(KEY_EMQX_CONFIG);
+    if (emqx_config.IsNull() || emqx_config.GetAllObjects().empty()) {
         LOG_I(WRITE_CONFIG_SUBJECT, "Configuration /%s not present. Configuration from /%s will not be applied.",
               KEY_EMQX_CONFIG, KEY_EMQX_CONFIG);
         return 0;
