@@ -130,7 +130,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     }
     if (!config_view.IsObject()) {
         LOG_E(WRITE_CONFIG_SUBJECT, "Component configuration is not an object.");
-        return 8;
+        return 1;
     }
 
     // Write customer-provided values to CWD
@@ -177,7 +177,7 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
         output.erase(closing_brace);
     }
 
-    LOG_I(WRITE_CONFIG_SUBJECT, "Writing configuration to %s", emqx_conf.string());
+    LOG_I(WRITE_CONFIG_SUBJECT, "Writing configuration to %s", emqx_conf.string().c_str());
 
     // Open file for writing. Will create file if it doesn't exist.
     auto out_path = std::ofstream(emqx_conf, std::ofstream::app);
