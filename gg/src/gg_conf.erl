@@ -59,7 +59,7 @@ greengrass_emqx_default_conf() ->
 
 load_greengrass_emqx_default_conf() ->
   %% we know this is valid conf because it's also used in emqx.conf
-  case hocon:load(filename:join([emqx:etc_dir(), <<"gg.emqx.conf">>])) of
+  case hocon:load(emqx:etc_file("gg.emqx.conf")) of
     {ok, C} ->
       Conf = ?NORMALIZE_MAP(C),
       application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf),
