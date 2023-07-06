@@ -155,7 +155,8 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
 
   NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf, #{})),
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, NewOverrideConf]),
-  case emqx_conf_cli:load_config(term_to_binary(NewOverrideConf), merge) of
+  BinaryNewOverrideConf = list_to_binary(io_lib:format("~p", [NewOverrideConf])),
+  case emqx_conf_cli:load_config(BinaryNewOverrideConf, merge) of
     ok -> ok;
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
