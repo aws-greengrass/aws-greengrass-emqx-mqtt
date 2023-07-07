@@ -17,6 +17,9 @@
 
 -define(INITIAL_CONF_TIMEOUT_MILLIS, 30000).
 
+%% TODO figure out how to import emqx_conf.hrl instead
+-define(READONLY_KEYS, [cluster, rpc, node]).
+
 %% config keys
 -define(KEY_EMQX_CONFIG, <<"emqxConfig">>).
 -define(KEY_AUTH_MODE, <<"authMode">>).
@@ -154,8 +157,10 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   end,
 
   NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf, #{})),
-  logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, NewOverrideConf]),
-  case emqx_conf_cli:load_config(emqx_utils_json:encode(NewOverrideConf), merge) of
+  ReloadableConf = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, NewOverrideConf),
+  %% TODO detect change of non-reloadable conf
+  logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, ReloadableConf]),
+  case emqx_conf_cli:load_config(emqx_utils_json:encode(ReloadableConf), merge) of
     ok -> ok;
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
