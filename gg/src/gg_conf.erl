@@ -61,6 +61,7 @@ greengrass_emqx_default_conf() ->
   application:get_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, #{}).
 
 load_greengrass_emqx_default_conf() ->
+  %% TODO include environment variables e.g. certfile
   %% we know this is valid conf because it's also used in emqx.conf
   case hocon:load(emqx:etc_file("gg.emqx.conf")) of
     {ok, C} ->
@@ -186,6 +187,8 @@ validate_plugin_conf(Conf) ->
     Fields = lists:map(fun(SchemaEntry) -> element(1, SchemaEntry) end, gg_schema:fields(gg_schema:namespace())),
     PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => PluginConf}, #{return_plain => true, format => map}),
+      %% TODO remove
+    logger:debug("schemaFields=~p, conf=~p, pluginConf=~p, checkedConf=~p", [Fields, Conf, PluginConf, CheckedConf]),
     maps:get(?SCHEMA_ROOT, ?NORMALIZE_MAP(CheckedConf))
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
@@ -210,22 +213,18 @@ update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
 update_override_conf(ExistingConf, NewConf) ->
   MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
   clear_override_conf(MapToClear),
-  do_update_override_conf(NewConf, maps:keys(NewConf)).
+  maps:foreach(fun do_update_override_conf/2, NewConf).
 
-do_update_override_conf(_, []) ->
-  ok;
-do_update_override_conf(Conf, [Key | Rest]) ->
-  ConfPath = [Key],
-  case catch emqx_conf:update(ConfPath, maps:get(Key, Conf), ?CONF_OPTS) of
-    {ok, _} -> logger:info("Updated ~p config", [ConfPath]);
-    {error, UpdateError} -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, UpdateError]);
-    Err -> logger:warning("Failed to update configuration. confPath=~p, error=~p", [ConfPath, Err])
-  end,
-  do_update_override_conf(Conf, Rest).
+do_update_override_conf(Key, Value) ->
+  case catch emqx_conf:update([Key], Value, ?CONF_OPTS) of
+    {ok, _} -> logger:info("Updated ~p config", [Key]);
+    {error, UpdateError} -> logger:warning("Failed to update configuration. conf=~p, error=~p", [Key, UpdateError]);
+    Err -> logger:warning("Failed to update configuration. conf=~p, error=~p", [Key, Err])
+  end.
 
-clear_override_conf(ExistingConf) when is_map(ExistingConf) ->
+clear_override_conf(Conf) when is_map(Conf) ->
   %% we must remove leaf configs because EMQX does not allow use to remove root configs.
-  for_each_conf(ExistingConf, fun remove_override_conf_path/1).
+  for_each_conf(Conf, fun remove_override_conf_path/1).
 
 remove_override_conf_path([]) ->
   ok;
@@ -241,6 +240,8 @@ remove_override_conf(Path) when is_list(Path) ->
     {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
     Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
   end.
+
+%% TODO set of all paths, sorted descending size, exclude size one
 
 for_each_conf(Conf, Func) ->
   for_each_conf([], Conf, Func).
