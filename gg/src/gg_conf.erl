@@ -18,7 +18,7 @@
 -define(INITIAL_CONF_TIMEOUT_MILLIS, 30000).
 
 %% TODO figure out how to import emqx_conf.hrl instead
--define(READONLY_KEYS, [cluster, rpc, node]).
+-define(READONLY_KEYS, [<<"cluster">>, <<"rpc">>, <<"node">>]).
 
 %% config keys
 -define(KEY_EMQX_CONFIG, <<"emqxConfig">>).
