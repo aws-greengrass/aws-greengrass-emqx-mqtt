@@ -184,7 +184,7 @@ clear_plugin_conf() ->
 validate_plugin_conf(Conf) ->
   try
     %% Unknown fields not allowed when checking schema
-    Fields = lists:map(fun(SchemaEntry) -> element(1, atom_to_binary(SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
+    Fields = lists:map(fun(SchemaEntry) -> atom_to_binary(element(1, SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
     PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => PluginConf}, #{return_plain => true, format => map}),
     maps:get(?SCHEMA_ROOT, ?NORMALIZE_MAP(CheckedConf))
