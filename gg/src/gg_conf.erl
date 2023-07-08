@@ -90,7 +90,7 @@ stop() ->
   ?UPDATE_PROC ! stop.
 
 %% Retrieve Greengrass configuration via GetConfiguration IPC call,
-%% and update emqx override configuration with the result.
+%% and update EMQX override configuration with the result.
 request_update() ->
   ?UPDATE_PROC ! update.
 
@@ -150,16 +150,16 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   ExistingConf = normalize_map(ExistingOverrideConf),
   NewConf = normalize_map(NewComponentConf),
 
-  try update_plugin_conf(NewConf)
+  PluginConf = get_plugin_conf(NewConf),
+  try update_plugin_conf(PluginConf)
   catch
     PluginUpdateErr -> logger:warning("Unable to update plugin configuration: ~p", [PluginUpdateErr])
   end,
 
-  NewOverrideConf = hocon:deep_merge(greengrass_emqx_default_conf(), maps:get(?KEY_EMQX_CONFIG, NewConf, #{})),
-  ReloadableConf = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, NewOverrideConf),
+  OverrideConf = get_override_conf(NewConf),
   %% TODO detect change of non-reloadable conf
-  logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, ReloadableConf]),
-  case catch update_override_conf(ExistingConf, ReloadableConf) of
+  logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
+  case catch update_override_conf(ExistingConf, OverrideConf) of
     ok -> ok;
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
@@ -168,34 +168,30 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
 %% Update Plugin Config
 %%--------------------------------------------------------------------
 
-%% TODO trigger actions on config change
-update_plugin_conf(#{} = NewComponentConf) when map_size(NewComponentConf) == 0 ->
-  clear_plugin_conf();
-update_plugin_conf(NewComponentConf) ->
-  CheckedConf = validate_plugin_conf(NewComponentConf),
-  update_plugin_env(CheckedConf).
+get_plugin_conf(Conf) ->
+  %% Unknown fields not allowed when checking schema
+  Fields = lists:map(fun(SchemaEntry) -> atom_to_binary(element(1, SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
+  PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
+  validate_plugin_conf(PluginConf).
 
-clear_plugin_conf() ->
-  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
-  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
-
-validate_plugin_conf(Conf) ->
+validate_plugin_conf(PluginConf) ->
   try
-    %% Unknown fields not allowed when checking schema
-    Fields = lists:map(fun(SchemaEntry) -> atom_to_binary(element(1, SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
-    PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => PluginConf}, #{return_plain => true, format => map}),
     maps:get(?SCHEMA_ROOT, normalize_map(CheckedConf))
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
 
-update_plugin_env(ComponentConf) ->
+%% TODO trigger actions on config change
+update_plugin_conf(#{} = PluginConf) when map_size(PluginConf) == 0 ->
+  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
+  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES);
+update_plugin_conf(PluginConf) ->
   %% TODO find a more dynamic way
-  AuthMode = maps:get(?KEY_AUTH_MODE, ComponentConf, ?DEFAULT_AUTH_MODE),
+  AuthMode = maps:get(?KEY_AUTH_MODE, PluginConf, ?DEFAULT_AUTH_MODE),
   application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_AUTH_MODE], AuthMode]),
-  UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ComponentConf, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
+  UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, PluginConf, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
   application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates),
   logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]).
 
@@ -203,6 +199,14 @@ update_plugin_env(ComponentConf) ->
 %%--------------------------------------------------------------------
 %% Update EMQX Override Config
 %%--------------------------------------------------------------------
+
+get_override_conf(Conf) ->
+  PluginConf = get_plugin_conf(Conf),
+  Conf1 = maps:get(?KEY_EMQX_CONFIG, Conf, #{}),
+  Conf2 = hocon:deep_merge(greengrass_emqx_default_conf(), Conf1),
+  Conf3 = maps:filter(fun(K,_) -> not maps:is_key(K, PluginConf) end, Conf2),
+  Conf4 = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, Conf3),
+  Conf4.
 
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_override_conf(ExistingConf);
@@ -224,7 +228,7 @@ remove_override_conf(Path) ->
     {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
     Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
   end,
-  %% remove subpaths as well, emqx applications may be listening for config changes on a subpath,
+  %% remove subpaths as well, EMQX applications may be listening for config changes on a subpath,
   %% so deleting just leaf configs may not trigger these listeners.
   %% for example, bridges only reacts when [bridges, http, <bridge_name>] path changes.
   remove_override_conf(lists:droplast(Path)).
