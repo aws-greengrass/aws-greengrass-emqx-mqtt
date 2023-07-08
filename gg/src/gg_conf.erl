@@ -224,35 +224,30 @@ do_update_override_conf(Key, Value) ->
 
 clear_override_conf(Conf) when is_map(Conf) ->
   %% we must remove leaf configs because EMQX does not allow use to remove root configs.
-  for_each_conf(Conf, fun remove_override_conf_path/1).
-
-remove_override_conf_path([]) ->
-  ok;
-remove_override_conf_path(Path) ->
-  remove_override_conf(Path),
-  remove_override_conf_path(lists:droplast(Path)).
+  lists:foreach(fun remove_override_conf/1, uniq(leaf_config_paths(Conf))).
 
 remove_override_conf([]) ->
   ok;
-remove_override_conf(Path) when is_list(Path) ->
+remove_override_conf([_]) -> %% EMQX doesn't allow root key removal
+  ok;
+remove_override_conf(Path) ->
   case catch emqx_conf:remove(Path, ?CONF_OPTS) of
     {ok, _} -> logger:info("Removed ~p config", [Path]);
     {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
     Err -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, Err])
-  end.
+  end,
+  %% remove subpaths as well, emqx applications may be listening for config changes on a subpath,
+  %% so deleting just leaf configs may not trigger these listeners.
+  %% for example, bridges only reacts when [bridges, http, <bridge_name>] path changes.
+  remove_override_conf(lists:droplast(Path)).
 
-%% TODO set of all paths, sorted descending size, exclude size one
+leaf_config_paths(Conf) when is_map(Conf) ->
+  lists:flatmap(fun ({Key, Val}) -> Key ++ leaf_config_paths(Val) end, maps:to_list(Conf));
+leaf_config_paths(_) ->
+  [].
 
-for_each_conf(Conf, Func) ->
-  for_each_conf([], Conf, Func).
-for_each_conf(Path, Conf, Func) ->
-  if
-    map_size(Conf) == 0 -> Func(Path);
-    true -> maps:foreach(
-      fun(K, V) ->
-        if
-          is_map(V) -> for_each_conf(Path ++ [K], V, Func);
-          true -> Func(Path ++ [K])
-        end
-      end, Conf)
-  end.
+%% use lists:uniq instead when we upgrade to OTP 25
+uniq([]) ->
+  [];
+uniq([H|T]) ->
+  [H | [X || X <- uniq(T), H /= X]].
