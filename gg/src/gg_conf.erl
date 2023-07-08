@@ -184,11 +184,9 @@ clear_plugin_conf() ->
 validate_plugin_conf(Conf) ->
   try
     %% Unknown fields not allowed when checking schema
-    Fields = lists:map(fun(SchemaEntry) -> element(1, SchemaEntry) end, gg_schema:fields(gg_schema:namespace())),
+    Fields = lists:map(fun(SchemaEntry) -> element(1, atom_to_binary(SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
     PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => PluginConf}, #{return_plain => true, format => map}),
-      %% TODO remove
-    logger:debug("schemaFields=~p, conf=~p, pluginConf=~p, checkedConf=~p", [Fields, Conf, PluginConf, CheckedConf]),
     maps:get(?SCHEMA_ROOT, ?NORMALIZE_MAP(CheckedConf))
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
@@ -213,14 +211,7 @@ update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
 update_override_conf(ExistingConf, NewConf) ->
   MapToClear = maps:filter(fun(K,_) -> not maps:is_key(K, NewConf) end, ExistingConf),
   clear_override_conf(MapToClear),
-  maps:foreach(fun do_update_override_conf/2, NewConf).
-
-do_update_override_conf(Key, Value) ->
-  case catch emqx_conf:update([Key], Value, ?CONF_OPTS) of
-    {ok, _} -> logger:info("Updated ~p config", [Key]);
-    {error, UpdateError} -> logger:warning("Failed to update configuration. conf=~p, error=~p", [Key, UpdateError]);
-    Err -> logger:warning("Failed to update configuration. conf=~p, error=~p", [Key, Err])
-  end.
+  emqx_conf_cli:load_config(emqx_utils_json:encode(NewConf), replace).
 
 clear_override_conf(Conf) when is_map(Conf) ->
   lists:foreach(fun remove_override_conf/1, uniq(leaf_config_paths(Conf))).
