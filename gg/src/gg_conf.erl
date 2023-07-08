@@ -223,7 +223,6 @@ do_update_override_conf(Key, Value) ->
   end.
 
 clear_override_conf(Conf) when is_map(Conf) ->
-  %% we must remove leaf configs because EMQX does not allow use to remove root configs.
   lists:foreach(fun remove_override_conf/1, uniq(leaf_config_paths(Conf))).
 
 remove_override_conf([]) ->
