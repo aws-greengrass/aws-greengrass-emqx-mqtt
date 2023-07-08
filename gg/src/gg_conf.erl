@@ -159,7 +159,7 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   ReloadableConf = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, NewOverrideConf),
   %% TODO detect change of non-reloadable conf
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, ReloadableConf]),
-  case update_override_conf(ExistingConf, ReloadableConf) of
+  case catch update_override_conf(ExistingConf, ReloadableConf) of
     ok -> ok;
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
