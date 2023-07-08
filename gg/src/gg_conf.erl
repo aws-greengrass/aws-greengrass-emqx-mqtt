@@ -239,11 +239,13 @@ leaf_config_paths(_) ->
   [].
 
 normalize_map(Map) ->
-  BinMap = emqx_utils_maps:binary_key_map(Map), %% configs like authentication only work with binary keys
-  replace_value(BinMap, fun(V) -> V == null end, undefined). %% null is okay in emqx.conf but apparently not during an update
+  Map1 = emqx_utils_maps:binary_key_map(Map), %% configs like authentication only work with binary keys
+  Map2 = replace_value(Map1, fun(V) -> V == null end, undefined), %% null is okay in emqx.conf but apparently not during an update
+  logger:debug("normalize_map: Map1=~p, Map2=~p", [Map1, Map2]), %% TODO remove
+  Map2.
 
 replace_value(Element, Predicate, NewVal) when is_map(Element) ->
-  maps:map(fun(Key, Value) -> {Key, replace_value(Value, Predicate, NewVal)} end, Element);
+  maps:fold(fun(K,V,Acc) -> maps:put(K, replace_value(V, Predicate, NewVal), Acc) end, #{}, Element);
 replace_value(Element, Predicate, NewVal) when is_list(Element) ->
   lists:map(fun(Elem) -> replace_value(Elem, Predicate, NewVal) end, Element);
 replace_value(Element, Predicate, NewVal) ->
