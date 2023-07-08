@@ -38,8 +38,6 @@
 -define(UPDATE_PROC, gg_conf_listen_for_updates).
 -define(CONF_UPDATE, conf_updated).
 
--define(NORMALIZE_MAP, fun emqx_utils_maps:binary_key_map/1). %% configs like authentication only work with binary keys
-
 
 %%--------------------------------------------------------------------
 %% Config API
@@ -65,7 +63,7 @@ load_greengrass_emqx_default_conf() ->
   %% we know this is valid conf because it's also used in emqx.conf
   case hocon:load(emqx:etc_file("gg.emqx.conf")) of
     {ok, C} ->
-      Conf = ?NORMALIZE_MAP(C),
+      Conf = normalize_map(C),
       application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf),
       ok;
     {error, Err} -> {error, {unable_to_read_config, Err}}
@@ -149,8 +147,8 @@ decode_conf(Conf) when is_binary(Conf) ->
   end.
 
 update_conf(ExistingOverrideConf, NewComponentConf) ->
-  ExistingConf = ?NORMALIZE_MAP(ExistingOverrideConf),
-  NewConf = ?NORMALIZE_MAP(NewComponentConf),
+  ExistingConf = normalize_map(ExistingOverrideConf),
+  NewConf = normalize_map(NewComponentConf),
 
   try update_plugin_conf(NewConf)
   catch
@@ -187,7 +185,7 @@ validate_plugin_conf(Conf) ->
     Fields = lists:map(fun(SchemaEntry) -> atom_to_binary(element(1, SchemaEntry)) end, gg_schema:fields(gg_schema:namespace())),
     PluginConf = maps:filter(fun(Key, _) -> lists:member(Key, Fields) end, Conf),
     {_, CheckedConf} = hocon_tconf:map_translate(gg_schema, #{?SCHEMA_ROOT => PluginConf}, #{return_plain => true, format => map}),
-    maps:get(?SCHEMA_ROOT, ?NORMALIZE_MAP(CheckedConf))
+    maps:get(?SCHEMA_ROOT, normalize_map(CheckedConf))
   catch throw:E:ST ->
     {error, {config_validation, E, ST}}
   end.
@@ -235,6 +233,20 @@ leaf_config_paths(Conf) when is_map(Conf) ->
   lists:flatmap(fun ({Key, Val}) -> Key ++ leaf_config_paths(Val) end, maps:to_list(Conf));
 leaf_config_paths(_) ->
   [].
+
+normalize_map(Map) ->
+  BinMap = emqx_utils_maps:binary_key_map(Map), %% configs like authentication only work with binary keys
+  replace_value(BinMap, fun(V) -> V == null end, undefined). %% null is okay in emqx.conf but apparently not during an update
+
+replace_value(Element, Predicate, NewVal) when is_map(Element) ->
+  maps:map(fun(Key, Value) -> {Key, replace_value(Value, Predicate, NewVal)} end, Element);
+replace_value(Element, Predicate, NewVal) when is_list(Element) ->
+  lists:map(fun(Elem) -> replace_value(Elem, Predicate, NewVal) end, Element);
+replace_value(Element, Predicate, NewVal) ->
+  case Predicate(Element) of
+    true -> NewVal;
+    _ -> Element
+  end.
 
 %% use lists:uniq instead when we upgrade to OTP 25
 uniq([]) ->
