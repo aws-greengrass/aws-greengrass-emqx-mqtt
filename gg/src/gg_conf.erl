@@ -67,7 +67,9 @@ load_greengrass_emqx_default_conf() ->
              end,
   %% also include env overrides because we set some in the recipe (e.g. ssl keyfile/certfile)
   Conf1 = hocon_tconf:merge_env_overrides(emqx_schema, Conf0, all, #{format => map}),
-  application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf1).
+  %% some fields are lost during the override merge, bring them back in
+  Conf2 = hocon:deep_merge(Conf0, Conf1),
+  application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf2).
 
 %%--------------------------------------------------------------------
 %% Config Update Listener
@@ -206,6 +208,7 @@ get_override_conf(Conf) ->
   Conf2 = hocon:deep_merge(greengrass_emqx_default_conf(), Conf1),
   Conf3 = maps:filter(fun(K,_) -> not maps:is_key(K, PluginConf) end, Conf2),
   Conf4 = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, Conf3),
+  logger:debug("override Conf1=~p, Conf2=~p, Conf3=~p, Conf4=~p", [Conf1, Conf2, Conf3, Conf4]),
   Conf4.
 
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
