@@ -208,8 +208,27 @@ get_override_conf(Conf) ->
   Conf2 = hocon:deep_merge(greengrass_emqx_default_conf(), Conf1),
   Conf3 = maps:filter(fun(K,_) -> not maps:is_key(K, PluginConf) end, Conf2),
   Conf4 = maps:filter(fun(Key, _) -> not lists:member(Key, ?READONLY_KEYS) end, Conf3),
-  logger:debug("override Conf1=~p, Conf2=~p, Conf3=~p, Conf4=~p", [Conf1, Conf2, Conf3, Conf4]),
-  Conf4.
+  Conf5 = no_cacertfile_workaround(Conf4),
+  Conf5.
+
+%% We don't set cacertfile in ssl options. In order for this to take
+%% in emqx_conf_cli:load_config, we must remove it from the configuration map.
+%% Setting cacertfile to null, undefined, or empty string does not work (as of EMQX 5.1.1)
+no_cacertfile_workaround(#{<<"listeners">> := Val} = Conf) ->
+  logger:debug("here1"),
+  Conf#{<<"listeners">> => no_cacertfile_workaround(Val)};
+no_cacertfile_workaround(#{<<"ssl">> := Val} = Conf) ->
+  logger:debug("here2"),
+  Conf#{<<"ssl">> => no_cacertfile_workaround(Val)};
+no_cacertfile_workaround(#{<<"default">> := Val} = Conf) ->
+  logger:debug("here3"),
+  Conf#{<<"default">> => no_cacertfile_workaround(Val)};
+no_cacertfile_workaround(#{<<"ssl_options">> := #{<<"cacertfile">> := CA} = Val} = Conf) when CA == null; CA == undefined ->
+  logger:debug("here4"),
+  Conf#{<<"ssl_options">> => maps:remove(<<"cacertfile">>, Val)};
+no_cacertfile_workaround(Conf)->
+  logger:debug("here5"),
+  Conf.
 
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
   clear_override_conf(ExistingConf);
@@ -221,8 +240,6 @@ update_override_conf(ExistingConf, NewConf) ->
 clear_override_conf(Conf) when is_map(Conf) ->
   ConfPaths0 = leaf_config_paths(Conf),
   ConfPaths1 = uniq(ConfPaths0),
-  logger:debug("ConfPaths0: ~p", [ConfPaths0]),
-  logger:debug("ConfPaths1: ~p", [ConfPaths1]),
   lists:foreach(fun remove_override_conf/1, ConfPaths1).
 
 remove_override_conf([]) ->
@@ -248,7 +265,6 @@ leaf_config_paths(_) ->
 normalize_map(Map) ->
   Map1 = emqx_utils_maps:binary_key_map(Map), %% configs like authentication only work with binary keys
   Map2 = replace_value(Map1, fun(V) -> V == null end, undefined), %% null is okay in emqx.conf but apparently not during an update
-  logger:debug("normalize_map: Map1=~p, Map2=~p", [Map1, Map2]), %% TODO remove
   Map2.
 
 replace_value(Element, Predicate, NewVal) when is_map(Element) ->
