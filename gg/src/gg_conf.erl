@@ -216,13 +216,17 @@ update_override_conf(ExistingConf, NewConf) ->
   emqx_conf_cli:load_config(emqx_utils_json:encode(NewConf), replace).
 
 clear_override_conf(Conf) when is_map(Conf) ->
-  lists:foreach(fun remove_override_conf/1, uniq(leaf_config_paths(Conf))).
+  ConfPaths0 = leaf_config_paths(Conf),
+  ConfPaths1 = uniq(ConfPaths0),
+  logger:debug("ConfPaths0: ~p", [ConfPaths0]),
+  logger:debug("ConfPaths1: ~p", [ConfPaths1]),
+  lists:foreach(fun remove_override_conf/1, ConfPaths1).
 
 remove_override_conf([]) ->
   ok;
 remove_override_conf([_]) -> %% EMQX doesn't allow root key removal
   ok;
-remove_override_conf(Path) ->
+remove_override_conf(Path) when is_list(Path) ->
   case catch emqx_conf:remove(Path, ?CONF_OPTS) of
     {ok, _} -> logger:info("Removed ~p config", [Path]);
     {error, RemoveError} -> logger:warning("Failed to remove configuration. confPath=~p, error=~p", [Path, RemoveError]);
@@ -234,7 +238,7 @@ remove_override_conf(Path) ->
   remove_override_conf(lists:droplast(Path)).
 
 leaf_config_paths(Conf) when is_map(Conf) ->
-  lists:flatmap(fun ({Key, Val}) -> [Key] ++ leaf_config_paths(Val) end, maps:to_list(Conf));
+  lists:map(fun ({Key, Val}) -> lists:flatten([Key] ++ leaf_config_paths(Val)) end, maps:to_list(Conf));
 leaf_config_paths(_) ->
   [].
 
