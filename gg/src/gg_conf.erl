@@ -215,19 +215,14 @@ get_override_conf(Conf) ->
 %% in emqx_conf_cli:load_config, we must remove it from the configuration map.
 %% Setting cacertfile to null, undefined, or empty string does not work (as of EMQX 5.1.1)
 no_cacertfile_workaround(#{<<"listeners">> := Val} = Conf) ->
-  logger:debug("here1"),
   Conf#{<<"listeners">> => no_cacertfile_workaround(Val)};
 no_cacertfile_workaround(#{<<"ssl">> := Val} = Conf) ->
-  logger:debug("here2"),
   Conf#{<<"ssl">> => no_cacertfile_workaround(Val)};
 no_cacertfile_workaround(#{<<"default">> := Val} = Conf) ->
-  logger:debug("here3"),
   Conf#{<<"default">> => no_cacertfile_workaround(Val)};
 no_cacertfile_workaround(#{<<"ssl_options">> := #{<<"cacertfile">> := CA} = Val} = Conf) when CA == null; CA == undefined ->
-  logger:debug("here4"),
   Conf#{<<"ssl_options">> => maps:remove(<<"cacertfile">>, Val)};
 no_cacertfile_workaround(Conf)->
-  logger:debug("here5"),
   Conf.
 
 update_override_conf(ExistingConf, #{} = NewConf) when map_size(NewConf) == 0 ->
