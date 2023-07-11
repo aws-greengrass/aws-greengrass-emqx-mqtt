@@ -59,15 +59,15 @@ greengrass_emqx_default_conf() ->
   application:get_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, #{}).
 
 load_greengrass_emqx_default_conf() ->
-  %% TODO include environment variables e.g. certfile
   %% we know this is valid conf because it's also used in emqx.conf
-  case hocon:load(emqx:etc_file("gg.emqx.conf")) of
-    {ok, C} ->
-      Conf = normalize_map(C),
-      application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf),
-      ok;
-    {error, Err} -> {error, {unable_to_read_config, Err}}
-  end.
+  Conf0 = case hocon:load(emqx:etc_file("gg.emqx.conf")) of
+               {ok, C} ->
+                 normalize_map(C);
+               {error, Err} -> exit({error, {unable_to_read_config, Err}})
+             end,
+  %% also include env overrides because we set some in the recipe (e.g. ssl keyfile/certfile)
+  Conf1 = hocon_tconf:merge_env_overrides(emqx_schema, Conf0, all, #{format => map}),
+  application:set_env(?ENV_APP, ?KEY_DEFAULT_EMQX_CONF, Conf1).
 
 %%--------------------------------------------------------------------
 %% Config Update Listener
