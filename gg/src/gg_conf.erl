@@ -234,7 +234,7 @@ remove_override_conf(Path) ->
   remove_override_conf(lists:droplast(Path)).
 
 leaf_config_paths(Conf) when is_map(Conf) ->
-  lists:flatmap(fun ({Key, Val}) -> Key ++ leaf_config_paths(Val) end, maps:to_list(Conf));
+  lists:flatmap(fun ({Key, Val}) -> [Key] ++ leaf_config_paths(Val) end, maps:to_list(Conf));
 leaf_config_paths(_) ->
   [].
 
