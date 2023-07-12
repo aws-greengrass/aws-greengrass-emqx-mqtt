@@ -162,7 +162,10 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   %% TODO detect change of non-reloadable conf
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
   case catch update_override_conf(ExistingConf, OverrideConf) of
-    ok -> ok;
+    ok ->
+      %% TODO only do this when necessary
+      %% TODO handle error
+      gg_listeners:put_verify_fun(ssl, default, fun gg_tls:verify_client_certificate/3);
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
 

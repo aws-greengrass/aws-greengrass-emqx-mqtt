@@ -16,23 +16,8 @@ start(_StartType, _StartArgs) ->
   gg_port_driver:start(),
   gg_conf:start(),
   gg_certs:request_certificates(),
-  enable_cert_verification(),
   gg:load(application:get_all_env()),
   {ok, Sup}.
-
-enable_cert_verification() ->
-  case gg_conf:auth_mode() of
-    bypass ->
-      logger:info("Skipping custom cert verification");
-    _ ->
-      case gg_tls:enable(default) of
-        ok ->
-          logger:info("Custom cert verification enabled");
-        {error, Reason} ->
-          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s", [Reason]),
-          throw({error, ErrorString})
-      end
-  end.
 
 stop(_State) ->
   gg_conf:stop(),
