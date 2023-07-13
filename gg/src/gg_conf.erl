@@ -162,12 +162,20 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   %% TODO detect change of non-reloadable conf
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
   case catch update_override_conf(ExistingConf, OverrideConf) of
-    ok ->
-      %% TODO only do this when necessary
-      %% TODO handle error
-      gg_listeners:put_verify_fun(ssl, default, fun gg_tls:verify_client_certificate/3);
+    ok -> put_verify_fun();
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
+
+put_verify_fun() ->
+  put_verify_fun(auth_mode()).
+put_verify_fun(AuthMode) when AuthMode =/= bypass ->
+  %% TODO don't do this if already set
+  case gg_listeners:put_verify_fun(ssl, default, fun gg_tls:verify_client_certificate/3) of
+    ok -> logger:info("SSL listener custom verify fun set");
+    Err -> logger:error("Failed to set listener verify fun: ~p", [Err])
+  end;
+put_verify_fun(_AuthMode) ->
+  skip.
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config
