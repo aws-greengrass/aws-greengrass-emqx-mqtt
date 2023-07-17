@@ -92,7 +92,7 @@ stop() ->
   ?UPDATE_PROC ! stop.
 
 receive_conf_updates() ->
-  ListenPID = spawn(?MODULE, do_listen_for_update_requests, []),
+  ListenPID = spawn(?MODULE, do_receive_conf_updates, []),
   register(?UPDATE_PROC, ListenPID).
 
 do_receive_conf_updates() ->
