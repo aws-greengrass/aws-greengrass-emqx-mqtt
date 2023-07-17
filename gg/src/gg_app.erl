@@ -16,6 +16,14 @@ start(_StartType, _StartArgs) ->
   gg_port_driver:start(),
   gg_conf:start(),
   gg_certs:request_certificates(),
+  %% update config again to ensure "listeners" config is applied.
+  %% "listeners" config update will fail the first time
+  %% this component runs, because cert and key haven't been written yet,
+  %% and emqx validates that they exist.
+  case gg_conf:request_update_sync() of
+    ok -> ok;
+    Error -> exit(Error)
+  end,
   gg:load(application:get_all_env()),
   {ok, Sup}.
 
