@@ -5,6 +5,8 @@
 
 -module(gg_conf).
 
+-include_lib("emqx/include/emqx_authentication.hrl").
+
 -export([auth_mode/0, use_greengrass_managed_certificates/0]).
 
 -export([start/0, stop/0]).
@@ -167,7 +169,9 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   end,
 
   OverrideConf = get_override_conf(NewConf),
+  pre_config_handler(OverrideConf),
   %% TODO detect change of non-reloadable conf
+  %% TODO only update values that have changed (prevent EMQX pre/post config handlers from running)
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
   case catch update_override_conf(ExistingConf, OverrideConf) of
     ok -> put_verify_fun();
@@ -184,6 +188,35 @@ put_verify_fun(AuthMode) when AuthMode =/= bypass ->
   end;
 put_verify_fun(_AuthMode) ->
   skip.
+
+%%--------------------------------------------------------------------
+%% Special Case Config Handling
+%%--------------------------------------------------------------------
+
+%% This function is the place to perform operations before configuration
+%% is updated.  Needed for configs such as "authentication" which require
+%% a separate "create" operation to be performed before an update can occur.
+pre_config_handler(Conf) ->
+  pre_config_authentication(Conf).
+
+pre_config_authentication(Conf) ->
+  %% if we want to update the global authentication chain,
+  %% it must first be created.  this is what EMQX does in its dashboard.
+  %% TODO, do we need a removal operation?
+  case maps:is_key(<<"authentication">>, Conf) of
+    true ->
+      logger:info("authentication configuration update detected, creating global authenticator"),
+      case emqx_authn_api:create_authenticator([authentication], ?GLOBAL, Conf) of
+        {200, _} ->
+          logger:info("authenticator ~p created", [?GLOBAL]),
+          ok;
+        {409, _} -> ok; %% already exists
+        Err ->
+          logger:error("Unable to create authenticator ~p: ~p", [?GLOBAL, Err]),
+          error
+      end;
+    _ -> pass
+  end.
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config
