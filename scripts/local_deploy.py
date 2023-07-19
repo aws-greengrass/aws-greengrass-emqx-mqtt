@@ -20,14 +20,14 @@ def stop_greengrass() -> None:
     if os.name == 'nt':
         subprocess.call(['net', 'stop', 'greengrass'])  # allow failure, service may already be stopped
     else:
-        subprocess.check_call(['systemctl', 'stop', 'greengrass'])
+        raise NotImplementedError('unix not yet supported')
 
 
 def start_greengrass() -> None:
     if os.name == 'nt':
         subprocess.check_call(['net', 'start', 'greengrass'])
     else:
-        subprocess.check_call(['systemctl', 'start', 'greengrass'])
+        raise NotImplementedError('unix not yet supported')
 
 
 class ValidationException(Exception):
@@ -98,6 +98,9 @@ class LocalDeployer:
 
 
 if __name__ == '__main__':
+    if os.name != 'nt':
+        raise NotImplementedError('unix/docker not yet supported')
+
     parser = argparse.ArgumentParser(description='Deploy emqx component locally to greengrass core device. '
                                                  'The latest component version in artifacts-unarchived will be '
                                                  'replaced with contents of emqx.zip. NOTE: This script will only work'
