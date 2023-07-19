@@ -56,8 +56,12 @@ unhook(HookPoint, MFA) ->
 
 -spec(execute_auth_hook(function()) -> ?CONTINUE_HOOK_CHAIN | {?STOP_HOOK_CHAIN, {error, any()} | #{result => ?AUTHZ_DENY}}).
 execute_auth_hook(Hook) ->
+  execute_auth_hook(gg_conf:auth_mode(), Hook).
+execute_auth_hook(AuthMode, _Hook) when AuthMode == bypass ->
+  ?CONTINUE_HOOK_CHAIN;
+execute_auth_hook(AuthMode, Hook) ->
   case catch Hook() of
-    Result -> handle_auth_hook_result(gg_conf:auth_mode(), Result)
+    Result -> handle_auth_hook_result(AuthMode, Result)
   end.
 
 handle_auth_hook_result(_, {ok, _} = AuthNSuccess) ->

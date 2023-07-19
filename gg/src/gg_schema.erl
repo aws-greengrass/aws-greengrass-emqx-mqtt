@@ -15,14 +15,13 @@
   fields/1
 ]).
 
-%% TODO rename?
-namespace() -> "aws_greengrass_emqx_auth".
+namespace() -> "gg".
 
-roots() -> [{"aws_greengrass_emqx_auth", ?HOCON(?R_REF("aws_greengrass_emqx_auth"), #{translate_to => ["aws_greengrass_emqx_auth"]})}].
+roots() -> ["gg"].
 
-fields("aws_greengrass_emqx_auth") ->
+fields("gg") ->
   [
-    {auth_mode,
+    {authMode,
       ?HOCON(
         hoconsc:enum([enabled, bypass_on_failure, bypass]),
         #{
@@ -31,7 +30,7 @@ fields("aws_greengrass_emqx_auth") ->
           desc => "Auth mode"
         }
       )},
-    {use_greengrass_managed_certificates,
+    {useGreengrassManagedCertificates,
       ?HOCON(
         boolean(),
         #{

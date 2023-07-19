@@ -16,23 +16,16 @@ start(_StartType, _StartArgs) ->
   gg_port_driver:start(),
   gg_conf:start(),
   gg_certs:request_certificates(),
-  enable_cert_verification(),
+  %% update config again to ensure "listeners" config is applied.
+  %% "listeners" config update will fail the first time
+  %% this component runs, because cert and key haven't been written yet,
+  %% and emqx validates that they exist.
+  case gg_conf:request_update_sync() of
+    ok -> ok;
+    Error -> exit(Error)
+  end,
   gg:load(application:get_all_env()),
   {ok, Sup}.
-
-enable_cert_verification() ->
-  case gg_conf:auth_mode() of
-    bypass ->
-      logger:info("Skipping custom cert verification");
-    _ ->
-      case gg_tls:enable(default) of
-        ok ->
-          logger:info("Custom cert verification enabled");
-        {error, Reason} ->
-          ErrorString = io_lib:format("Failed to enable SSL custom certificate verification. Error: ~s", [Reason]),
-          throw({error, ErrorString})
-      end
-  end.
 
 stop(_State) ->
   gg_conf:stop(),

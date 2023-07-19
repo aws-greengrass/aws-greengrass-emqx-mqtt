@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <config.h>
 #include <logger.h>
 
 aws_log_level crtStringToLogLevel(const std::string &level);
