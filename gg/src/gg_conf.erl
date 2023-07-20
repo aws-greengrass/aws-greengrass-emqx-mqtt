@@ -167,7 +167,6 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   end,
 
   OverrideConf = get_override_conf(NewConf),
-  %% TODO detect change of non-reloadable conf
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
   case catch update_override_conf(ExistingConf, OverrideConf) of
     ok -> put_verify_fun();

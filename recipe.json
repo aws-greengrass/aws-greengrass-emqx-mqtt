@@ -63,7 +63,10 @@
           "EMQX_LOG__CONSOLE__LEVEL": "{configuration:/emqx/log.level}",
           "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
           "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}"
+          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}",
+          "RESTART_NODE_CONF": "{configuration:/emqxConfig/node}",
+          "RESTART_CLUSTER_CONF": "{configuration:/emqxConfig/cluster}",
+          "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -99,7 +102,10 @@
             "EMQX_LOG__CONSOLE__LEVEL": "{configuration:/emqx/log.level}",
             "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
             "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-            "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}"
+            "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+            "RESTART_NODE_CONF": "{configuration:/emqxConfig/node}",
+            "RESTART_CLUSTER_CONF": "{configuration:/emqxConfig/cluster}",
+            "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}"
           }
         },
         "shutdown": {
