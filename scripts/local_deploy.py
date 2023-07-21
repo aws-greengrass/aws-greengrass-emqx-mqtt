@@ -88,7 +88,7 @@ class LocalDeployer:
 
         print(f'Extracting build artifact')
         with zipfile.ZipFile(dst_artifact, 'r') as z:
-            z.extractall(self.deploy_dir)
+            z.extractall(os.path.join(self.deploy_dir, 'emqx'))
         os.remove(dst_artifact)
 
         print(f'Starting greengrass')
