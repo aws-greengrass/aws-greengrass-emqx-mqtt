@@ -9,6 +9,7 @@
 
 -export([start/0, stop/0]).
 -export([receive_conf_updates/0, do_receive_conf_updates/0, request_update/0, request_update_sync/0]).
+-export([register_config_change_handler/2]).
 
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
 -type(use_greengrass_managed_certificates() :: true | false).
@@ -33,6 +34,8 @@
 -define(ENV_APP, aws_greengrass_emqx_auth).
 -define(KEY_DEFAULT_EMQX_CONF, default_emqx_conf).
 
+-define(KEY_CONFIG_CHANGE_HANDLER, config_change_handler).
+
 -define(CONF_OPTS, #{override_to => cluster}).
 
 -define(UPDATE_PROC, gg_conf_listen_for_updates).
@@ -50,6 +53,24 @@ auth_mode() ->
 -spec(use_greengrass_managed_certificates() -> use_greengrass_managed_certificates()).
 use_greengrass_managed_certificates() ->
   application:get_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
+
+%%--------------------------------------------------------------------
+%% On Config Change Callbacks
+%%--------------------------------------------------------------------
+
+register_config_change_handler(Path, Handler) ->
+  Handlers = application:get_env(?ENV_APP, ?KEY_CONFIG_CHANGE_HANDLER, #{}),
+  application:set_env(?ENV_APP, ?KEY_CONFIG_CHANGE_HANDLER, Handlers#{Path => Handler}).
+
+get_config_change_handler(Path) ->
+  Handlers = application:get_env(?ENV_APP, ?KEY_CONFIG_CHANGE_HANDLER, #{}),
+  maps:get(Path, Handlers, undefined).
+
+fire_config_change(Path, NewVal) ->
+  case get_config_change_handler(Path) of
+    undefined -> skip;
+    Handler -> Handler(NewVal)
+  end.
 
 %%--------------------------------------------------------------------
 %% Greengrass EMQX Defaults
@@ -203,19 +224,19 @@ validate_plugin_conf(PluginConf) ->
     {error, {config_validation, E, ST}}
   end.
 
-%% TODO trigger actions on config change
-update_plugin_conf(#{} = PluginConf) when map_size(PluginConf) == 0 ->
-  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
-  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES);
 update_plugin_conf(PluginConf) ->
-  %% TODO find a more dynamic way
-  AuthMode = maps:get(?KEY_AUTH_MODE, PluginConf, ?DEFAULT_AUTH_MODE),
-  application:set_env(?ENV_APP, ?KEY_AUTH_MODE, AuthMode),
-  logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_AUTH_MODE], AuthMode]),
-  UseGreengrassManagedCertificates = maps:get(?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, PluginConf, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES),
-  application:set_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, UseGreengrassManagedCertificates),
-  logger:info("Updated ~p plugin config to ~p", [[?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES], UseGreengrassManagedCertificates]).
+  update_plugin_conf(PluginConf, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
+  update_plugin_conf(PluginConf, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
+update_plugin_conf(PluginConf, Key, Default) ->
+  PrevVal = application:get_env(?ENV_APP, Key, undefined),
+  NewVal = maps:get(Key, PluginConf, Default),
+  if PrevVal =/= NewVal ->
+    application:set_env(?ENV_APP, Key, NewVal),
+    logger:info("Updated ~p plugin config to ~p", [Key, NewVal]),
+    fire_config_change(Key, NewVal);
+    true -> skip
+  end.
 
 %%--------------------------------------------------------------------
 %% Update EMQX Override Config
