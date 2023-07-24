@@ -14,20 +14,20 @@
 start(_StartType, _StartArgs) ->
   {ok, Sup} = gg_sup:start_link(),
   gg_port_driver:start(),
+  gg_certs:start(),
+  gg_conf:register_config_change_handler(<<"useGreengrassManagedCertificates">>, fun on_use_greengrass_managed_certificates_change/1),
   gg_conf:start(),
-  gg_certs:request_certificates(),
-  %% update config again to ensure "listeners" config is applied.
-  %% "listeners" config update will fail the first time
-  %% this component runs, because cert and key haven't been written yet,
-  %% and emqx validates that they exist.
-  case gg_conf:request_update_sync() of
-    ok -> ok;
-    Error -> exit(Error)
-  end,
   gg:load(application:get_all_env()),
   {ok, Sup}.
 
 stop(_State) ->
+  gg_certs:stop(),
   gg_conf:stop(),
   gg:unload(),
   gg_port_driver:stop().
+
+on_use_greengrass_managed_certificates_change(_NewValue = true) ->
+  gg_certs:request_certificates();
+on_use_greengrass_managed_certificates_change(_) ->
+  %% TODO delete certs?
+  pass.
