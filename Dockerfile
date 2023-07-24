@@ -67,6 +67,7 @@ FROM build-base as emqx
 WORKDIR /build
 
 COPY --from=build-base /build/bin bin
+COPY patches/emqx_plugins.app.src patches/
 COPY emqx.commit .
 COPY bin/build_emqx.py bin
 RUN python3 -u -m bin --emqx-only
