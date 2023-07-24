@@ -21,15 +21,13 @@ def build_emqx(context):
     subprocess.check_call(f"git fetch -a -p", shell=True)
     subprocess.check_call(f"git reset --hard {emqx_commit_id}", shell=True)
 
-    print("Setting up EMQ X plugin checkout symlink")
-    # TODO do we need this symlink anymore for 5.x?
-    try:
-        # Remove existing symlink (if any) before linking
-        os.remove(f"{context.original_path}/emqx/apps/gg")
-    except FileNotFoundError:
-        pass
-    os.symlink(context.original_path, f"{context.original_path}/emqx/apps/gg",
-               target_is_directory=True)
+    # hack: need emqx_authn to load before our gg plugin,
+    #       so include it as a dependency for emqx_plugins.
+    #       must be done before we build emqx.
+    with open('../patches/emqx_plugins.app.src', 'r') as f:
+        plugins_app_patch = f.read()
+    with open('apps/emqx_plugins/src/emqx_plugins.app.src', 'w') as f:
+        f.write(plugins_app_patch)
 
     print("Building EMQ X")
     emqx_build_cmd = 'make -j'
