@@ -1,0 +1,11 @@
+%% -*- mode: erlang -*-
+{application, emqx_plugins, [
+  {description, "EMQX Plugin Management"},
+  {vsn, "0.1.4"},
+  {modules, []},
+  {mod, {emqx_plugins_app, []}},
+  %% gg plugin relies on emqx_authn, so we need it to start
+  %% BEFORE plugins are loaded
+  {applications, [kernel, stdlib, emqx]},
+  {env, []}
+]}.
