@@ -6,6 +6,6 @@
   {mod, {emqx_plugins_app, []}},
   %% gg plugin relies on emqx_authn, so we need it to start
   %% BEFORE plugins are loaded
-  {applications, [kernel, stdlib, emqx]},
+  {applications, [kernel, stdlib, emqx, emqx_authn]},
   {env, []}
 ]}.
