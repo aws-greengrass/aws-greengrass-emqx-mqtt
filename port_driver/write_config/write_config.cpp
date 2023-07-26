@@ -170,11 +170,11 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // as seen during our testing, HOCON won't support multiple JSON docs in a single file.
     auto opening_brace = output.find_first_of('{');
     if (opening_brace != std::string::npos) {
-        output.erase(opening_brace);
+        output.erase(opening_brace, 1);
     }
     auto closing_brace = output.find_last_of('}');
     if (closing_brace != std::string::npos) {
-        output.erase(closing_brace);
+        output.erase(closing_brace, 1);
     }
 
     LOG_I(WRITE_CONFIG_SUBJECT, "Writing configuration to %s", emqx_conf.string().c_str());
