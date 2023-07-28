@@ -219,8 +219,11 @@ is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retr
   case reauthenticate(ClientId) of
     {ok, _} -> is_authorized(Retries + 1, ClientId, Resource, Action);
     _ ->
-      logger:info("Could not get a new auth token. Kicking client (~s) to have client reconnect with updated credentials", [ClientId]),
-      emqx_mgmt:kickout_client(ClientId),
+      kick_client(ClientId,
+        fun() -> logger:info(
+          "Could not get a new auth token.
+          Kicking client (~s) to have client reconnect with updated credentials", [ClientId])
+        end),
       ?UNAUTHORIZED
   end;
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
@@ -233,17 +236,30 @@ is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retr
 %% Utils
 %%--------------------------------------------------------------------
 
+kick_client(ClientId, OnPreKick) ->
+  kick_client(gg_conf:auth_mode(), ClientId, OnPreKick).
+kick_client(_AuthMode = enabled, ClientId, OnPreKick) ->
+  OnPreKick(),
+  emqx_mgmt:kickout_client(ClientId);
+kick_client(_AuthMode, _ClientId, _OnPreKick) ->
+  skip. %% keep connection open so we can fallback to next auth provider in bypass modes
+
 kick_non_v5_client(ClientId) ->
   kick_non_v5_client(get(?CLIENT_MQTT_VERSION), ClientId).
 
-kick_non_v5_client(Version, ClientId) when Version < 5 ->
-  logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]),
-  emqx_mgmt:kickout_client(ClientId);
-kick_non_v5_client(Version, ClientId) when Version /= 5 ->
-  logger:info("Client(~s) has an unknown MQTT version ~p. Disconnecting client", [ClientId, Version]),
-  emqx_mgmt:kickout_client(ClientId);
-kick_non_v5_client(_, _) ->
-  ok.
+kick_non_v5_client(Version, ClientId) when is_number(Version), Version < 5 ->
+  kick_client(ClientId,
+    fun() -> logger:info("Disconnecting MQTTv3 client(~s).", [ClientId]) end);
+kick_non_v5_client(Version, _ClientId) when is_number(Version), Version =:= 5 ->
+  ok;
+kick_non_v5_client(Version, ClientId) ->
+  kick_client(ClientId,
+    fun() ->
+      logger:info(
+        "Client(~s) has an unknown MQTT version ~p.
+        Disconnecting client", [ClientId, Version])
+    end).
+
 
 encode_peer_cert(nossl) ->
   <<"">>;
