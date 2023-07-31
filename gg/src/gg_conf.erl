@@ -203,7 +203,8 @@ put_verify_fun(AuthMode) when AuthMode =/= bypass ->
     Err -> logger:error("Failed to set listener verify fun: ~p", [Err])
   end;
 put_verify_fun(_AuthMode) ->
-  skip.
+  %% TODO only do this workaround on startup? listener restarts will disconnect clients
+  emqx_listeners:restart_listener(ssl, default, gg_listeners:get_listener_config(ssl, default)).
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config

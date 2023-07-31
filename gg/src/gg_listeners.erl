@@ -5,7 +5,7 @@
 
 -module(gg_listeners).
 
--export([put_verify_fun/3]).
+-export([put_verify_fun/3, get_listener_config/2]).
 
 %% Set verify_fun erlang ssl option on a listener.
 %% Listener is restarted for changes to take effect.
