@@ -13,10 +13,33 @@
 -define(CERT_LOAD_TIMEOUT_MILLIS, 300000). %% 5 minutes
 
 start() ->
-  receive_certificate_requests().
+  receive_certificate_requests(),
+  gg_conf:register_config_change_handler(<<"useGreengrassManagedCertificates">>, fun on_use_greengrass_managed_certificates_change/1).
 
 stop() ->
   certificate_request_receiver ! stop.
+
+on_use_greengrass_managed_certificates_change(_NewValue = true) ->
+  request_certificates();
+on_use_greengrass_managed_certificates_change(_) ->
+  gg_port_driver:unsubscribe_from_certificate_updates(),
+  DeletedFiles = delete_files(gg_cert_files()),
+  logger:info("Unsubscribed from receiving future gg certificates"),
+  logger:info("Deleted gg cert files: ~p", DeletedFiles).
+
+gg_cert_files() ->
+  DataDir = emqx:data_dir(),
+  lists:map(fun(File) -> filename:join([DataDir, File]) end, ["key.pem", "cert.pem"]).
+
+delete_files(ToDelete) ->
+  lists:filter(
+    fun(File) ->
+      case file:delete(File) of
+        ok -> true;
+        _ -> false
+      end
+    end,
+    ToDelete).
 
 %% Request that CDA generate server certificates for EMQX to use.
 %% On completion of this function, certificates will be written
@@ -53,8 +76,7 @@ do_request_certificates(_Requested = true, Caller) ->
 do_request_certificates(_Requested = false, Caller) ->
   logger:info("Certificate update request received"),
   register_listener(Caller),
-  gg_port_driver:register_fun(certificate_update, fun on_cert_update/0),
-  gg_port_driver:request_certificates(),
+  gg_port_driver:subscribe_to_certificate_updates(fun on_cert_update/0),
   application:set_env(?ENV_APP, certificates_requested, true).
 
 register_listener(Pid) ->

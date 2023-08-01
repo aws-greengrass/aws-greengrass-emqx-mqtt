@@ -10,7 +10,8 @@
   , on_client_check_acl/4
   , verify_client_certificate/1
   , register_fun/2
-  , request_certificates/0
+  , subscribe_to_certificate_updates/1
+  , unsubscribe_from_certificate_updates/0
   , subscribe_to_configuration_updates/1
   , get_configuration/0
 ]).
@@ -22,6 +23,7 @@
 -define(SUBSCRIBE_TO_CERTIFICATE_UPDATES, 6).
 -define(SUBSCRIBE_TO_CONFIGURATION_UPDATES, 7).
 -define(GET_CONFIGURATION, 8).
+-define(UNSUBSCRIBE_FROM_CERTIFICATE_UPDATES, 9).
 
 %% RETURN CODES
 -define(RETURN_CODE_SUCCESS, 0).
@@ -160,8 +162,12 @@ on_client_check_acl(ClientId, AuthToken, Topic, PubSub) ->
 verify_client_certificate(CertPem) ->
   call_port({?VERIFY_CLIENT_CERTIFICATE, CertPem}, async).
 
-request_certificates() ->
+subscribe_to_certificate_updates(Callback) ->
+  register_fun(certificate_update, Callback),
   call_port({?SUBSCRIBE_TO_CERTIFICATE_UPDATES}).
+
+unsubscribe_from_certificate_updates() ->
+  call_port({?UNSUBSCRIBE_FROM_CERTIFICATE_UPDATES}).
 
 subscribe_to_configuration_updates(Callback) ->
   register_fun(configuration_update, Callback),
