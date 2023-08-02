@@ -21,7 +21,9 @@ stop() ->
 
 on_use_greengrass_managed_certificates_change(_NewValue = true) ->
   restore_cert_files(),
-  request_certificates();
+  request_certificates(),
+  %% restart listener. otherwise, ssl_server_session_cache_db no_longer_defined error occurs
+  gg_listeners:restart_default_ssl_listener(); %% TODO dedup listener restarting, it could also happen in gg_conf
 on_use_greengrass_managed_certificates_change(_NewValue) ->
   gg_port_driver:unsubscribe_from_certificate_updates(),
   {Names, SoftDeleteNames} = gg_cert_files(),
