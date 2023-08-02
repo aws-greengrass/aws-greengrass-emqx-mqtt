@@ -50,6 +50,8 @@ CertSubscribeUpdateStatus ClientDeviceAuthIntegration::subscribeToCertUpdates(
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
 }
 
+void ClientDeviceAuthIntegration::unsubscribeFromCertUpdates() { certificateUpdater.unsubscribeFromUpdates(); }
+
 std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get_configuration() {
     auto getConfigOperation = greengrassIpcWrapper.getIPCClient().NewGetConfiguration();
     if (!getConfigOperation) {

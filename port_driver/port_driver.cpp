@@ -503,6 +503,11 @@ void handle_certificate_update_subscription(DriverContext *context) {
     return_code = RETURN_CODE_SUCCESS;
 }
 
+void handle_certificate_update_unsubscribe(DriverContext *context) {
+    context->cda_integration->unsubscribeFromCertUpdates();
+    write_atom_to_port(context, ATOMS.valid, RETURN_CODE_SUCCESS);
+}
+
 void handle_configuration_update_subscription(DriverContext *context) {
     char return_code = RETURN_CODE_UNEXPECTED;
     ErlDrvTermData result_atom = ATOMS.unknown;
@@ -607,6 +612,10 @@ void drv_output(ErlDrvData handle, ErlIOVec *erlIoVec) {
     case SUBSCRIBE_TO_CERTIFICATE_UPDATES:
         LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CERTIFICATE_UPDATES")
         handle_certificate_update_subscription(context);
+        break;
+    case UNSUBSCRIBE_FROM_CERTIFICATE_UPDATES:
+        LOG_I(PORT_DRIVER_SUBJECT, "UNSUBSCRIBE_FROM_CERTIFICATE_UPDATES")
+        handle_certificate_update_unsubscribe(context);
         break;
     case SUBSCRIBE_TO_CONFIGURATION_UPDATES:
         LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CONFIGURATION_UPDATES")

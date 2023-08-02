@@ -111,12 +111,32 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
     std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
 
+    if (subscribed) {
+        subscriptionActive->exchange(true);
+        LOG_I(CERT_UPDATER_SUBJECT, "Subscription already exists, ignoring subscription request");
+        return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
+    }
+
     GG::SubscribeToCertificateUpdatesRequest request;
     GG::CertificateOptions options;
     options.SetCertificateType(GG::CERTIFICATE_TYPE_SERVER);
     request.SetCertificateOptions(options);
 
-    updatesHandler = std::make_shared<CertificateUpdatesHandler>(std::move(basePath), std::move(subscription));
+    std::shared_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscriptionCapture = std::move(subscription);
+    auto updatesHandlerWrapper = std::make_unique<std::function<void(Aws::Greengrass::CertificateUpdateEvent *)>>(
+        [subscriptionCapture = subscriptionCapture,
+         subscriptionActive = subscriptionActive]([[maybe_unused]] Aws::Greengrass::CertificateUpdateEvent *event) {
+            if (!subscriptionCapture) {
+                return;
+            }
+            if (!subscriptionActive->load()) {
+                LOG_I(CERT_UPDATER_SUBJECT, "Ignoring received certificate update, subscription is not active");
+                return;
+            }
+            subscriptionCapture->operator()(event);
+        });
+
+    updatesHandler = std::make_shared<CertificateUpdatesHandler>(std::move(basePath), std::move(updatesHandlerWrapper));
     operation = ipcClient.NewSubscribeToCertificateUpdates(updatesHandler);
 
     if (!operation) {
@@ -151,6 +171,13 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
         return CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     }
 
+    subscribed = true;
+    subscriptionActive->exchange(true);
     LOG_I(CERT_UPDATER_SUBJECT, "Successfully subscribed to cert updates");
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
+}
+
+void CertificateUpdater::unsubscribeFromUpdates() {
+    subscriptionActive->exchange(false);
+    LOG_I(CERT_UPDATER_SUBJECT, "Successfully unsubscribed from cert updates");
 }

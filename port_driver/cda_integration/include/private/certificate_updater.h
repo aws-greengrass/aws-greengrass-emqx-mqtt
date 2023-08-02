@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <aws/greengrass/GreengrassCoreIpcClient.h>
 #include <filesystem>
 
@@ -50,6 +51,10 @@ class CertificateUpdater {
     GG::GreengrassCoreIpcClient &ipcClient;
     std::shared_ptr<CertificateUpdatesHandler> updatesHandler;
     std::shared_ptr<GG::SubscribeToCertificateUpdatesOperation> operation;
+    // for subscription idempotency
+    bool subscribed = false;
+    // for simulating an unsubscribe operation, since one doesn't exist in IPC currently
+    const std::shared_ptr<std::atomic<bool>> subscriptionActive = std::make_shared<std::atomic<bool>>(true);
 
   public:
     CertificateUpdater(GG::GreengrassCoreIpcClient &client) : ipcClient(client), updatesHandler({}){};
@@ -57,4 +62,6 @@ class CertificateUpdater {
     CertSubscribeUpdateStatus
     subscribeToUpdates(std::unique_ptr<std::filesystem::path> basePath,
                        std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription);
+
+    void unsubscribeFromUpdates();
 };
