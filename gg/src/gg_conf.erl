@@ -204,7 +204,7 @@ put_verify_fun(AuthMode) when AuthMode =/= bypass ->
   end;
 put_verify_fun(_AuthMode) ->
   %% TODO only do this workaround on startup? listener restarts will disconnect clients
-  emqx_listeners:restart_listener(ssl, default, gg_listeners:get_listener_config(ssl, default)).
+  gg_listeners:restart_default_ssl_listener().
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config

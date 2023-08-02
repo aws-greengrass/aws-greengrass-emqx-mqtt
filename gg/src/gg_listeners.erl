@@ -6,6 +6,7 @@
 -module(gg_listeners).
 
 -export([put_verify_fun/3, get_listener_config/2]).
+-export([restart_default_ssl_listener/0, restart_listener/2]).
 
 %% Set verify_fun erlang ssl option on a listener.
 %% Listener is restarted for changes to take effect.
@@ -40,3 +41,9 @@ get_listener_config(_, _, _) -> listener_not_found.
 -spec(get_listener_config(atom, atom) -> #{} | listener_not_found).
 get_listener_config(Proto, Name) ->
   get_listener_config(maps:to_list(emqx:get_config([listeners], #{})), Proto, Name).
+
+restart_default_ssl_listener() ->
+  restart_listener(ssl, default).
+
+restart_listener(Proto, Name) ->
+  emqx_listeners:restart_listener(Proto, Name, gg_listeners:get_listener_config(Proto, Name)).
