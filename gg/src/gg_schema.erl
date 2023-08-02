@@ -29,14 +29,5 @@ fields("gg") ->
           required => false,
           desc => "Auth mode"
         }
-      )},
-    {useGreengrassManagedCertificates,
-      ?HOCON(
-        boolean(),
-        #{
-          default => true,
-          required => false,
-          desc => "Use greengrass managed certificates"
-        }
       )}
   ].
