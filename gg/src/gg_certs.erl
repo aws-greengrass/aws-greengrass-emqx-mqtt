@@ -42,14 +42,19 @@ restore_cert_files() ->
   logger:info("Restored gg cert files: ~p", RestoredFiles).
 
 rename_files(Sources, Dests) ->
-  lists:filter(
-    fun({Source, Dest}) ->
-      case file:rename(Source, Dest) of
-        ok -> true;
-        _ -> false
-      end
-    end,
-    lists:zip(Sources, Dests)).
+  {_, RenamedDests} =
+    lists:unzip(
+      lists:filter(
+        fun({Source, Dest}) ->
+          case file:rename(Source, Dest) of
+            ok -> true;
+            _ -> false
+          end
+        end,
+        lists:zip(Sources, Dests)
+      )
+    ),
+  RenamedDests.
 
 %% Request that CDA generate server certificates for EMQX to use.
 %% On completion of this function, certificates will be written
