@@ -13,7 +13,8 @@
 -define(CERT_LOAD_TIMEOUT_MILLIS, 300000). %% 5 minutes
 
 start() ->
-  receive_certificate_requests().
+  receive_certificate_requests(),
+  request_certificates().
 
 stop() ->
   certificate_request_receiver ! stop.
@@ -38,21 +39,19 @@ receive_certificate_requests() ->
 do_receive_certificate_requests() ->
   receive
     {request_certificates, Caller} ->
+      register_listener(Caller),
       do_request_certificates(Caller),
       do_receive_certificate_requests();
     stop -> ok
   end.
-
-%% TODO for completeness, we should implement unsubscribe from cert requests and delete certs from config = false
 
 do_request_certificates(Caller) ->
   do_request_certificates(application:get_env(?ENV_APP, certificates_requested, false), Caller).
 do_request_certificates(_Requested = true, Caller) ->
   logger:debug("Ignoring certificate update request."),
   Caller ! ignore;
-do_request_certificates(_Requested = false, Caller) ->
+do_request_certificates(_Requested = false, _Caller) ->
   logger:info("Certificate update request received"),
-  register_listener(Caller),
   gg_port_driver:register_fun(certificate_update, fun on_cert_update/0),
   gg_port_driver:request_certificates(),
   application:set_env(?ENV_APP, certificates_requested, true).

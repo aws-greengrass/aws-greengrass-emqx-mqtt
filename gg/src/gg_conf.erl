@@ -5,16 +5,15 @@
 
 -module(gg_conf).
 
--export([auth_mode/0, use_greengrass_managed_certificates/0]).
+-export([auth_mode/0]).
 
 -export([start/0, stop/0]).
 -export([receive_conf_updates/0, do_receive_conf_updates/0, request_update/0, request_update_sync/0]).
 -export([register_config_change_handler/2]).
 
 -type(auth_mode() :: enabled | bypass_on_failure | bypass).
--type(use_greengrass_managed_certificates() :: true | false).
 
--export_type([auth_mode/0, use_greengrass_managed_certificates/0]).
+-export_type([auth_mode/0]).
 
 -define(CONF_TIMEOUT_MILLIS, 30000).
 
@@ -24,10 +23,8 @@
 %% config keys
 -define(KEY_EMQX_CONFIG, <<"emqxConfig">>).
 -define(KEY_AUTH_MODE, <<"authMode">>).
--define(KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, <<"useGreengrassManagedCertificates">>).
 %% defaults
 -define(DEFAULT_AUTH_MODE, enabled).
--define(DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES, true).
 
 -define(SCHEMA_ROOT, list_to_binary(gg_schema:namespace())).
 
@@ -49,10 +46,6 @@
 -spec(auth_mode() -> auth_mode()).
 auth_mode() ->
   application:get_env(?ENV_APP, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE).
-
--spec(use_greengrass_managed_certificates() -> use_greengrass_managed_certificates()).
-use_greengrass_managed_certificates() ->
-  application:get_env(?ENV_APP, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
 
 %%--------------------------------------------------------------------
 %% On Config Change Callbacks
@@ -225,8 +218,7 @@ validate_plugin_conf(PluginConf) ->
   end.
 
 update_plugin_conf(PluginConf) ->
-  update_plugin_conf(PluginConf, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE),
-  update_plugin_conf(PluginConf, ?KEY_USE_GREENGRASS_MANAGED_CERTIFICATES, ?DEFAULT_USE_GREENGRASS_MANAGED_CERTIFICATES).
+  update_plugin_conf(PluginConf, ?KEY_AUTH_MODE, ?DEFAULT_AUTH_MODE).
 
 update_plugin_conf(PluginConf, Key, Default) ->
   PrevVal = application:get_env(?ENV_APP, Key, undefined),
