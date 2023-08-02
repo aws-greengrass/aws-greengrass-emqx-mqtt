@@ -20,26 +20,36 @@ stop() ->
   certificate_request_receiver ! stop.
 
 on_use_greengrass_managed_certificates_change(_NewValue = true) ->
+  restore_cert_files(),
   request_certificates();
-on_use_greengrass_managed_certificates_change(_) ->
+on_use_greengrass_managed_certificates_change(_NewValue) ->
   gg_port_driver:unsubscribe_from_certificate_updates(),
-  DeletedFiles = delete_files(gg_cert_files()),
+  {Names, SoftDeleteNames} = gg_cert_files(),
+  SoftDeletedFiles = rename_files(Names, SoftDeleteNames),
   logger:info("Unsubscribed from receiving future gg certificates"),
-  logger:info("Deleted gg cert files: ~p", DeletedFiles).
+  logger:info("Deleted gg cert files: ~p", SoftDeletedFiles).
 
 gg_cert_files() ->
   DataDir = emqx:data_dir(),
-  lists:map(fun(File) -> filename:join([DataDir, File]) end, ["key.pem", "cert.pem"]).
+  {
+    lists:map(fun(File) -> filename:join([DataDir, File]) end, ["key.pem", "cert.pem"]),
+    lists:map(fun(File) -> filename:join([DataDir, File]) end, ["deleted.key.pem", "deleted.cert.pem"])
+  }.
 
-delete_files(ToDelete) ->
+restore_cert_files() ->
+  {Names, SoftDeleteNames} = gg_cert_files(),
+  RestoredFiles = rename_files(SoftDeleteNames, Names),
+  logger:info("Restored gg cert files: ~p", RestoredFiles).
+
+rename_files(Sources, Dests) ->
   lists:filter(
-    fun(File) ->
-      case file:delete(File) of
+    fun({Source, Dest}) ->
+      case file:rename(Source, Dest) of
         ok -> true;
         _ -> false
       end
     end,
-    ToDelete).
+    lists:zip(Sources, Dests)).
 
 %% Request that CDA generate server certificates for EMQX to use.
 %% On completion of this function, certificates will be written
@@ -48,8 +58,7 @@ delete_files(ToDelete) ->
 request_certificates() ->
   certificate_request_receiver ! {request_certificates, self()},
   receive
-    certs_updated -> ok;
-    ignore -> ignore
+    certs_updated -> ok
   after ?CERT_LOAD_TIMEOUT_MILLIS ->
     exit({error, "Timed out waiting for certificate update"})
   end.
@@ -66,18 +75,10 @@ do_receive_certificate_requests() ->
     stop -> ok
   end.
 
-%% TODO for completeness, we should implement unsubscribe from cert requests and delete certs from config = false
-
 do_request_certificates(Caller) ->
-  do_request_certificates(application:get_env(?ENV_APP, certificates_requested, false), Caller).
-do_request_certificates(_Requested = true, Caller) ->
-  logger:debug("Ignoring certificate update request."),
-  Caller ! ignore;
-do_request_certificates(_Requested = false, Caller) ->
   logger:info("Certificate update request received"),
   register_listener(Caller),
-  gg_port_driver:subscribe_to_certificate_updates(fun on_cert_update/0),
-  application:set_env(?ENV_APP, certificates_requested, true).
+  gg_port_driver:subscribe_to_certificate_updates(fun on_cert_update/0).
 
 register_listener(Pid) ->
   application:set_env(?ENV_APP, on_cert_update, Pid).
