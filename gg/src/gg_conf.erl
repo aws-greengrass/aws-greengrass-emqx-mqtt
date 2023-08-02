@@ -190,21 +190,11 @@ update_conf(ExistingOverrideConf, NewComponentConf) ->
   OverrideConf = get_override_conf(NewConf),
   logger:debug("Updating emqx override config. existing=~p, override=~p", [ExistingConf, OverrideConf]),
   case catch update_override_conf(ExistingConf, OverrideConf) of
-    ok -> put_verify_fun();
+    %% TODO optimize, we don't want to restart every time, ideally, but this is the most defensive against edge cases.
+    %% restart listener. otherwise, in some cases, ssl_server_session_cache_db no_longer_defined error occurs
+    ok -> gg_listeners:restart_default_ssl_listener();
     OverrideUpdateError -> logger:warning("Unable to update emqx override configuration: ~p", [OverrideUpdateError])
   end.
-
-put_verify_fun() ->
-  put_verify_fun(auth_mode()).
-put_verify_fun(AuthMode) when AuthMode =/= bypass ->
-  %% TODO don't do this if already set
-  case gg_listeners:put_verify_fun(ssl, default, fun gg_tls:verify_client_certificate/3) of
-    ok -> logger:info("SSL listener custom verify fun set");
-    Err -> logger:error("Failed to set listener verify fun: ~p", [Err])
-  end;
-put_verify_fun(_AuthMode) ->
-  %% TODO only do this workaround on startup? listener restarts will disconnect clients
-  gg_listeners:restart_default_ssl_listener().
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config
