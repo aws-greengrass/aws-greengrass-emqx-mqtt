@@ -27,7 +27,7 @@ on_use_greengrass_managed_certificates_change(_NewValue) ->
   {Names, SoftDeleteNames} = gg_cert_files(),
   SoftDeletedFiles = rename_files(Names, SoftDeleteNames),
   logger:info("Unsubscribed from receiving future gg certificates"),
-  logger:info("Deleted gg cert files: ~p", SoftDeletedFiles).
+  logger:info("Deleted gg cert files: ~p", [SoftDeletedFiles]).
 
 gg_cert_files() ->
   DataDir = emqx:data_dir(),
@@ -39,7 +39,7 @@ gg_cert_files() ->
 restore_cert_files() ->
   {Names, SoftDeleteNames} = gg_cert_files(),
   RestoredFiles = rename_files(SoftDeleteNames, Names),
-  logger:info("Restored gg cert files: ~p", RestoredFiles).
+  logger:info("Restored gg cert files: ~p", [RestoredFiles]).
 
 rename_files(Sources, Dests) ->
   {_, RenamedDests} =
