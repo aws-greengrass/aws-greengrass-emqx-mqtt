@@ -265,7 +265,7 @@ TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToConfigurationTest) {
     EXPECT_TRUE(received);
 }
 
-TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesSuccessTest) {
+TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesTest) {
     std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
     SendCommand("set with_success");
     auto subscription_callback =
@@ -274,39 +274,33 @@ TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesSuccessT
               cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
     auto command = NextCommand();
     EXPECT_EQ(command, "subscribe_to_certificate_updates");
-}
 
-TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesErrorTest) {
-    std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
+    testPath = std::make_unique<std::filesystem::path>(filePath);
     SendCommand("set with_error");
-    auto subscription_callback =
+    subscription_callback =
         std::make_unique<std::function<void(CertificateUpdateEvent *)>>([](CertificateUpdateEvent *) {});
     EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE,
               cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
-    auto command = NextCommand();
+    command = NextCommand();
     EXPECT_EQ(command, "subscribe_to_certificate_updates");
-}
 
-TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesTimeoutTest) {
-    std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
+    testPath = std::make_unique<std::filesystem::path>(filePath);
     SendCommand("set with_timeout");
-    auto subscription_callback =
+    subscription_callback =
         std::make_unique<std::function<void(CertificateUpdateEvent *)>>([](CertificateUpdateEvent *) {});
     EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_TIMEOUT_RESPONSE,
               cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
-    auto command = NextCommand();
+    command = NextCommand();
     EXPECT_EQ(command, "subscribe_to_certificate_updates");
-}
 
-TEST_F(CDAIntegrationTester, CDAIntegrationSubscribeToCertificateUpdatesCallbackTest) {
     bool received = false;
-    std::unique_ptr<std::filesystem::path> testPath = std::make_unique<std::filesystem::path>(filePath);
+    testPath = std::make_unique<std::filesystem::path>(filePath);
     SendCommand("set with_callback");
-    auto subscription_callback = std::make_unique<std::function<void(CertificateUpdateEvent *)>>(
+    subscription_callback = std::make_unique<std::function<void(CertificateUpdateEvent *)>>(
         [&received](CertificateUpdateEvent *) { received = true; });
     EXPECT_EQ(CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS,
               cda_integ->subscribeToCertUpdates(std::move(testPath), std::move(subscription_callback)));
-    auto command = NextCommand();
+    command = NextCommand();
     EXPECT_EQ(command, "subscribe_to_certificate_updates");
     command = NextCommand();
     EXPECT_EQ(command, "sent_certificates");
