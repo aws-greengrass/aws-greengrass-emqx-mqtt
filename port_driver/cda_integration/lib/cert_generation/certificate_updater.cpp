@@ -111,12 +111,6 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
     std::unique_ptr<std::filesystem::path> basePath,
     std::unique_ptr<std::function<void(GG::CertificateUpdateEvent *)>> subscription) {
 
-    if (subscribed) {
-        subscriptionActive->exchange(true);
-        LOG_I(CERT_UPDATER_SUBJECT, "Subscription already exists, ignoring subscription request");
-        return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;
-    }
-
     GG::SubscribeToCertificateUpdatesRequest request;
     GG::CertificateOptions options;
     options.SetCertificateType(GG::CERTIFICATE_TYPE_SERVER);
@@ -171,7 +165,6 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
         return CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     }
 
-    subscribed = true;
     subscriptionActive->exchange(true);
     LOG_I(CERT_UPDATER_SUBJECT, "Successfully subscribed to cert updates");
     return CertSubscribeUpdateStatus::SUBSCRIBE_SUCCESS;

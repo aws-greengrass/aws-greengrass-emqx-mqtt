@@ -51,8 +51,6 @@ class CertificateUpdater {
     GG::GreengrassCoreIpcClient &ipcClient;
     std::shared_ptr<CertificateUpdatesHandler> updatesHandler;
     std::shared_ptr<GG::SubscribeToCertificateUpdatesOperation> operation;
-    // for subscription idempotency
-    bool subscribed = false;
     // for simulating an unsubscribe operation, since one doesn't exist in IPC currently
     const std::shared_ptr<std::atomic<bool>> subscriptionActive = std::make_shared<std::atomic<bool>>(true);
 

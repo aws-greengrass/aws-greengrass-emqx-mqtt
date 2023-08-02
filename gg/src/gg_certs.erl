@@ -63,8 +63,9 @@ rename_files(Sources, Dests) ->
 request_certificates() ->
   certificate_request_receiver ! {request_certificates, self()},
   receive
-    certs_updated -> ok
-  after ?CERT_LOAD_TIMEOUT_MILLIS ->
+    certs_updated -> ok;
+    already_subscribed -> ok
+  after ?CERT_LOAD_TIMEOUT_MILLIS -> %% TODO receive failure rather than waiting
     exit({error, "Timed out waiting for certificate update"})
   end.
 
@@ -81,18 +82,26 @@ do_receive_certificate_requests() ->
   end.
 
 do_request_certificates(Caller) ->
-  logger:info("Certificate update request received"),
-  register_listener(Caller),
-  gg_port_driver:subscribe_to_certificate_updates(fun on_cert_update/0).
+  logger:info("Handling certificate update request"),
+  register_receiver(Caller),
+  subscribe_to_certificate_updates_once().
 
-register_listener(Pid) ->
+subscribe_to_certificate_updates_once() ->
+  case application:get_env(?ENV_APP, certificates_requested, false) of
+    true -> send_to_receiver(already_subscribed);
+    false ->
+      gg_port_driver:subscribe_to_certificate_updates(fun on_cert_update/0),
+      application:set_env(?ENV_APP, certificates_requested, true)
+  end.
+
+register_receiver(Pid) ->
   application:set_env(?ENV_APP, on_cert_update, Pid).
 
-trigger_listener() ->
-  trigger_listener(application:get_env(?ENV_APP, on_cert_update, undefined)).
-trigger_listener(Pid) when is_pid(Pid) ->
-  Pid ! certs_updated;
-trigger_listener(_) ->
+send_to_receiver(Message) ->
+  send_to_receiver(Message, application:get_env(?ENV_APP, on_cert_update, undefined)).
+send_to_receiver(Message, Pid) when is_pid(Pid) ->
+  Pid ! Message;
+send_to_receiver(_Message, _) ->
   pass.
 
 on_cert_update() ->
@@ -100,4 +109,4 @@ on_cert_update() ->
     ok -> logger:info("PEM cache cleared");
     Err -> logger:warning("Unable to clear PEM cache: ~p", [Err])
   end,
-  trigger_listener().
+  send_to_receiver(certs_updated).
