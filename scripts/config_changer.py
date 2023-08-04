@@ -85,6 +85,7 @@ class LocalDeployer:
             if deployment_status == 'SUCCEEDED':
                 return
             time.sleep(5)
+        raise ValueError('Local deployment did not complete in time')
 
     def find_latest_component_version(self):
         artifacts_unarchived = os.path.join(
