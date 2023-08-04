@@ -71,10 +71,13 @@ class LocalDeployer:
         for i in range(10):
             if i == 0:
                 print('waiting for deployment to complete...')
-            resp = subprocess.check_output([
-                'greengrass-cli.cmd', 'deployment', 'status',
-                '-i', deployment_id
-            ])
+            try:
+                resp = subprocess.check_output([
+                    'greengrass-cli.cmd', 'deployment', 'status',
+                    '-i', deployment_id
+                ])
+            except subprocess.CalledProcessError:
+                continue
             deployment_status = resp.strip().split()[-1].decode('utf-8')
             print(deployment_status)
             if deployment_status == 'FAILED':
