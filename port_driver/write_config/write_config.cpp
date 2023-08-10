@@ -12,7 +12,6 @@
 #include <variant>
 
 static const char *CRT_LOG_LEVEL_ENV_VAR = "CRT_LOG_LEVEL";
-static const char *EMQX_LOG_LEVEL_ENV_VAR = "EMQX_LOG__CONSOLE_HANDLER__LEVEL";
 static const char *ORIGINAL_EMQX_DATA_DIR_ENV_VAR = "ORIG_EMQX_NODE__DATA_DIR";
 static const char *ORIGINAL_EMQX_ETC_DIR_ENV_VAR = "ORIG_EMQX_NODE__ETC_DIR";
 static const char *EMQX_DATA_DIR_ENV_VAR = "EMQX_NODE__DATA_DIR";
@@ -65,9 +64,7 @@ void setup_logger() {
         // Use CRT_LOG_LEVEL when it is provided a non-empty
         awsLogLevel = crtStringToLogLevel(crtLogLevel);
     } else {
-        // Otherwise, get the log level from the EMQX log level envvar
-        const char *logLevel = getenv(EMQX_LOG_LEVEL_ENV_VAR); // Log level may be null or empty
-        awsLogLevel = erlangStringToLogLevel(logLevel == nullptr ? "" : logLevel);
+        awsLogLevel = AWS_LL_WARN;
     }
     struct aws_logger_standard_options logger_options = {
         .level = awsLogLevel,
