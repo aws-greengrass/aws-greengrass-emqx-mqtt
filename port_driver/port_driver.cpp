@@ -361,17 +361,17 @@ static void handle_get_auth_token(DriverContext *context, char *buff, int index)
         return;
     }
 
-    auto *packed = new packer{
+    auto packed = std::make_unique<packer>(packer{
         .client_id = std::move(client_id),
         .pem = std::move(pem),
         .context = context,
-    };
+    });
     // Decode the request ID which is used to identify the caller back in Erlang
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
 
-    driver_async(context->port, nullptr, &get_auth_token, packed, &write_async_string_response_and_free);
+    driver_async(context->port, nullptr, &get_auth_token, packed.get(), &write_async_string_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
@@ -429,18 +429,18 @@ static void handle_check_acl(DriverContext *context, char *buff, int index) {
         return;
     }
 
-    auto *packed = new packer{
+    auto packed = std::make_unique<packer>(packer{
         .client_id = std::move(client_id),
         .auth_token = std::move(auth_token),
         .resource = std::move(resource),
         .operation = std::move(operation),
         .context = context,
-    };
+    });
     // Decode the request ID which is used to identify the caller back in Erlang
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
-    driver_async(context->port, nullptr, &check_acl, packed, &write_async_atom_response_and_free);
+    driver_async(context->port, nullptr, &check_acl, packed.get(), &write_async_atom_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
@@ -465,15 +465,15 @@ static void handle_verify_client_certificate(DriverContext *context, char *buff,
         return;
     }
 
-    auto *packed = new packer{
+    auto packed = std::make_unique<packer>(packer{
         .pem = std::move(pem),
         .context = context,
-    };
+    });
     // Decode the request ID which is used to identify the caller back in Erlang
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
-    driver_async(context->port, nullptr, &verify_client_certificate, packed, &write_async_atom_response_and_free);
+    driver_async(context->port, nullptr, &verify_client_certificate, packed.get(), &write_async_atom_response_and_free);
     result_atom = ATOMS.invalid;
     return_code = RETURN_CODE_ASYNC;
 }
@@ -533,15 +533,15 @@ static void handle_get_configuration(DriverContext *context, char *buff, int ind
 
     defer { write_binary_to_port(context, "", return_code); };
 
-    auto *packed = new packer{
+    auto packed = std::make_unique<packer>(packer{
         .context = context,
-    };
+    });
     // Decode the request ID which is used to identify the caller back in Erlang
     if (ei_decode_longlong(buff, &index, &packed->requestId) != 0) {
         return;
     }
 
-    driver_async(context->port, nullptr, &get_configuration, packed, &write_async_binary_response_and_free);
+    driver_async(context->port, nullptr, &get_configuration, packed.get(), &write_async_binary_response_and_free);
     return_code = RETURN_CODE_ASYNC;
 }
 
