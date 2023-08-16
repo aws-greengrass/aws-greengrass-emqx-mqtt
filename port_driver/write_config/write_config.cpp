@@ -51,6 +51,9 @@ int copy_default_config() {
 
     LOG_I(WRITE_CONFIG_SUBJECT, "Copying default EMQX configuration");
 
+    std::filesystem::create_directories(new_etc_path);
+    std::filesystem::create_directories(new_data_path);
+
     // Copy from the original path to the new paths which we be loaded by EMQX
     std::filesystem::copy(original_etc_dir, new_etc_path, recursive_copy_options);
     std::filesystem::copy(original_data_dir, new_data_path, recursive_copy_options);
@@ -133,9 +136,6 @@ int read_config_and_update_files(GreengrassIPCWrapper &ipc) {
     // Write customer-provided values to CWD
     const std::filesystem::path etc_dir(std::getenv(EMQX_ETC_DIR_ENV_VAR));
     auto emqx_conf = etc_dir / EMQX_CONF_FILE;
-
-    // Try to create the directories as needed, ignoring errors
-    std::filesystem::create_directories(emqx_conf.parent_path());
 
     // Configuration is in the form of
     // {"emqxConfig": {"listeners": {"ssl": {"default": ...}}}}
