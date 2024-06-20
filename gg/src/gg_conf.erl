@@ -245,7 +245,7 @@ get_override_conf(Conf) ->
 
 %% We don't set cacertfile in ssl options. In order for this to take
 %% in emqx_conf_cli:load_config, we must remove it from the configuration map.
-%% Setting cacertfile to null, undefined, or empty string does not work (as of EMQX 5.1.6)
+%% Setting cacertfile to null, undefined, or empty string does not work (as of EMQX 5.1.1)
 no_cacertfile_workaround(#{<<"listeners">> := Val} = Conf) ->
   Conf#{<<"listeners">> => no_cacertfile_workaround(Val)};
 no_cacertfile_workaround(#{<<"ssl">> := Val} = Conf) ->
