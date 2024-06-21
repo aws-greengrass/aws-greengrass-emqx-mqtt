@@ -146,7 +146,7 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
             }
         } else if (responseType == RPC_ERROR) {
             auto error = response.GetRpcError();
-            LOG_E(CERT_UPDATER_SUBJECT, "Cert updates RPC failure response: %s", error.StatusToString().c_str())
+            LOG_E(CERT_UPDATER_SUBJECT, "Cert updates RPC failure response: %s", error.StatusToString().c_str());
         }
         return CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     }
