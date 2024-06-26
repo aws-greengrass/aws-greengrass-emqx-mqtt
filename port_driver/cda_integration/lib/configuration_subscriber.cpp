@@ -57,7 +57,7 @@ ConfigurationSubscriber::subscribe_to_configuration_updates(std::unique_ptr<std:
         return ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     case RPC_ERROR:
         LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Config updates RPC failure response: %s",
-              response.GetRpcError().StatusToString().c_str())
+              response.GetRpcError().StatusToString().c_str());
         return ConfigurationSubscribeStatus::SUBSCRIBE_ERROR_FAILURE_RESPONSE;
     default:
         LOG_E(CONFIG_SUBSCRIBER_SUBJECT, "Subscribe failed with response type %d", response.GetResultType());
