@@ -590,27 +590,27 @@ void drv_output(ErlDrvData handle, ErlIOVec *erlIoVec) {
 
     switch (operation) {
     case GET_CLIENT_DEVICE_AUTH_TOKEN:
-        LOG_I(PORT_DRIVER_SUBJECT, "GET_CLIENT_DEVICE_AUTH_TOKEN")
+        LOG_I(PORT_DRIVER_SUBJECT, "GET_CLIENT_DEVICE_AUTH_TOKEN");
         handle_get_auth_token(context, buff, index);
         break;
     case ON_CLIENT_CHECK_ACL:
-        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CHECK_ACL")
+        LOG_I(PORT_DRIVER_SUBJECT, "ON_CLIENT_CHECK_ACL");
         handle_check_acl(context, buff, index);
         break;
     case VERIFY_CLIENT_CERTIFICATE:
-        LOG_I(PORT_DRIVER_SUBJECT, "VERIFY_CLIENT_CERTIFICATE")
+        LOG_I(PORT_DRIVER_SUBJECT, "VERIFY_CLIENT_CERTIFICATE");
         handle_verify_client_certificate(context, buff, index);
         break;
     case SUBSCRIBE_TO_CERTIFICATE_UPDATES:
-        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CERTIFICATE_UPDATES")
+        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CERTIFICATE_UPDATES");
         handle_certificate_update_subscription(context);
         break;
     case SUBSCRIBE_TO_CONFIGURATION_UPDATES:
-        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CONFIGURATION_UPDATES")
+        LOG_I(PORT_DRIVER_SUBJECT, "SUBSCRIBE_TO_CONFIGURATION_UPDATES");
         handle_configuration_update_subscription(context);
         break;
     case GET_CONFIGURATION:
-        LOG_I(PORT_DRIVER_SUBJECT, "GET_CONFIGURATION")
+        LOG_I(PORT_DRIVER_SUBJECT, "GET_CONFIGURATION");
         handle_get_configuration(context, buff, index);
         break;
     default:
