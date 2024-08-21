@@ -1,3 +1,7 @@
+# clang-format off
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+# clang-format on
 cmake_minimum_required(VERSION 3.20)
 
 project(cda_integration)
