@@ -106,7 +106,7 @@ jobs:
           python3 -u -m bin --port-driver-only
           python3 -u -m bin --quick
       - name: Upload artifact
-        uses: actions/upload-artifact@v1.0.0
+        uses: actions/upload-artifact@v3
         with:
           name: Build artifact ${{matrix.os}}
           path: build/emqx.zip
