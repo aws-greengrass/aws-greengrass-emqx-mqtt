@@ -11,7 +11,6 @@ RUN apk add --no-cache \
     coreutils \
     curl \
     dpkg-dev dpkg \
-    erlang-dev \
     g++ \
     gcc \
     git \
@@ -37,6 +36,23 @@ RUN apk add --no-cache \
     wget \
     zip \
     zlib-dev
+
+ENV KERL_URL "https://raw.githubusercontent.com/kerl/kerl/master/kerl"
+
+RUN curl -O -s ${KERL_URL} &&\
+    chmod a+x kerl &&\
+    mv kerl /usr/bin
+
+RUN kerl build git https://github.com/emqx/otp.git emqx-OTP-25.3.2 25.3.2 &&\
+    kerl install 25.3.2 /opt/erlang/25.3.2
+
+RUN echo "./opt/erlang/25.3.2/activate" >> /etc/profile
+
+# Set environment variables for Erlang
+ENV PATH="/opt/erlang/25.3.2/bin:$PATH" \
+    ERLANG_HOME="/opt/erlang/25.3.2"
+
+ENV TERM xterm
 
 WORKDIR /build
 
