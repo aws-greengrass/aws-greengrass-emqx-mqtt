@@ -28,6 +28,7 @@
 %% part of return value in authZ hook
 -define(AUTHZ_ALLOW, allow).
 -define(AUTHZ_DENY, deny).
+-define(DEFAULT_AUTH_SOURCE, default).
 
 -export([load/1, unload/0]).
 -export([on_client_connect/3, on_client_authenticate/3, on_client_authorize/5]).
@@ -150,23 +151,26 @@ reauthenticate(ClientId) ->
 
 %% Interface derived from
 %% https://github.com/emqx/emqx/blob/270059f0c2694342fc72338760dbb968b78b7918/apps/emqx/src/emqx_access_control.erl#L121-L127
-on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
+on_client_authorize(ClientInfo = #{clientid := ClientId}, Action, Topic, Result, _Env) ->
   execute_auth_hook(
     fun() ->
-      logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
-        [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-      case is_pubsub_authorized(PubSub, ClientId, Topic) of
-        true -> #{result => ?AUTHZ_ALLOW};
-        false -> #{result => ?AUTHZ_DENY}
-      end
+      logger:debug("Client(~s) check_acl, Action:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
+        [ClientId, Action, Topic, ClientInfo, Result, _Env]),
+      is_pubsub_authorized(Action, ClientId, Topic)
     end
   ).
 
--spec(is_pubsub_authorized(PubSub :: atom(), ClientId :: any(), Topic :: any()) -> boolean()).
-is_pubsub_authorized(publish, ClientId, Topic) ->
-  is_publish_authorized(ClientId, Topic);
-is_pubsub_authorized(subscribe, ClientId, Topic) ->
-  is_subscribe_authorized(ClientId, Topic).
+-spec(is_pubsub_authorized(Action :: atom(), ClientId :: any(), Topic :: any()) -> #{result => allow | deny, from => default}).
+is_pubsub_authorized(AUTHZ_PUBLISH, ClientId, Topic) ->
+  case is_publish_authorized(ClientId, Topic) of
+    true -> #{result => ?AUTHZ_ALLOW, from => ?DEFAULT_AUTH_SOURCE};
+    false -> #{result => ?AUTHZ_DENY, from => ?DEFAULT_AUTH_SOURCE}
+  end;
+is_pubsub_authorized(AUTHZ_SUBSCRIBE, ClientId, Topic) ->
+  case is_subscribe_authorized(ClientId, Topic) of
+    true -> #{result => ?AUTHZ_ALLOW, from => ?DEFAULT_AUTH_SOURCE};
+    false -> #{result => ?AUTHZ_DENY, from => ?DEFAULT_AUTH_SOURCE}
+  end.
 
 -spec(is_connect_authorized(ClientId :: any()) -> boolean()).
 is_connect_authorized(ClientId) ->

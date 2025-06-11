@@ -34,6 +34,8 @@ execute_process(
 message("Erlang libs directory found: ${ERL_LIBS}")
 
 include_directories("include")
+include_directories("/opt/erlang/25.3.2/usr/include")
+link_directories("/opt/erlang/25.3.2/usr/lib")
 add_subdirectory(cda_integration)
 
 if (CLANG_TIDY)

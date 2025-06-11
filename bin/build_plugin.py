@@ -29,6 +29,8 @@ def build_plugin(context) -> None:
             shutil.copy(lib, 'priv')
 
     try:
+        if os.path.islink(REBAR):
+            os.remove(REBAR)
         os.symlink(os.path.join(context.original_path, 'emqx', REBAR), REBAR)
     except FileExistsError:
         pass
