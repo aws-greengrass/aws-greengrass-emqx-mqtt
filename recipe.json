@@ -1,6 +1,7 @@
 {
   "RecipeFormatVersion": "2020-01-25",
   "ComponentName": "aws.greengrass.clientdevices.mqtt.EMQX",
+  "ComponentVersion": "2.0.3",
   "ComponentType": "aws.greengrass.generic",
   "ComponentDescription": "The EMQX MQTT broker component provides an MQTT v5 broker, based on the EMQX MQTT broker, for client devices to connect to your Greengrass core device.\n\nOn Windows operating systems this software includes code distributed under the Microsoft Software License Terms - Microsoft Visual Studio Community 2022. By downloading this software, you agree to that code's license terms, which can be found at https://visualstudio.microsoft.com/license-terms/vs2022-ga-community.",
   "ComponentPublisher": "AWS",
@@ -32,8 +33,8 @@
   },
   "ComponentDependencies": {
     "aws.greengrass.clientdevices.Auth": {
-      "VersionRequirement": ">=2.2.0 <2.5.0",
-      "DependencyType": "SOFT"
+      "VersionRequirement": ">=2.2.0 <2.6.0",
+      "DependencyType": "HARD"
     }
   },
   "Manifests": [
@@ -47,19 +48,19 @@
           "timeout": "{configuration:/startupTimeoutSeconds}"
         },
         "setEnv": {
-          "EMQX_PLUGINS__INSTALL_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins",
-          "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\data",
-          "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
-          "EMQX_NODE__DATA_DIR": "{work:path}\\v2\\data",
-          "EMQX_NODE__ETC_DIR": "{work:path}\\v2\\etc",
-          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE": "{work:path}\\v2\\data\\key.pem",
-          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE": "{work:path}\\v2\\data\\cert.pem",
-          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
-          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}",
           "RESTART_NODE_CONF": "{configuration:/emqxConfig/node}",
+          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__KEYFILE": "{work:path}\\v2\\data\\key.pem",
+          "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
+          "ORIG_EMQX_NODE__ETC_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\etc",
           "RESTART_CLUSTER_CONF": "{configuration:/emqxConfig/cluster}",
-          "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}"
+          "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
+          "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}",
+          "EMQX_PLUGINS__INSTALL_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\plugins",
+          "EMQX_LISTENERS__SSL__DEFAULT__SSL_OPTIONS__CERTFILE": "{work:path}\\v2\\data\\cert.pem",
+          "EMQX_NODE__ETC_DIR": "{work:path}\\v2\\etc",
+          "EMQX_NODE__DATA_DIR": "{work:path}\\v2\\data",
+          "ORIG_EMQX_NODE__DATA_DIR": "{artifacts:decompressedPath}\\emqx\\emqx\\data",
+          "CRT_LOG_LEVEL": "{configuration:/crtLogLevel}"
         },
         "shutdown": {
           "script": "{artifacts:decompressedPath}\\emqx\\emqx\\bin\\emqx.cmd stop"
@@ -67,7 +68,7 @@
       },
       "Artifacts": [
         {
-          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
+          "Uri": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/emqx.zip",
           "Unarchive": "ZIP",
           "Permission": {
             "Read": "OWNER",
@@ -78,7 +79,8 @@
     },
     {
       "Platform": {
-        "os": "linux"
+        "os": "linux",
+        "architecture": "amd64"
       },
       "Lifecycle": {
         "install": {
@@ -87,18 +89,14 @@
         },
         "startup": {
           "requiresPrivilege": "{configuration:/requiresPrivilege}",
-          "timeout": "{configuration:/startupTimeoutSeconds}",
-          "script": "case $DOCKER_EXTRA in \\{configuration:*) DOCKER_EXTRA=\"\";; esac; docker run --rm --name emqx $DOCKER_EXTRA -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e SVCUID -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT -e EMQX_LISTENERS__SSL__DEFAULT__BIND -e CRT_LOG_LEVEL -e IPC_TIMEOUT_SECONDS -e RESTART_IDENTIFIER aws-greengrass-emqx:amd64",
           "setEnv": {
-            "DOCKER_EXTRA": "{configuration:/dockerOptions}",
-            "EMQX_LISTENERS__SSL__DEFAULT__BIND": "{configuration:/emqx/listener.ssl.default.bind}",
-            "RESTART_IDENTIFIER": "{configuration:/restartIdentifier}",
-            "CRT_LOG_LEVEL":  "{configuration:/crtLogLevel}",
-            "IPC_TIMEOUT_SECONDS": "{configuration:/ipcTimeoutSeconds}",
             "RESTART_NODE_CONF": "{configuration:/emqxConfig/node}",
+            "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}",
             "RESTART_CLUSTER_CONF": "{configuration:/emqxConfig/cluster}",
-            "RESTART_RPC_CONF": "{configuration:/emqxConfig/rpc}"
-          }
+            "DOCKER_EXTRA": "{configuration:/dockerOptions}"
+          },
+          "timeout": "{configuration:/startupTimeoutSeconds}",
+          "script": "case $DOCKER_EXTRA in \\{configuration:*) DOCKER_EXTRA=\"\";; esac;\n                docker run --rm --name emqx $DOCKER_EXTRA \\\n                -v $AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT:$AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT \\\n                -e SVCUID \\\n                -e AWS_GG_NUCLEUS_DOMAIN_SOCKET_FILEPATH_FOR_COMPONENT \\\n                -e RESTART_IDENTIFIER={configuration:/restartIdentifier} \\\n-e CRT_LOG_LEVEL={configuration:/crtLogLevel} \\\n-e IPC_TIMEOUT_SECONDS={configuration:/ipcTimeoutSeconds} \\\n aws-greengrass-emqx:amd64"
         },
         "shutdown": {
           "requiresPrivilege": "{configuration:/requiresPrivilege}",
@@ -107,9 +105,10 @@
       },
       "Artifacts": [
         {
-          "URI": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/aws-greengrass-emqx.amd64.tar.gz"
+          "Uri": "s3://BUCKET_NAME/COMPONENT_NAME/COMPONENT_VERSION/aws-greengrass-emqx.amd64.tar.gz"
         }
       ]
     }
-  ]
+  ],
+  "Lifecycle": {}
 }
