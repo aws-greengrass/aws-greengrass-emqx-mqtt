@@ -34,6 +34,18 @@ execute_process(
 message("Erlang libs directory found: ${ERL_LIBS}")
 
 include_directories("include")
+#
+# Suppress unreferenced-parameter warnings coming from third-party/submodule code:
+# - MSVC: disable C4100 (unreferenced formal parameter)
+# - GCC/Clang: disable -Wunused-parameter
+if (MSVC)
+    # Ignore unreferenced parameter warning in MSVC (C4100)
+    add_compile_options("/wd4100")
+else()
+    # Ignore unused parameter warnings for GCC/Clang
+    add_compile_options("-Wno-unused-parameter")
+endif()
+
 add_subdirectory(cda_integration)
 
 if (CLANG_TIDY)
