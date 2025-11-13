@@ -67,7 +67,7 @@
 +:: )
 +:: [greengrass patch end]
 
- @set conf_path="%etc_dir%\emqx.conf"
+ @set conf_path=%etc_dir%\emqx.conf
 
 -@for /f "usebackq tokens=1,2 delims==" %%a in (`"%escript% %nodetool% hocon -s %schema_mod% -c %conf_path% multi_get node.name node.cookie node.data_dir"`) do @(
 -  if "%%a"=="node.name" set node_name=%%b
@@ -78,7 +78,7 @@
 +:: remove data dir looking from config file,
 +:: use env vars for data dir since that's how
 +:: greengrass exposes user configuration
-+@for /f "usebackq tokens=1,2 delims==" %%a in (`"%escript% %nodetool% hocon -s %schema_mod% -c %conf_path% multi_get node.name node.cookie"`) do @(
++@for /f "usebackq tokens=1,2 delims==" %%a in (`"%escript% %nodetool% hocon -s %schema_mod% -c "%conf_path%" multi_get node.name node.cookie"`) do @(
 +   if "%%a"=="node.name" set node_name=%%b
 +   if "%%a"=="node.cookie" set node_cookie=%%b
 + )

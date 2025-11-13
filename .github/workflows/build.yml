@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019] # windows-latest does not have visual studio 2017
+        os: [ubuntu-20.04, windows-2022]
         otp: ['24.0']
     steps:
       - uses: actions/checkout@v3
