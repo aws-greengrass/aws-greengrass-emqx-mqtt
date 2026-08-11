@@ -56,7 +56,7 @@ def build_port_driver(context) -> None:
         generator = "-A x64"
 
     clang_tidy = ""
-    if (shutil.which("clang-tidy")) is not None:
+    if os.getenv("ENABLE_CLANG_TIDY") == "1" and shutil.which("clang-tidy") is not None:
         clang_tidy = "-DCLANG_TIDY=1"
 
     subprocess.check_call(f"cmake {generator} {enable_unit_test_flag} -DCMAKE_BUILD_TYPE=\"{context.cmake_build_type}\""

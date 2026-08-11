@@ -8,6 +8,8 @@ from typing import Tuple
 
 def find_vcvars_path() -> Tuple[str, str]:
     vcvars_paths = {
+        ("C:\\Program Files\\Microsoft Visual "
+         "Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
         ("C:\\Program Files (x86)\\Microsoft Visual "
          "Studio\\2019\\Enterprise\\VC\\Auxiliary\\Build\\vcvarsall.bat", "x86_amd64"),
         ("C:\\Program Files (x86)\\Microsoft Visual "
