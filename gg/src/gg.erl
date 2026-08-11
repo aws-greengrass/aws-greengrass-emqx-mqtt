@@ -39,7 +39,8 @@
 load(Env) ->
   hook('client.connect', {?MODULE, on_client_connect, [Env]}),
   hook('client.authenticate', {?MODULE, on_client_authenticate, [Env]}),
-  hook('client.authorize', {?MODULE, on_client_authorize, [Env]}).
+  hook('client.authorize', {?MODULE, on_client_authorize, [Env]}),
+  log_skipped_listeners().
 
 unload() ->
   unhook('client.connect', {?MODULE, on_client_connect}),
@@ -109,6 +110,14 @@ handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto
 
 %% Interface derived from
 %% https://github.com/emqx/emqx/blob/270059f0c2694342fc72338760dbb968b78b7918/apps/emqx/src/emqx_access_control.erl#L53-L68
+%%
+%% Listeners with enable_authn: false skip GG auth entirely.
+%% EMQX places the listener's enable_authn setting directly in ClientInfo
+%% (see emqx_channel:init/2). Defense-in-depth: EMQX also natively skips
+%% the authenticate hook chain for these listeners, but we guard here too.
+on_client_authenticate(#{enable_authn := false, clientid := ClientId}, _Result, _Env) ->
+  logger:debug("Client(~s) skipping GG auth (enable_authn=false)", [ClientId]),
+  ?CONTINUE_HOOK_CHAIN;
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
     fun() ->
@@ -150,6 +159,13 @@ reauthenticate(ClientId) ->
 
 %% Interface derived from
 %% https://github.com/emqx/emqx/blob/270059f0c2694342fc72338760dbb968b78b7918/apps/emqx/src/emqx_access_control.erl#L121-L127
+%%
+%% Listeners with enable_authn: false skip GG authZ — GG authZ requires
+%% the auth token from GG authn, which cannot exist for these clients.
+%% Authorization falls through to the EMQX authorization chain (sources + no_match).
+on_client_authorize(#{enable_authn := false, clientid := ClientId}, _PubSub, _Topic, _Result, _Env) ->
+  logger:debug("Client(~s) skipping GG authZ (enable_authn=false)", [ClientId]),
+  ?CONTINUE_HOOK_CHAIN;
 on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
   execute_auth_hook(
     fun() ->
@@ -235,6 +251,22 @@ is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retr
 %%--------------------------------------------------------------------
 %% Utils
 %%--------------------------------------------------------------------
+
+%% Log once at startup which listeners have GG auth disabled.
+log_skipped_listeners() ->
+  Listeners = maps:to_list(emqx:get_config([listeners], #{})),
+  lists:foreach(
+    fun({Proto, NameMap}) ->
+      lists:foreach(
+        fun({Name, Conf}) ->
+          case maps:get(enable_authn, Conf, true) of
+            false ->
+              logger:warning("GG auth disabled for listener ~p:~p; authorization defers to EMQX sources (no_match=~p)",
+                [Proto, Name, emqx:get_config([authorization, no_match], deny)]);
+            _ -> ok
+          end
+        end, maps:to_list(NameMap))
+    end, Listeners).
 
 kick_client(ClientId, OnPreKick) ->
   kick_client(gg_conf:auth_mode(), ClientId, OnPreKick).
