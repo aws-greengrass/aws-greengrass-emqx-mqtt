@@ -22,6 +22,7 @@ def build_sdk(context):
         "-DCMAKE_INSTALL_PREFIX=.",
         f"-DCMAKE_BUILD_TYPE={context.cmake_build_type}",
         "-DBUILD_TESTING=OFF",
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
     ]
     cmake_configure_args.append("../aws-iot-device-sdk-cpp-v2")
     subprocess.check_call(cmake_configure_args)

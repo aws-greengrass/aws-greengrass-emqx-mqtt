@@ -62,5 +62,5 @@ void GreengrassIPCWrapper::setAsRunning() {
     request.SetState(Aws::Greengrass::REPORTED_LIFECYCLE_STATE_RUNNING);
     auto fut = operation->Activate(request, nullptr);
     fut.wait();
-    operation->GetOperationResult().wait_for(std::chrono::seconds(timeoutSeconds));
+    operation->GetResult().wait_for(std::chrono::seconds(timeoutSeconds));
 }

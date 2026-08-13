@@ -65,7 +65,7 @@ std::variant<int, std::unique_ptr<std::string>> ClientDeviceAuthIntegration::get
         return 1;
     }
 
-    auto resultFuture = getConfigOperation->GetOperationResult();
+    auto resultFuture = getConfigOperation->GetResult();
     if (resultFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CONFIGURATION_OP);
         return 1;
@@ -148,7 +148,7 @@ std::unique_ptr<std::string> ClientDeviceAuthIntegration::get_client_device_auth
         return {};
     }
 
-    auto responseFuture = operation->GetOperationResult();
+    auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, GET_CLIENT_DEVICE_AUTH_TOKEN_OP);
         return {};
@@ -197,7 +197,7 @@ AuthorizationStatus ClientDeviceAuthIntegration::on_check_acl(const char *client
         return AuthorizationStatus::UNKNOWN_ERROR;
     }
 
-    auto responseFuture = authorizationOperation->GetOperationResult();
+    auto responseFuture = authorizationOperation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, AUTHORIZE_CLIENT_DEVICE_ACTION);
         return AuthorizationStatus::UNKNOWN_ERROR;
@@ -247,7 +247,7 @@ bool ClientDeviceAuthIntegration::verify_client_certificate(const char *certPem)
         return false;
     }
 
-    auto responseFuture = operation->GetOperationResult();
+    auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(timeoutSeconds)) == std::future_status::timeout) {
         LOG_E(CDA_INTEG_SUBJECT, FAILED_TIMEOUT_ERROR_FMT, VERIFY_CLIENT_DEVICE_IDENTITY);
         return false;
