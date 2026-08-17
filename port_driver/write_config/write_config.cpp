@@ -89,7 +89,7 @@ std::variant<int, Aws::Crt::JsonObject> get_emqx_configuration(GreengrassIPCWrap
         return 1;
     }
 
-    auto responseFuture = operation->GetOperationResult();
+    auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(ipc.getTimeoutSeconds())) == std::future_status::timeout) {
         LOG_E(WRITE_CONFIG_SUBJECT, ClientDeviceAuthIntegration::FAILED_TIMEOUT_ERROR_FMT, GetConfigurationRequest);
         return 1;

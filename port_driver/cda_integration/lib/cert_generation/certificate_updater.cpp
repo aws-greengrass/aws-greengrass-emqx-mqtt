@@ -127,7 +127,7 @@ CertSubscribeUpdateStatus CertificateUpdater::subscribeToUpdates(
     auto activate = operation->Activate(request, nullptr);
     activate.wait();
 
-    auto responseFuture = operation->GetOperationResult();
+    auto responseFuture = operation->GetResult();
     if (responseFuture.wait_for(std::chrono::seconds(SUBSCRIBE_TIMEOUT_SECONDS)) == std::future_status::timeout) {
         LOG_E(CERT_UPDATER_SUBJECT, "Operation timed out while waiting for response from Greengrass Core.");
         return CertSubscribeUpdateStatus::SUBSCRIBE_ERROR_TIMEOUT_RESPONSE;
