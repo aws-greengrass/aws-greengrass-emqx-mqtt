@@ -79,9 +79,14 @@ handle_auth_hook_result(_, #{result := ?AUTHZ_DENY} = AuthZDeny) ->
   {?STOP_HOOK_CHAIN, AuthZDeny};
 handle_auth_hook_result(_, {error, _} = Error) ->
   %% stop auth chain and report error
+  logger:error("GG auth hook returned error, denying: ~p", [Error]),
   {?STOP_HOOK_CHAIN, Error};
 handle_auth_hook_result(_, Error) ->
-  %% stop auth chain and report error
+  %% stop auth chain and report error. Unexpected shapes reach here — notably a
+  %% caught {'EXIT', Reason} when the hook itself crashed (e.g. a function_clause
+  %% if EMQX changes the action/arg shape). Log at error so the GG plugin is named
+  %% as the source instead of relying only on EMQX's generic authorization error.
+  logger:error("GG auth hook failed unexpectedly, denying: ~p", [Error]),
   {?STOP_HOOK_CHAIN, {error, Error}}.
 
 %%--------------------------------------------------------------------
@@ -171,17 +176,31 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     fun() ->
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
+      Action = pubsub_action_type(PubSub),
       case is_pubsub_authorized(PubSub, ClientId, Topic) of
-        true -> #{result => ?AUTHZ_ALLOW};
-        false -> #{result => ?AUTHZ_DENY}
+        true ->
+          logger:info("GG authZ result=allow clientid=~s action=~p topic=~p",
+            [ClientId, Action, Topic]),
+          #{result => ?AUTHZ_ALLOW};
+        false ->
+          logger:info("GG authZ result=deny clientid=~s action=~p topic=~p",
+            [ClientId, Action, Topic]),
+          #{result => ?AUTHZ_DENY}
       end
     end
   ).
 
--spec(is_pubsub_authorized(PubSub :: atom(), ClientId :: any(), Topic :: any()) -> boolean()).
-is_pubsub_authorized(publish, ClientId, Topic) ->
+%% Extract the action atom from the EMQX 5.1.3 map for logging.
+%% Fallback clause ensures logging never crashes authZ.
+pubsub_action_type(#{action_type := Action}) -> Action;
+pubsub_action_type(Other) -> Other.
+
+%% EMQX 5.1.3 (emqx_types:pubsub()) passes the action as a map
+%% #{action_type := publish|subscribe, ...}.
+-spec(is_pubsub_authorized(PubSub :: map(), ClientId :: any(), Topic :: any()) -> boolean()).
+is_pubsub_authorized(#{action_type := publish}, ClientId, Topic) ->
   is_publish_authorized(ClientId, Topic);
-is_pubsub_authorized(subscribe, ClientId, Topic) ->
+is_pubsub_authorized(#{action_type := subscribe}, ClientId, Topic) ->
   is_subscribe_authorized(ClientId, Topic).
 
 -spec(is_connect_authorized(ClientId :: any()) -> boolean()).
