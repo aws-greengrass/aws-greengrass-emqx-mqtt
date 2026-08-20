@@ -179,10 +179,13 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
       Action = pubsub_action_type(PubSub),
       case is_pubsub_authorized(PubSub, ClientId, Topic) of
         true ->
-          logger:info("GG authZ result=allow clientid=~s action=~p topic=~p",
+          %% Allow is the common per-message case; log at debug to avoid one
+          %% info line per publish/subscribe on disk-constrained edge devices.
+          logger:debug("GG authZ result=allow clientid=~s action=~p topic=~p",
             [ClientId, Action, Topic]),
           #{result => ?AUTHZ_ALLOW};
         false ->
+          %% Denials are the security-relevant events worth surfacing at info.
           logger:info("GG authZ result=deny clientid=~s action=~p topic=~p",
             [ClientId, Action, Topic]),
           #{result => ?AUTHZ_DENY}
@@ -197,11 +200,21 @@ pubsub_action_type(Other) -> Other.
 
 %% EMQX 5.1.3 (emqx_types:pubsub()) passes the action as a map
 %% #{action_type := publish|subscribe, ...}.
--spec(is_pubsub_authorized(PubSub :: map(), ClientId :: any(), Topic :: any()) -> boolean()).
+-spec(is_pubsub_authorized(PubSub :: map() | term(), ClientId :: any(), Topic :: any()) -> boolean()).
 is_pubsub_authorized(#{action_type := publish}, ClientId, Topic) ->
   is_publish_authorized(ClientId, Topic);
 is_pubsub_authorized(#{action_type := subscribe}, ClientId, Topic) ->
-  is_subscribe_authorized(ClientId, Topic).
+  is_subscribe_authorized(ClientId, Topic);
+is_pubsub_authorized(Other, ClientId, Topic) ->
+  %% Defensive terminal clause. EMQX is pinned in gg/rebar.config, so the two map
+  %% clauses above are exhaustive today. But the pin is bumped by routine in-repo
+  %% PRs and Erlang gives no compile-time exhaustiveness warning, so a future
+  %% reshape of emqx_types:pubsub() would otherwise raise function_clause here —
+  %% which the catch in execute_auth_hook/2 turns into deny-everything. Fail
+  %% closed (deny) with a named error log instead of a silent crash.
+  logger:error("GG authZ unrecognized action shape, denying: clientid=~s action=~p topic=~p",
+    [ClientId, Other, Topic]),
+  false.
 
 -spec(is_connect_authorized(ClientId :: any()) -> boolean()).
 is_connect_authorized(ClientId) ->
