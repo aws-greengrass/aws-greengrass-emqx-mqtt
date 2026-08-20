@@ -40,6 +40,20 @@ def build_plugin(context) -> None:
         vcvars_path, arch = context.get_vcvars_path()
         plugin_build_cmd = f'call "{vcvars_path}" {arch} && {plugin_build_cmd}'
 
+    # Run the plugin EUnit suite (test profile pulls in meck) unless tests are
+    # explicitly skipped. This guards the EMQX<->plugin authZ action-shape
+    # contract in CI; see is_pubsub_authorized_test_ in gg/src/gg.erl.
+    if not context.no_test:
+        if os.name == 'nt':
+            # Windows must chain the vcvars batch script with '&&', which
+            # requires shell interpretation. Command is composed only of
+            # build-time constants (no untrusted input).
+            eunit_cmd = f'call "{vcvars_path}" {arch} && {REBAR} eunit'
+            subprocess.check_call(eunit_cmd, env=plugin_build_env, shell=True)
+        else:
+            # List form avoids a shell entirely (no shell=True).
+            subprocess.check_call([f'./{REBAR}', 'eunit'], env=plugin_build_env)
+
     subprocess.check_call(
         plugin_build_cmd,
         env=plugin_build_env,

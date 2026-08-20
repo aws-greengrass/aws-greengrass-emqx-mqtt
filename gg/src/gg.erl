@@ -367,3 +367,83 @@ encode_peer_cert(undefined) ->
   <<"">>;
 encode_peer_cert(PeerCert) ->
   base64:encode(PeerCert).
+
+
+%%--------------------------------------------------------------------
+%% Tests
+%%--------------------------------------------------------------------
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+%% Pull in EMQX's OWN definition of the authZ action term. ?AUTHZ_PUBLISH and
+%% ?AUTHZ_SUBSCRIBE are the exact constructors emqx_channel uses when it invokes
+%% the 'client.authorize' hook (apps/emqx/include/emqx_access_control.hrl). By
+%% building test inputs from these macros rather than hand-writing a map, the
+%% test is bound to the real EMQX API: if a future EMQX version reshapes the
+%% action term, the plugin recompiles against the new macro, these tests feed
+%% the new shape into is_pubsub_authorized/3, and the mismatch fails here
+%% instead of silently denying all client-device traffic in the field.
+-include_lib("emqx/include/emqx_access_control.hrl").
+
+%% These tests pin the contract between EMQX and the GG auth plugin: EMQX 5.1.3
+%% passes the authZ action as a map (#{action_type := publish|subscribe, ...}).
+%% The original ticket (V2286958564) was a shape mismatch — our clauses expected
+%% bare atoms while EMQX passed a map.
+%%
+%% is_pubsub_authorized/3 routes into is_authorized/… which performs a
+%% port-driver IPC call to Client Device Auth. We mock that single seam
+%% (gg_port_driver:on_client_check_acl/4) so the tests exercise the map
+%% destructuring and dispatch without a running port driver.
+
+is_pubsub_authorized_test_() ->
+  {foreach,
+    fun() -> meck:new(gg_port_driver, [non_strict, no_link]) end,
+    fun(_) -> meck:unload(gg_port_driver) end,
+    [
+      fun emqx_publish_action_dispatches_to_publish/0,
+      fun emqx_subscribe_action_dispatches_to_subscribe/0,
+      fun unrecognized_shape_denies_without_consulting_cda/0
+    ]}.
+
+%% EMQX's own publish action (?AUTHZ_PUBLISH) must resolve to an mqtt:publish
+%% check on the topic. Driving the input from the EMQX macro is what makes this
+%% a real API contract test rather than an assertion against our own assumption.
+emqx_publish_action_dispatches_to_publish() ->
+  meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
+  ?assertEqual(true, is_pubsub_authorized(?AUTHZ_PUBLISH, <<"cid">>, <<"a/b">>)),
+  ?assert(meck:called(gg_port_driver, on_client_check_acl,
+    ['_', '_', "mqtt:topic:a/b", "mqtt:publish"])).
+
+%% EMQX's own subscribe action (?AUTHZ_SUBSCRIBE) must resolve to an
+%% mqtt:subscribe check on the topic filter.
+emqx_subscribe_action_dispatches_to_subscribe() ->
+  meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
+  ?assertEqual(true, is_pubsub_authorized(?AUTHZ_SUBSCRIBE, <<"cid">>, <<"a/b">>)),
+  ?assert(meck:called(gg_port_driver, on_client_check_acl,
+    ['_', '_', "mqtt:topicfilter:a/b", "mqtt:subscribe"])).
+
+%% Any shape EMQX does not send must fail closed (deny) and must NOT consult
+%% CDA. This guards the defensive terminal clause against a future
+%% function_clause regression.
+unrecognized_shape_denies_without_consulting_cda() ->
+  meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
+  ?assertEqual(false, is_pubsub_authorized(#{unexpected => shape}, <<"cid">>, <<"a/b">>)),
+  ?assertEqual(false, is_pubsub_authorized(publish, <<"cid">>, <<"a/b">>)),
+  ?assertNot(meck:called(gg_port_driver, on_client_check_acl, ['_', '_', '_', '_'])).
+
+%% pubsub_action_type/1 extracts the action for logging from the EMQX action map
+%% or a raw term, and must never throw (logging must not break authZ).
+pubsub_action_type_test() ->
+  ?assertEqual(publish, pubsub_action_type(?AUTHZ_PUBLISH)),
+  ?assertEqual(subscribe, pubsub_action_type(?AUTHZ_SUBSCRIBE)),
+  ?assertEqual(some_other_shape, pubsub_action_type(some_other_shape)).
+
+%% An unrecognized result from the C++ port driver must fail closed (deny)
+%% rather than raise function_clause. The crash path is what would otherwise
+%% put the CDA auth token (a positional argument to is_authorized/6) into a
+%% stacktrace and then into the logs, so failing closed here is both the safe
+%% authZ outcome and the fix for that exposure.
+is_authorized_unrecognized_result_denies_test() ->
+  ?assertEqual(?UNAUTHORIZED,
+    is_authorized(unexpected_driver_result, _Retries = 0, <<"token">>, <<"cid">>, "mqtt:topic:a/b", "mqtt:publish")).
+
+-endif.
