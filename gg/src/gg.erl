@@ -437,4 +437,13 @@ pubsub_action_type_test() ->
   ?assertEqual(subscribe, pubsub_action_type(?AUTHZ_SUBSCRIBE)),
   ?assertEqual(some_other_shape, pubsub_action_type(some_other_shape)).
 
+%% An unrecognized result from the C++ port driver must fail closed (deny)
+%% rather than raise function_clause. The crash path is what would otherwise
+%% put the CDA auth token (a positional argument to is_authorized/6) into a
+%% stacktrace and then into the logs, so failing closed here is both the safe
+%% authZ outcome and the fix for that exposure.
+is_authorized_unrecognized_result_denies_test() ->
+  ?assertEqual(?UNAUTHORIZED,
+    is_authorized(unexpected_driver_result, _Retries = 0, <<"token">>, <<"cid">>, "mqtt:topic:a/b", "mqtt:publish")).
+
 -endif.
