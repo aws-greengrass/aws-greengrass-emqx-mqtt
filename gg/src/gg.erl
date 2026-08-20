@@ -71,18 +71,51 @@ handle_auth_hook_result(_, {ok, _} = AuthNSuccess) ->
 handle_auth_hook_result(_, #{result := ?AUTHZ_ALLOW} = AuthZSuccess) ->
   %% no need to evaluate rest of auth chain when we deem success
   {?STOP_HOOK_CHAIN, AuthZSuccess};
-handle_auth_hook_result(AuthMode, _) when AuthMode =:= bypass; AuthMode =:= bypass_on_failure ->
-  %% in bypass mode, ignore auth results/errors and move on to next step in auth chain
+handle_auth_hook_result(AuthMode, Result) when AuthMode =:= bypass; AuthMode =:= bypass_on_failure ->
+  %% Defer to the next auth source. Denials are expected here (bypass_on_failure
+  %% intentionally falls through to EMQX when GG does not allow); errors and
+  %% crashes are not, and this is the mode where they would otherwise go entirely
+  %% unreported — GG silently stops deciding and nothing looks wrong.
+  log_bypassed_result(Result),
   ?CONTINUE_HOOK_CHAIN;
 handle_auth_hook_result(_, #{result := ?AUTHZ_DENY} = AuthZDeny) ->
   %% stop auth chain and report authZ deny
   {?STOP_HOOK_CHAIN, AuthZDeny};
 handle_auth_hook_result(_, {error, _} = Error) ->
   %% stop auth chain and report error
+  logger:error("GG auth hook returned error, denying: ~p", [Error]),
   {?STOP_HOOK_CHAIN, Error};
-handle_auth_hook_result(_, Error) ->
-  %% stop auth chain and report error
-  {?STOP_HOOK_CHAIN, {error, Error}}.
+handle_auth_hook_result(_, {'EXIT', Reason}) ->
+  %% The hook body crashed and execute_auth_hook/2's catch turned it into a
+  %% value. Report the cause and location but NOT the failing call's arguments:
+  %% a function_clause trace's top frame carries the arg list, and
+  %% is_authorized/6 takes the CDA auth token as a positional argument.
+  log_hook_crash(Reason),
+  {?STOP_HOOK_CHAIN, {error, crashed}};
+handle_auth_hook_result(_, Other) ->
+  %% stop auth chain and report an otherwise-unrecognized result
+  logger:error("GG auth hook returned unexpected result, denying: ~p", [Other]),
+  {?STOP_HOOK_CHAIN, {error, Other}}.
+
+%% Report a caught crash by cause and location only. Dropping the stacktrace's
+%% argument list keeps the CDA auth token (a positional arg to is_authorized/6)
+%% out of the logs — error-level logs are uploaded by log manager and attached
+%% to support cases.
+log_hook_crash({Reason, [{M, F, _Args, _Loc} | _]}) ->
+  logger:error("GG auth hook crashed (~p) in ~p:~p, denying", [Reason, M, F]);
+log_hook_crash(Reason) ->
+  logger:error("GG auth hook crashed, denying: ~p", [Reason]).
+
+%% In bypass modes GG defers rather than decides. A denial is the ordinary
+%% "GG does not authorize, let EMQX decide" outcome and is not worth logging; an
+%% error or crash means GG could not decide (e.g. CDA unreachable) and is worth
+%% surfacing even though the chain continues.
+log_bypassed_result(#{result := ?AUTHZ_DENY}) ->
+  ok;
+log_bypassed_result({'EXIT', Reason}) ->
+  log_hook_crash(Reason);
+log_bypassed_result(Result) ->
+  logger:warning("GG auth hook failed, bypassing to next auth source: ~p", [Result]).
 
 %%--------------------------------------------------------------------
 %% Connect Hook
@@ -171,18 +204,45 @@ on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result,
     fun() ->
       logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
         [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
+      Action = pubsub_action_type(PubSub),
       case is_pubsub_authorized(PubSub, ClientId, Topic) of
-        true -> #{result => ?AUTHZ_ALLOW};
-        false -> #{result => ?AUTHZ_DENY}
+        true ->
+          %% Allow is the common per-message case; log at debug to avoid one
+          %% info line per publish/subscribe on disk-constrained edge devices.
+          logger:debug("GG authZ result=allow clientid=~s action=~p topic=~p",
+            [ClientId, Action, Topic]),
+          #{result => ?AUTHZ_ALLOW};
+        false ->
+          %% Denials are the security-relevant events worth surfacing at info.
+          logger:info("GG authZ result=deny clientid=~s action=~p topic=~p",
+            [ClientId, Action, Topic]),
+          #{result => ?AUTHZ_DENY}
       end
     end
   ).
 
--spec(is_pubsub_authorized(PubSub :: atom(), ClientId :: any(), Topic :: any()) -> boolean()).
-is_pubsub_authorized(publish, ClientId, Topic) ->
+%% Extract the action atom from the EMQX 5.1.3 map for logging.
+%% Fallback clause ensures logging never crashes authZ.
+pubsub_action_type(#{action_type := Action}) -> Action;
+pubsub_action_type(Other) -> Other.
+
+%% EMQX 5.1.3 (emqx_types:pubsub()) passes the action as a map
+%% #{action_type := publish|subscribe, ...}.
+-spec(is_pubsub_authorized(PubSub :: map() | term(), ClientId :: any(), Topic :: any()) -> boolean()).
+is_pubsub_authorized(#{action_type := publish}, ClientId, Topic) ->
   is_publish_authorized(ClientId, Topic);
-is_pubsub_authorized(subscribe, ClientId, Topic) ->
-  is_subscribe_authorized(ClientId, Topic).
+is_pubsub_authorized(#{action_type := subscribe}, ClientId, Topic) ->
+  is_subscribe_authorized(ClientId, Topic);
+is_pubsub_authorized(Other, ClientId, Topic) ->
+  %% Defensive terminal clause. EMQX is pinned in gg/rebar.config, so the two map
+  %% clauses above are exhaustive today. But the pin is bumped by routine in-repo
+  %% PRs and Erlang gives no compile-time exhaustiveness warning, so a future
+  %% reshape of emqx_types:pubsub() would otherwise raise function_clause here —
+  %% which the catch in execute_auth_hook/2 turns into deny-everything. Fail
+  %% closed (deny) with a named error log instead of a silent crash.
+  logger:error("GG authZ unrecognized action shape, denying: clientid=~s action=~p topic=~p",
+    [ClientId, Other, Topic]),
+  false.
 
 -spec(is_connect_authorized(ClientId :: any()) -> boolean()).
 is_connect_authorized(ClientId) ->
@@ -245,6 +305,14 @@ is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retr
 is_authorized({ok, bad_token}, Retries, _, ClientId, Resource, Action) when Retries > 0 ->
   logger:debug("Retry attempt failed. Client(~s) not authorized to perform ~p on resource ~p. Error: Could not get valid auth token.", [ClientId, Action, Resource]),
   kick_non_v5_client(ClientId),
+  ?UNAUTHORIZED;
+is_authorized(Other, _Retries, _AuthToken, ClientId, Resource, Action) ->
+  %% Unrecognized result from the C++ port driver — an external contract across a
+  %% language boundary, the same kind that broke with EMQX. Fail closed and log
+  %% the result WITHOUT the auth token (_AuthToken) rather than raising
+  %% function_clause, whose stacktrace would carry the token as a call argument.
+  logger:error("GG authZ unrecognized port driver result, denying: clientid=~s resource=~p action=~p result=~p",
+    [ClientId, Resource, Action, Other]),
   ?UNAUTHORIZED.
 
 
