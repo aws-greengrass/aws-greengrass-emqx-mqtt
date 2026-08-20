@@ -374,13 +374,20 @@ encode_peer_cert(PeerCert) ->
 %%--------------------------------------------------------------------
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+%% Pull in EMQX's OWN definition of the authZ action term. ?AUTHZ_PUBLISH and
+%% ?AUTHZ_SUBSCRIBE are the exact constructors emqx_channel uses when it invokes
+%% the 'client.authorize' hook (apps/emqx/include/emqx_access_control.hrl). By
+%% building test inputs from these macros rather than hand-writing a map, the
+%% test is bound to the real EMQX API: if a future EMQX version reshapes the
+%% action term, the plugin recompiles against the new macro, these tests feed
+%% the new shape into is_pubsub_authorized/3, and the mismatch fails here
+%% instead of silently denying all client-device traffic in the field.
+-include_lib("emqx/include/emqx_access_control.hrl").
 
 %% These tests pin the contract between EMQX and the GG auth plugin: EMQX 5.1.3
 %% passes the authZ action as a map (#{action_type := publish|subscribe, ...}).
 %% The original ticket (V2286958564) was a shape mismatch — our clauses expected
-%% bare atoms while EMQX passed a map — so if a future EMQX bump reshapes
-%% emqx_types:pubsub(), these tests must fail here rather than the plugin
-%% silently denying all client-device traffic in the field.
+%% bare atoms while EMQX passed a map.
 %%
 %% is_pubsub_authorized/3 routes into is_authorized/… which performs a
 %% port-driver IPC call to Client Device Auth. We mock that single seam
@@ -392,27 +399,30 @@ is_pubsub_authorized_test_() ->
     fun() -> meck:new(gg_port_driver, [non_strict, no_link]) end,
     fun(_) -> meck:unload(gg_port_driver) end,
     [
-      fun publish_map_dispatches_to_publish/0,
-      fun subscribe_map_dispatches_to_subscribe/0,
+      fun emqx_publish_action_dispatches_to_publish/0,
+      fun emqx_subscribe_action_dispatches_to_subscribe/0,
       fun unrecognized_shape_denies_without_consulting_cda/0
     ]}.
 
-%% A publish action map must resolve to an mqtt:publish check on the topic.
-publish_map_dispatches_to_publish() ->
+%% EMQX's own publish action (?AUTHZ_PUBLISH) must resolve to an mqtt:publish
+%% check on the topic. Driving the input from the EMQX macro is what makes this
+%% a real API contract test rather than an assertion against our own assumption.
+emqx_publish_action_dispatches_to_publish() ->
   meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
-  ?assertEqual(true, is_pubsub_authorized(#{action_type => publish}, <<"cid">>, <<"a/b">>)),
+  ?assertEqual(true, is_pubsub_authorized(?AUTHZ_PUBLISH, <<"cid">>, <<"a/b">>)),
   ?assert(meck:called(gg_port_driver, on_client_check_acl,
     ['_', '_', "mqtt:topic:a/b", "mqtt:publish"])).
 
-%% A subscribe action map must resolve to an mqtt:subscribe check on the topic filter.
-subscribe_map_dispatches_to_subscribe() ->
+%% EMQX's own subscribe action (?AUTHZ_SUBSCRIBE) must resolve to an
+%% mqtt:subscribe check on the topic filter.
+emqx_subscribe_action_dispatches_to_subscribe() ->
   meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
-  ?assertEqual(true, is_pubsub_authorized(#{action_type => subscribe}, <<"cid">>, <<"a/b">>)),
+  ?assertEqual(true, is_pubsub_authorized(?AUTHZ_SUBSCRIBE, <<"cid">>, <<"a/b">>)),
   ?assert(meck:called(gg_port_driver, on_client_check_acl,
     ['_', '_', "mqtt:topicfilter:a/b", "mqtt:subscribe"])).
 
-%% Any shape EMQX does not currently send must fail closed (deny) and must NOT
-%% consult CDA. This guards the defensive terminal clause against a future
+%% Any shape EMQX does not send must fail closed (deny) and must NOT consult
+%% CDA. This guards the defensive terminal clause against a future
 %% function_clause regression.
 unrecognized_shape_denies_without_consulting_cda() ->
   meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
@@ -420,11 +430,11 @@ unrecognized_shape_denies_without_consulting_cda() ->
   ?assertEqual(false, is_pubsub_authorized(publish, <<"cid">>, <<"a/b">>)),
   ?assertNot(meck:called(gg_port_driver, on_client_check_acl, ['_', '_', '_', '_'])).
 
-%% pubsub_action_type/1 extracts the action for logging from either the map form
+%% pubsub_action_type/1 extracts the action for logging from the EMQX action map
 %% or a raw term, and must never throw (logging must not break authZ).
 pubsub_action_type_test() ->
-  ?assertEqual(publish, pubsub_action_type(#{action_type => publish})),
-  ?assertEqual(subscribe, pubsub_action_type(#{action_type => subscribe})),
+  ?assertEqual(publish, pubsub_action_type(?AUTHZ_PUBLISH)),
+  ?assertEqual(subscribe, pubsub_action_type(?AUTHZ_SUBSCRIBE)),
   ?assertEqual(some_other_shape, pubsub_action_type(some_other_shape)).
 
 -endif.
