@@ -44,14 +44,15 @@ def build_plugin(context) -> None:
     # explicitly skipped. This guards the EMQX<->plugin authZ action-shape
     # contract in CI; see is_pubsub_authorized_test_ in gg/src/gg.erl.
     if not context.no_test:
-        eunit_cmd = f'{REBAR} eunit' if os.name == 'nt' else f'./{REBAR} eunit'
         if os.name == 'nt':
-            eunit_cmd = f'call "{vcvars_path}" {arch} && {eunit_cmd}'
-        subprocess.check_call(
-            eunit_cmd,
-            env=plugin_build_env,
-            shell=True
-        )
+            # Windows must chain the vcvars batch script with '&&', which
+            # requires shell interpretation. Command is composed only of
+            # build-time constants (no untrusted input).
+            eunit_cmd = f'call "{vcvars_path}" {arch} && {REBAR} eunit'
+            subprocess.check_call(eunit_cmd, env=plugin_build_env, shell=True)
+        else:
+            # List form avoids a shell entirely (no shell=True).
+            subprocess.check_call([f'./{REBAR}', 'eunit'], env=plugin_build_env)
 
     subprocess.check_call(
         plugin_build_cmd,
