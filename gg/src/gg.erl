@@ -396,7 +396,7 @@ encode_peer_cert(PeerCert) ->
 
 is_pubsub_authorized_test_() ->
   {foreach,
-    fun() -> meck:new(gg_port_driver, [non_strict, no_link]) end,
+    fun() -> meck:new(gg_port_driver, [no_link]) end,
     fun(_) -> meck:unload(gg_port_driver) end,
     [
       fun emqx_publish_action_dispatches_to_publish/0,
