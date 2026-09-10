@@ -148,29 +148,9 @@ handle_connect(_, ConnInfo = #{clientid := ClientId, peercert := PeerCert, proto
 %% EMQX places the listener's enable_authn setting directly in ClientInfo
 %% (see emqx_channel:init/2). Defense-in-depth: EMQX also natively skips
 %% the authenticate hook chain for these listeners, but we guard here too.
-%%
-%% Exception: the SSL listener always goes through GG authN, regardless of its
-%% enable_authn setting. TLS transport security is not an identity check, and
-%% an operator disabling enable_authn on the encrypted listener (by mistake or
-%% by copying the TCP-listener bypass) must not silently lose Greengrass client
-%% device authentication on what is meant to be the authenticated listener.
-%% ClientInfo's listener key is EMQX's own Type:Name atom for the connection
-%% (emqx_channel:init/2, emqx_listeners:listener_id/2); it reflects which
-%% listener accepted the socket and cannot be influenced by the client.
-on_client_authenticate(ClientInfo = #{enable_authn := false, listener := Listener, clientid := ClientId}, Result, _Env) ->
-  case is_ssl_listener(Listener) of
-    true ->
-      execute_auth_hook(
-        fun() ->
-          logger:debug("Client(~s) authenticate, ClientInfo ~n~p~n, Result:~n~p~n, Env:~n~p~n",
-            [ClientId, ClientInfo, Result, _Env]),
-          authenticate(ClientId)
-        end
-      );
-    false ->
-      logger:debug("Client(~s) skipping GG auth (enable_authn=false)", [ClientId]),
-      ?CONTINUE_HOOK_CHAIN
-  end;
+on_client_authenticate(#{enable_authn := false, clientid := ClientId}, _Result, _Env) ->
+  logger:debug("Client(~s) skipping GG auth (enable_authn=false)", [ClientId]),
+  ?CONTINUE_HOOK_CHAIN;
 on_client_authenticate(ClientInfo = #{clientid := ClientId}, Result, _Env) ->
   execute_auth_hook(
     fun() ->
@@ -216,33 +196,9 @@ reauthenticate(ClientId) ->
 %% Listeners with enable_authn: false skip GG authZ — GG authZ requires
 %% the auth token from GG authn, which cannot exist for these clients.
 %% Authorization falls through to the EMQX authorization chain (sources + no_match).
-%%
-%% Exception: the SSL listener always goes through GG authZ. See the matching
-%% exception on on_client_authenticate/3 above for the rationale.
-on_client_authorize(ClientInfo = #{enable_authn := false, listener := Listener, clientid := ClientId}, PubSub, Topic, Result, _Env) ->
-  case is_ssl_listener(Listener) of
-    true ->
-      execute_auth_hook(
-        fun() ->
-          logger:debug("Client(~s) check_acl, PubSub:~p, Topic:~p, ClientInfo ~n~p~n; Result:~n~p~n, Env: ~n~p~n",
-            [ClientId, PubSub, Topic, ClientInfo, Result, _Env]),
-          Action = pubsub_action_type(PubSub),
-          case is_pubsub_authorized(PubSub, ClientId, Topic) of
-            true ->
-              logger:debug("GG authZ result=allow clientid=~s action=~p topic=~p",
-                [ClientId, Action, Topic]),
-              #{result => ?AUTHZ_ALLOW};
-            false ->
-              logger:info("GG authZ result=deny clientid=~s action=~p topic=~p",
-                [ClientId, Action, Topic]),
-              #{result => ?AUTHZ_DENY}
-          end
-        end
-      );
-    false ->
-      logger:debug("Client(~s) skipping GG authZ (enable_authn=false)", [ClientId]),
-      ?CONTINUE_HOOK_CHAIN
-  end;
+on_client_authorize(#{enable_authn := false, clientid := ClientId}, _PubSub, _Topic, _Result, _Env) ->
+  logger:debug("Client(~s) skipping GG authZ (enable_authn=false)", [ClientId]),
+  ?CONTINUE_HOOK_CHAIN;
 on_client_authorize(ClientInfo = #{clientid := ClientId}, PubSub, Topic, Result, _Env) ->
   execute_auth_hook(
     fun() ->
@@ -364,23 +320,7 @@ is_authorized(Other, _Retries, _AuthToken, ClientId, Resource, Action) ->
 %% Utils
 %%--------------------------------------------------------------------
 
-%% ClientInfo's listener key is an atom of the form Type:Name (e.g. ssl:default),
-%% built by EMQX itself as emqx_listeners:listener_id(Type, Name) in
-%% emqx_channel:init/2. Matching on the "ssl:" prefix (rather than assuming the
-%% listener is named "default") covers any SSL listener an operator configures.
--spec(is_ssl_listener(Listener :: atom()) -> boolean()).
-is_ssl_listener(Listener) when is_atom(Listener) ->
-  case string:split(atom_to_list(Listener), ":", leading) of
-    ["ssl" | _] -> true;
-    _ -> false
-  end;
-is_ssl_listener(_Listener) ->
-  false.
-
-%% Log once at startup which listeners have GG auth disabled. The SSL listener
-%% is called out separately: enable_authn: false has no effect there (see
-%% is_ssl_listener/1 and its callers), so an operator who set it expecting a
-%% bypass needs to know GG auth is still enforced.
+%% Log once at startup which listeners have GG auth disabled.
 log_skipped_listeners() ->
   Listeners = maps:to_list(emqx:get_config([listeners], #{})),
   lists:foreach(
@@ -389,14 +329,8 @@ log_skipped_listeners() ->
         fun({Name, Conf}) ->
           case maps:get(enable_authn, Conf, true) of
             false ->
-              case is_ssl_listener(list_to_atom(lists:append([atom_to_list(Proto), ":", atom_to_list(Name)]))) of
-                true ->
-                  logger:warning("enable_authn=false is set for SSL listener ~p:~p but has no effect there; "
-                    "GG authN/authZ is always enforced on the SSL listener", [Proto, Name]);
-                false ->
-                  logger:warning("GG auth disabled for listener ~p:~p; authorization defers to EMQX sources (no_match=~p)",
-                    [Proto, Name, emqx:get_config([authorization, no_match], deny)])
-              end;
+              logger:warning("GG auth disabled for listener ~p:~p; authorization defers to EMQX sources (no_match=~p)",
+                [Proto, Name, emqx:get_config([authorization, no_match], deny)]);
             _ -> ok
           end
         end, maps:to_list(NameMap))
@@ -511,78 +445,5 @@ pubsub_action_type_test() ->
 is_authorized_unrecognized_result_denies_test() ->
   ?assertEqual(?UNAUTHORIZED,
     is_authorized(unexpected_driver_result, _Retries = 0, <<"token">>, <<"cid">>, "mqtt:topic:a/b", "mqtt:publish")).
-
-%% is_ssl_listener/1 matches EMQX's own Type:Name listener-id atom
-%% (emqx_listeners:listener_id/2), which is what ClientInfo's listener key
-%% actually contains (emqx_channel:init/2). It must match any listener name,
-%% not just the default one, and must not raise on non-atom input.
-is_ssl_listener_test() ->
-  ?assertEqual(true, is_ssl_listener('ssl:default')),
-  ?assertEqual(true, is_ssl_listener('ssl:my_custom_ssl_listener')),
-  ?assertEqual(false, is_ssl_listener('tcp:default')),
-  ?assertEqual(false, is_ssl_listener('ws:default')),
-  ?assertEqual(false, is_ssl_listener('wss:default')),
-  ?assertEqual(false, is_ssl_listener(undefined)),
-  ?assertEqual(false, is_ssl_listener(<<"ssl:default">>)).
-
-%% The SSL listener must always be routed through GG authN, even when
-%% enable_authn: false is set for it — the exact misconfiguration this guards
-%% against. execute_auth_hook/2 makes the real port-driver IPC call, so mock
-%% gg_port_driver the same way is_pubsub_authorized_test_ does and assert the
-%% hook actually ran instead of taking the ?CONTINUE_HOOK_CHAIN bypass.
-on_client_authenticate_ssl_listener_test_() ->
-  {foreach,
-    fun() -> meck:new(gg_port_driver, [no_link]) end,
-    fun(_) -> meck:unload(gg_port_driver) end,
-    [
-      fun ssl_listener_with_enable_authn_false_still_calls_gg_authn/0,
-      fun tcp_listener_with_enable_authn_false_skips_gg_authn/0
-    ]}.
-
-ssl_listener_with_enable_authn_false_still_calls_gg_authn() ->
-  meck:expect(gg_port_driver, get_auth_token, fun(_, _) -> {error, no_cert} end),
-  Result = on_client_authenticate(
-    #{enable_authn => false, listener => 'ssl:default', clientid => <<"cid">>}, {ok, #{}}, []),
-  %% The hook ran (it did not take ?CONTINUE_HOOK_CHAIN); with no cert
-  %% presented the port driver call fails and GG denies. execute_auth_hook/1
-  %% wraps every terminal result as {?STOP_HOOK_CHAIN, Result} in the default
-  %% (enabled) auth mode.
-  ?assertEqual({?STOP_HOOK_CHAIN, {error, ?AUTHN_FAILURE}}, Result),
-  ?assert(meck:called(gg_port_driver, get_auth_token, ['_', '_'])).
-
-tcp_listener_with_enable_authn_false_skips_gg_authn() ->
-  Result = on_client_authenticate(
-    #{enable_authn => false, listener => 'tcp:default', clientid => <<"cid">>}, {ok, #{}}, []),
-  ?assertEqual(?CONTINUE_HOOK_CHAIN, Result),
-  ?assertNot(meck:called(gg_port_driver, get_auth_token, ['_', '_'])).
-
-%% Same carve-out on the authZ hook: the SSL listener must always be evaluated
-%% by is_pubsub_authorized/3, even with enable_authn: false, rather than
-%% deferring to the EMQX authorization chain.
-on_client_authorize_ssl_listener_test_() ->
-  {foreach,
-    fun() -> meck:new(gg_port_driver, [no_link]) end,
-    fun(_) -> meck:unload(gg_port_driver) end,
-    [
-      fun ssl_listener_with_enable_authn_false_still_calls_gg_authz/0,
-      fun tcp_listener_with_enable_authn_false_skips_gg_authz/0
-    ]}.
-
-ssl_listener_with_enable_authn_false_still_calls_gg_authz() ->
-  meck:expect(gg_port_driver, on_client_check_acl, fun(_, _, _, _) -> {ok, authorized} end),
-  Result = on_client_authorize(
-    #{enable_authn => false, listener => 'ssl:default', clientid => <<"cid">>},
-    ?AUTHZ_PUBLISH, <<"a/b">>, {ok, #{}}, []),
-  %% execute_auth_hook/1 wraps every terminal result, including AUTHZ_ALLOW, as
-  %% {?STOP_HOOK_CHAIN, Result}.
-  ?assertEqual({?STOP_HOOK_CHAIN, #{result => ?AUTHZ_ALLOW}}, Result),
-  ?assert(meck:called(gg_port_driver, on_client_check_acl, ['_', '_', '_', '_'])).
-
-tcp_listener_with_enable_authn_false_skips_gg_authz() ->
-  Result = on_client_authorize(
-    #{enable_authn => false, listener => 'tcp:default', clientid => <<"cid">>},
-    ?AUTHZ_PUBLISH, <<"a/b">>, {ok, #{}}, []),
-  ?assertEqual(?CONTINUE_HOOK_CHAIN, Result),
-  ?assertNot(meck:called(gg_port_driver, on_client_check_acl, ['_', '_', '_', '_'])).
 
 -endif.
