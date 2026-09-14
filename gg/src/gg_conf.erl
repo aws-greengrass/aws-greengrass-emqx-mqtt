@@ -6,6 +6,7 @@
 -module(gg_conf).
 
 -export([auth_mode/0]).
+-export([post_config_update/5]).
 
 -export([start/0, stop/0]).
 -export([receive_conf_updates/0, do_receive_conf_updates/0, request_update/0, request_update_sync/0]).
@@ -97,12 +98,14 @@ start() ->
   end,
   receive_conf_updates(),
   gg_port_driver:subscribe_to_configuration_updates(fun request_update/0),
+  emqx_config_handler:add_handler([listeners, ssl, default], ?MODULE),
   case request_update_sync() of
     ok -> ok;
     Error -> exit(Error)
   end.
 
 stop() ->
+  emqx_config_handler:remove_handler([listeners, ssl, default]),
   ?UPDATE_PROC ! stop.
 
 receive_conf_updates() ->
@@ -198,6 +201,17 @@ put_verify_fun(AuthMode) when AuthMode =/= bypass ->
 put_verify_fun(_AuthMode) ->
   %% TODO only do this workaround on startup? listener restarts will disconnect clients
   emqx_listeners:restart_listener(ssl, default, gg_listeners:get_listener_config(ssl, default)).
+
+%%--------------------------------------------------------------------
+%% Config Change Handler
+%%--------------------------------------------------------------------
+
+%% Called by emqx_config_handler after any config update to the SSL listener.
+%% Re-injects verify_fun which is lost on every listener restart because
+%% it is an in-memory Erlang fun that cannot be serialized to hocon config.
+post_config_update(_Path, _UpdateReq, _NewConf, _OldConf, _AppEnvs) ->
+  put_verify_fun(),
+  ok.
 
 %%--------------------------------------------------------------------
 %% Update Plugin Config
